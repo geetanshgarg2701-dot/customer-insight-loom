@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored DuckDB-Wasm files copied on postinstall.
+    "public/duckdb/**",
   ]),
 ]);
 
