@@ -1,13 +1,18 @@
-import * as duckdb from "@duckdb/duckdb-wasm";
+import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import { selfHostedBundles } from "./bundles";
 import { toPlainRow, type PlainRow } from "./normalize";
 
-let dbPromise: Promise<duckdb.AsyncDuckDB> | null = null;
+let dbPromise: Promise<AsyncDuckDB> | null = null;
 
-/** Starts DuckDB-Wasm once, inside its own Web Worker. Browser only. */
-export function getDuckDb(): Promise<duckdb.AsyncDuckDB> {
+/**
+ * Starts DuckDB-Wasm once, inside its own Web Worker. Browser only.
+ * The package is imported lazily: its Node entry crashes if Next evaluates
+ * it during server rendering.
+ */
+export function getDuckDb(): Promise<AsyncDuckDB> {
   if (!dbPromise) {
     dbPromise = (async () => {
+      const duckdb = await import("@duckdb/duckdb-wasm");
       const bundle = await duckdb.selectBundle(selfHostedBundles());
       const worker = new Worker(bundle.mainWorker!);
       const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
