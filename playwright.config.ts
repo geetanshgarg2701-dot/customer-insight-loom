@@ -7,7 +7,14 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: { baseURL: "http://localhost:3000", trace: "on-first-retry" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Set PW_CHANNEL=msedge or chrome to use an installed browser instead of
+  // downloading Playwright's Chromium.
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], channel: process.env.PW_CHANNEL },
+    },
+  ],
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000",
