@@ -17,6 +17,24 @@ export class TooManyColumnsError extends Error {
   }
 }
 
+export type OtherDelimiter = ";" | "\t" | "|";
+
+const DELIMITER_WORDS: Record<OtherDelimiter, string> = {
+  ";": "semicolons",
+  "\t": "tabs",
+  "|": "pipes",
+};
+
+export class UnsupportedDelimiterError extends Error {
+  constructor(public readonly delimiter: OtherDelimiter) {
+    super(
+      `This file looks like it is separated by ${DELIMITER_WORDS[delimiter]}, but only commas are supported. ` +
+        "Save it as a comma separated CSV and try again.",
+    );
+    this.name = "UnsupportedDelimiterError";
+  }
+}
+
 export class CsvParseError extends Error {
   constructor(
     message: string,

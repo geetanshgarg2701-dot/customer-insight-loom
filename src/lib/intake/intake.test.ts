@@ -4,6 +4,7 @@ import {
   EmptyFileError,
   NotLoadedError,
   TooManyColumnsError,
+  UnsupportedDelimiterError,
 } from "./errors";
 import { createIntake } from "./intake";
 import { defaultMapping } from "./mapping";
@@ -249,5 +250,65 @@ describe("parsing edge cases", () => {
     })().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CsvParseError);
     expect(String((error as Error).message)).not.toContain(secret);
+  });
+});
+
+describe("unsupported delimiters", () => {
+  it.each([
+    ["semicolon", ";", "semicolons"],
+    ["tab", "\t", "tabs"],
+    ["pipe", "|", "pipes"],
+  ])("rejects a %s separated file with a clear message", async (_label, sep, word) => {
+    const text = lines(
+      ["id", "comment", "score"].join(sep),
+      ["1", "great", "5"].join(sep),
+      ["2", "ok", "3"].join(sep),
+    );
+    const error = await intake.open(bytes(text)).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnsupportedDelimiterError);
+    expect((error as UnsupportedDelimiterError).delimiter).toBe(sep);
+    expect((error as Error).message).toContain(word);
+    expect((error as Error).message).toContain("comma");
+  });
+
+  it("rejects a header only file that is not comma separated", async () => {
+    await expect(intake.open(bytes("id;comment;score\n"))).rejects.toBeInstanceOf(
+      UnsupportedDelimiterError,
+    );
+  });
+
+  it("does not put file text into the message", async () => {
+    const error = await intake
+      .open(bytes(lines("secret_a;secret_b", "private1;private2")))
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnsupportedDelimiterError);
+    expect((error as Error).message).not.toMatch(/secret|private/);
+  });
+
+  it("still loads a one column comma file", async () => {
+    const { headers, preview } = await loadAll(bytes(lines("comment", "great", "ok")));
+    expect(headers.map((h) => h.name)).toEqual(["comment"]);
+    expect(preview.rows).toEqual([["great"], ["ok"]]);
+  });
+
+  it("still loads a one column file whose values contain a semicolon", async () => {
+    const { preview } = await loadAll(bytes(lines("comment", "great; fast", "ok; slow")));
+    expect(preview.rows).toEqual([["great; fast"], ["ok; slow"]]);
+  });
+
+  it("still loads a one column file whose header has a semicolon but whose rows do not", async () => {
+    const { headers, preview } = await loadAll(bytes(lines("notes; extra", "hello", "world")));
+    expect(headers.map((h) => h.name)).toEqual(["notes; extra"]);
+    expect(preview.rows).toEqual([["hello"], ["world"]]);
+  });
+
+  it("does not interfere with a comma file that has semicolons, tabs and pipes in quoted fields", async () => {
+    const { preview } = await loadAll(
+      bytes(lines("id,comment", '1,"a;b|c\td"', '2,"x;y"')),
+    );
+    expect(preview.rows).toEqual([
+      ["1", "a;b|c\td"],
+      ["2", "x;y"],
+    ]);
   });
 });

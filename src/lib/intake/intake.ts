@@ -6,6 +6,8 @@ import {
   NotLoadedError,
   NotOpenError,
   TooManyColumnsError,
+  UnsupportedDelimiterError,
+  type OtherDelimiter,
 } from "./errors";
 import { validateMapping } from "./mapping";
 import type {
@@ -46,6 +48,10 @@ function readCsv(width: number): string {
   );
 }
 
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 function isBlank(bytes: Uint8Array): boolean {
   let i = 0;
   if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) i = 3;
@@ -54,6 +60,29 @@ function isBlank(bytes: Uint8Array): boolean {
     if (b !== 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) return false;
   }
   return true;
+}
+
+const OTHER_DELIMITERS: OtherDelimiter[] = [";", "\t", "|"];
+
+/**
+ * A file read as one column whose header holds many semicolons, tabs or pipes
+ * is almost certainly not comma separated. To avoid flagging a real single
+ * column file, the first data row must hold the same character too.
+ * Returns null when nothing looks wrong.
+ */
+function guessOtherDelimiter(header: string, firstRow: string | null): OtherDelimiter | null {
+  let best: OtherDelimiter | null = null;
+  let bestCount = 0;
+  for (const d of OTHER_DELIMITERS) {
+    const count = header.split(d).length - 1;
+    if (count > bestCount) {
+      best = d;
+      bestCount = count;
+    }
+  }
+  if (!best) return null;
+  if (firstRow !== null && !firstRow.includes(best)) return null;
+  return best;
 }
 
 /** Turns an engine failure into a message that holds no file text. */
@@ -106,9 +135,10 @@ export function createIntake(engine: SqlEngine): Intake {
       fileRegistered = true;
 
       let first: Record<string, unknown> | undefined;
+      let second: Record<string, unknown> | undefined;
       try {
-        [first] = await engine.all(
-          `SELECT * FROM ${readCsv(MAX_COLUMNS + 1)} LIMIT 1`,
+        [first, second] = await engine.all(
+          `SELECT * FROM ${readCsv(MAX_COLUMNS + 1)} LIMIT 2`,
         );
       } catch (error) {
         await reset();
@@ -130,9 +160,18 @@ export function createIntake(engine: SqlEngine): Intake {
         await reset();
         throw new TooManyColumnsError(MAX_COLUMNS);
       }
+      if (width === 1) {
+        const headerText = stripBom(String(cells[0]));
+        const next = second ? Object.values(second)[0] : null;
+        const other = guessOtherDelimiter(headerText, next === null || next === undefined ? null : String(next));
+        if (other) {
+          await reset();
+          throw new UnsupportedDelimiterError(other);
+        }
+      }
 
       headers = cells.slice(0, width).map((cell, index) => {
-        const name = String(cell).replace(/^﻿/, "");
+        const name = stripBom(String(cell));
         return { index, name, blocked: isBlockedColumn(name) };
       });
       return headers.map((h) => ({ ...h }));
