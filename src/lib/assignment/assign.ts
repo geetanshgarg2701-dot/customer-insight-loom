@@ -83,7 +83,7 @@ export async function assignAudience(input: {
 
 const FORMULA_START = /^[=+\-@\t\r]/;
 
-function csvCell(value: string): string {
+export function csvCell(value: string): string {
   // A leading quote stops spreadsheets from running a cell as a formula.
   const safe = FORMULA_START.test(value) ? `'${value}` : value;
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;

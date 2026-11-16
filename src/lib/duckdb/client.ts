@@ -1,5 +1,6 @@
 import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import { verifyResults } from "../assignment/assign";
+import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
 import type { Intake, SqlEngine } from "../intake/types";
 import { importLedger } from "../ledger/export";
@@ -96,6 +97,17 @@ export async function importBrowserLedger(file: unknown): Promise<Ledger> {
     await engine.close?.();
   }
   return ledger;
+}
+
+/** Fills an empty shared ledger with the three synthetic demo entries, plan 6.1. */
+export async function seedBrowserDemo(): Promise<void> {
+  const ledger = await getBrowserLedger();
+  const engine = await createBrowserEngine();
+  try {
+    await seedDemoLedger({ engine, ledger });
+  } finally {
+    await engine.close?.();
+  }
 }
 
 /** Checks an uploaded results file against the stored assignment and reads out the experiment. */

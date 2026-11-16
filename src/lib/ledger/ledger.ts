@@ -15,6 +15,11 @@ export const CORRECTION_METHODS = ["benjamini_hochberg", "exploratory_label"] as
 export const ARMS = ["treatment", "control"] as const;
 /** Tables a citation may point at in demo mode. More join as their tables arrive. */
 export const CITABLE_TABLES = ["ledger_entries"] as const;
+/**
+ * Actor name for everything the demo seed does. An entry is synthetic when
+ * this actor created it. Kept in the audit trail, so it survives export and import.
+ */
+export const SYNTHETIC_ACTOR = "synthetic_demo";
 
 export type EntryStatus = (typeof STATUSES)[number];
 export type FrameworkTag = (typeof FRAMEWORK_TAGS)[number];
@@ -43,6 +48,8 @@ export type LedgerEntry = {
   status: EntryStatus;
   /** Imported entries carry times from a file, which this browser did not witness. */
   provenance: "local" | "imported";
+  /** Generated demo data, which every screen must label as synthetic. */
+  synthetic: boolean;
 };
 
 export type Citation = {
@@ -125,7 +132,9 @@ export const SCHEMA_SQL = [
 const ENTRY_SELECT = `SELECT e.*,
   CASE WHEN e.registered_at IS NULL OR e.launched_at IS NULL THEN NULL
        WHEN e.registered_at < e.launched_at THEN 'confirmatory' ELSE 'exploratory' END AS entry_type,
-  EXISTS (SELECT 1 FROM ledger_audit a WHERE a.entry_id = e.id AND a.action = 'imported') AS imported
+  EXISTS (SELECT 1 FROM ledger_audit a WHERE a.entry_id = e.id AND a.action = 'imported') AS imported,
+  EXISTS (SELECT 1 FROM ledger_audit a WHERE a.entry_id = e.id AND a.action = 'created'
+          AND a.actor = '${SYNTHETIC_ACTOR}') AS synthetic
   FROM ledger_entries e`;
 
 function parseJson(v: unknown): Json | null {
@@ -164,6 +173,7 @@ function rowToEntry(raw: Record<string, unknown>): LedgerEntry {
     correctionMethod: (r.correction_method as CorrectionMethod | null) ?? null,
     status: r.status as EntryStatus,
     provenance: r.imported ? "imported" : "local",
+    synthetic: Boolean(r.synthetic),
   };
 }
 

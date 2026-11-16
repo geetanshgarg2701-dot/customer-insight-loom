@@ -1,0 +1,192 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { assignAudience, verifyResults } from "../assignment/assign";
+import { resultRecord } from "../assignment/record";
+import { createNodeEngine } from "../intake/testing/node-engine";
+import type { SqlEngine } from "../intake/types";
+import { SYNTHETIC_ACTOR, createLedger, dropLedgerTables, type Ledger } from "../ledger/ledger";
+import { seedDemoLedger } from "./seed";
+import {
+  DEMO_DOMAIN,
+  DEMO_POOL_SIZE,
+  demoAudienceCsv,
+  demoEmail,
+  demoResultRows,
+  demoResultsCsv,
+} from "./synthetic";
+
+let engine: SqlEngine;
+let ledger: Ledger;
+
+beforeEach(async () => {
+  engine = await createNodeEngine();
+  await dropLedgerTables(engine);
+  await engine.exec("DROP TABLE IF EXISTS experiment_results");
+  ledger = await createLedger(engine, {});
+});
+
+afterEach(async () => {
+  await dropLedgerTables(engine);
+  await engine.exec("DROP TABLE IF EXISTS experiment_results");
+  await engine.close?.();
+});
+
+describe("synthetic people", () => {
+  it("uses the reserved .invalid domain, so no address can reach a real person", () => {
+    expect(DEMO_DOMAIN).toBe("example.invalid");
+    expect(demoEmail(0)).toBe("demo.person0@example.invalid");
+    expect(demoEmail(41)).toBe("demo.person41@example.invalid");
+  });
+
+  it("writes a demo audience file with an email column and no real names", () => {
+    const csv = demoAudienceCsv(5);
+    const lines = csv.split("\r\n").filter(Boolean);
+    expect(lines[0]).toBe("email,segment,signup_week");
+    expect(lines).toHaveLength(6);
+    expect(lines[1].startsWith("demo.person0@example.invalid,")).toBe(true);
+    expect(() => demoAudienceCsv(DEMO_POOL_SIZE + 1)).toThrow(RangeError);
+  });
+});
+
+describe("demo results for an entry", () => {
+  it("covers exactly the demo people assigned to the entry, with a known planted lift", async () => {
+    const entryId = (await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "u")).id;
+    const emails = Array.from({ length: 6000 }, (_, i) => demoEmail(i));
+    await assignAudience({ ledger, entryId, emails, treatmentShare: 0.5 });
+
+    const { rows, matched } = await demoResultRows({ ledger, entryId, baselineRate: 0.1, trueLift: 0.05, seed: 7 });
+    expect(matched).toBe(6000);
+    expect(rows).toHaveLength(6000);
+
+    const result = await verifyResults({ engine, ledger, entryId, rows, treatmentShare: 0.5 });
+    expect(result.verification).toMatchObject({ matched: 6000, unknown: 0, groupMismatch: 0, missing: 0 });
+    expect(result.readout.status).toBe("readable");
+    if (result.readout.status !== "readable") return;
+    const { interval } = result.readout.readout;
+    expect(interval.low).toBeLessThanOrEqual(0.05);
+    expect(interval.high).toBeGreaterThanOrEqual(0.05);
+  });
+
+  it("is the same file every time for the same entry and seed", async () => {
+    const entryId = (await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "u")).id;
+    await assignAudience({ ledger, entryId, emails: Array.from({ length: 300 }, (_, i) => demoEmail(i)), treatmentShare: 0.5 });
+    const a = await demoResultRows({ ledger, entryId, baselineRate: 0.2, trueLift: 0, seed: 3 });
+    const b = await demoResultRows({ ledger, entryId, baselineRate: 0.2, trueLift: 0, seed: 3 });
+    expect(demoResultsCsv(a.rows)).toBe(demoResultsCsv(b.rows));
+  });
+
+  it("leaves some windows open when asked, as blank converted values", async () => {
+    const entryId = (await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "u")).id;
+    await assignAudience({ ledger, entryId, emails: Array.from({ length: 2000 }, (_, i) => demoEmail(i)), treatmentShare: 0.5 });
+    const { rows } = await demoResultRows({ ledger, entryId, baselineRate: 0.2, trueLift: 0, seed: 3, pendingShare: 0.05 });
+    const open = rows.filter((r) => r.converted === "").length;
+    expect(open).toBeGreaterThan(50);
+    expect(open).toBeLessThan(150);
+  });
+
+  it("finds no one for an entry whose audience did not come from the demo pool", async () => {
+    const entryId = (await ledger.createDraft({ title: "Real", hypothesis: "H" }, "u")).id;
+    await assignAudience({ ledger, entryId, emails: ["someone@example.com"], treatmentShare: 0.5 });
+    const { matched } = await demoResultRows({ ledger, entryId, baselineRate: 0.1, trueLift: 0, seed: 1 });
+    expect(matched).toBe(0);
+  });
+
+  it("writes results as email, group, converted", () => {
+    const csv = demoResultsCsv([
+      { email: "demo.person1@example.invalid", group: "treatment", converted: "1" },
+      { email: "demo.person2@example.invalid", group: "control", converted: "" },
+    ]);
+    expect(csv.split("\r\n")).toEqual([
+      "email,group,converted",
+      "demo.person1@example.invalid,treatment,1",
+      "demo.person2@example.invalid,control,",
+      "",
+    ]);
+  });
+});
+
+describe("seedDemoLedger, plan 6.1 guided first run", () => {
+  it("creates one confirmatory readable entry, one exploratory and one running, all synthetic", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    const entries = await ledger.listEntries();
+    expect(entries).toHaveLength(3);
+    for (const e of entries) expect(e.synthetic).toBe(true);
+
+    const [confirmatory, exploratory, running] = entries;
+    expect(confirmatory).toMatchObject({ status: "readable", entryType: "confirmatory", correctionMethod: "benjamini_hochberg" });
+    expect(exploratory).toMatchObject({ entryType: "exploratory", correctionMethod: "exploratory_label" });
+    expect(running).toMatchObject({ status: "running", entryType: "confirmatory", result: null });
+    expect(await ledger.listAssignments(running.id)).not.toHaveLength(0);
+  });
+
+  it("plants known lifts, and each readout lands in a safe range around them", { timeout: 60_000 }, async () => {
+    // Assignment uses each ledger's own random secret, so the seeded readouts vary run to run.
+    // Coverage and power are measured properly by the honesty harness. Here the range is about
+    // six standard errors wide on each side, so a correct engine fails it less than once in a billion runs.
+    await seedDemoLedger({ engine, ledger });
+    const [confirmatory, exploratory] = await ledger.listEntries();
+    const c = confirmatory.result as { lift: number; interval_low: number; interval_high: number };
+    const truth = (confirmatory.design as { syntheticTrueLift: number }).syntheticTrueLift;
+    expect(truth).toBe(0.04);
+    expect(c.lift).toBeGreaterThan(truth - 0.06);
+    expect(c.lift).toBeLessThan(truth + 0.06);
+    expect(c.interval_low).toBeLessThan(c.lift);
+    expect(c.interval_high).toBeGreaterThan(c.lift);
+
+    const x = exploratory.result as { lift: number };
+    expect((exploratory.design as { syntheticTrueLift: number }).syntheticTrueLift).toBe(0);
+    expect(Math.abs(x.lift)).toBeLessThan(0.07);
+  });
+
+  it("stores no email anywhere in the exported ledger", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    const text = JSON.stringify(await ledger.exportFile());
+    expect(text).not.toContain("@");
+    expect(text).not.toContain(DEMO_DOMAIN);
+  });
+
+  it("refuses to seed a ledger that already has entries", async () => {
+    await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "u");
+    await expect(seedDemoLedger({ engine, ledger })).rejects.toThrow(/empty ledger/i);
+  });
+});
+
+describe("synthetic flag on entries", () => {
+  it("is true only for entries the demo created, and survives export and import", async () => {
+    const mine = await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "user");
+    const demo = await ledger.createDraft({ title: "Demo", hypothesis: "H" }, SYNTHETIC_ACTOR);
+    expect(mine.synthetic).toBe(false);
+    expect(demo.synthetic).toBe(true);
+    const file = await ledger.exportFile();
+    const other = await createNodeEngine({ isolated: true });
+    try {
+      const { importLedger } = await import("../ledger/export");
+      const copy = await importLedger(other, file, {});
+      const byTitle = Object.fromEntries((await copy.listEntries()).map((e) => [e.title, e]));
+      expect(byTitle.Demo.synthetic).toBe(true);
+      expect(byTitle.Mine.synthetic).toBe(false);
+    } finally {
+      await other.close?.();
+    }
+  });
+});
+
+describe("resultRecord", () => {
+  it("keeps aggregates and the method, and no identity", async () => {
+    const entryId = (await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "u")).id;
+    await assignAudience({ ledger, entryId, emails: Array.from({ length: 4000 }, (_, i) => demoEmail(i)), treatmentShare: 0.5 });
+    const { rows } = await demoResultRows({ ledger, entryId, baselineRate: 0.1, trueLift: 0.05, seed: 2 });
+    const r = await verifyResults({ engine, ledger, entryId, rows, treatmentShare: 0.5 });
+    if (r.readout.status !== "readable") throw new Error("expected readable");
+    const record = resultRecord(r.readout, r.verification, "2026-11-16T12:00:00.000Z");
+    expect(record).toMatchObject({
+      lift: r.readout.readout.lift,
+      interval_low: r.readout.readout.interval.low,
+      interval_high: r.readout.readout.interval.high,
+      srm_pass: true,
+      computed_at: "2026-11-16T12:00:00.000Z",
+      engine_version: r.readout.readout.engineVersion,
+    });
+    expect(String(record.method)).toMatch(/Newcombe/);
+    expect(JSON.stringify(record)).not.toContain("@");
+  });
+});
