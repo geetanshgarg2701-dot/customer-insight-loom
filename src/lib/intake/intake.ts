@@ -261,6 +261,38 @@ export function createIntake(engine: SqlEngine): Intake {
       };
     },
 
+    async readColumnsForMatching(indices) {
+      if (!headers) throw new NotOpenError();
+      const width = headers.length;
+      if (indices.length === 0 || indices.some((i) => !Number.isInteger(i) || i < 0 || i >= width)) {
+        throw new RangeError("Choose columns that exist in the file.");
+      }
+      const anyMissing = Array.from({ length: width }, (_, i) => `c${i} IS NULL`).join(" OR ");
+      const kind =
+        `CASE WHEN c${width} IS NOT NULL THEN 'many' ` +
+        `WHEN ${anyMissing} THEN 'few' ELSE 'ok' END`;
+      const picked = indices.map((source, i) => `NULLIF(c${source}, '') AS v${i}`).join(", ");
+      let raw: Record<string, unknown>[];
+      try {
+        raw = await engine.all(
+          `SELECT _k, ${picked} FROM (SELECT *, row_number() OVER () AS _n, ${kind} AS _k ` +
+            `FROM ${readCsv(width + 1)}) WHERE _n > 1 ORDER BY _n`,
+        );
+      } catch (error) {
+        throw toParseError(error);
+      }
+      const rows: (string | null)[][] = [];
+      let tooFewFields = 0;
+      let tooManyFields = 0;
+      for (const r of raw) {
+        const plain = toPlainRow(r);
+        if (plain._k === "few") tooFewFields++;
+        else if (plain._k === "many") tooManyFields++;
+        else rows.push(indices.map((_, i) => (plain[`v${i}`] === null ? null : String(plain[`v${i}`]))));
+      }
+      return { rows, skipped: { tooFewFields, tooManyFields } };
+    },
+
     async close() {
       await reset();
       await engine.close?.();

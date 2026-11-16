@@ -7,8 +7,12 @@ export interface SqlEngine {
   dropFile(name: string): Promise<void>;
   exec(sql: string): Promise<void>;
   all(sql: string): Promise<Record<string, unknown>[]>;
+  /** Runs SQL with `?` markers bound to params. Use this for any value that came from a person or a file. */
+  query(sql: string, params: readonly SqlParam[]): Promise<Record<string, unknown>[]>;
   close?(): Promise<void>;
 }
+
+export type SqlParam = string | number | boolean | null;
 
 export type Header = {
   index: number;
@@ -53,5 +57,14 @@ export interface Intake {
   /** Loads the included columns. Throws BlockedColumnError for a blocked column. */
   load(mapping: MappingEntry[]): Promise<LoadResult>;
   preview(): Promise<Preview>;
+  /**
+   * Raw values of chosen columns, blocked ones included, for assignment and
+   * results matching only. The caller hashes identity values at once and keeps
+   * no raw copy. Never use this to show, store or preview data.
+   */
+  readColumnsForMatching(indices: number[]): Promise<{
+    rows: (string | null)[][];
+    skipped: { tooFewFields: number; tooManyFields: number };
+  }>;
   close(): Promise<void>;
 }
