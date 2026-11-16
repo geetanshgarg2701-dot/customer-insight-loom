@@ -77,6 +77,7 @@ type Validated = {
   citations: Obj[];
   audit: Obj[];
   assignments: Obj[];
+  results: Obj[];
 };
 
 /** Checks every rule before anything is written. */
@@ -97,6 +98,8 @@ export function validateExport(file: unknown): Validated {
   const citations = list(file, "citations");
   const audit = list(file, "audit");
   const assignments = list(file, "assignments");
+  // Result versions were added after the first exports, so an older file may not have the list.
+  const results = file.results === undefined ? [] : list(file, "results");
 
   const ids = new Set<string>();
   entries.forEach((e, i) => {
@@ -172,7 +175,28 @@ export function validateExport(file: unknown): Validated {
     if (!isTime(a.assigned_at)) fail(`${n} has an invalid time.`);
   });
 
-  return { secret: file.workspace_secret, entries, citations, audit, assignments };
+  const resultIds = new Set<string>();
+  const versionKeys = new Set<string>();
+  results.forEach((r, i) => {
+    const n = `Result version ${i + 1}`;
+    if (typeof r.id !== "string" || !UUID.test(r.id)) fail(`${n} has an invalid id.`);
+    if (resultIds.has(r.id)) fail("The file has a duplicate result version id.");
+    resultIds.add(r.id);
+    if (typeof r.entry_id !== "string" || !ids.has(r.entry_id)) fail("A result version points at a missing entry.");
+    if (!Number.isInteger(r.version) || (r.version as number) < 1) fail(`${n} has an invalid version number.`);
+    const key = `${r.entry_id}:${r.version}`;
+    if (versionKeys.has(key)) fail("The file has a duplicate result version.");
+    versionKeys.add(key);
+    if (!isTime(r.recorded_at)) fail(`${n} has an invalid time.`);
+    if (!isText(r.actor) || !isText(r.reason)) fail(`${n} is missing its actor or reason.`);
+    if (!("result" in r) || r.result === undefined) fail(`${n} is missing its result.`);
+    if (!Number.isInteger(r.comparisons_count) || (r.comparisons_count as number) < 0) {
+      fail(`${n} has an invalid comparisons count.`);
+    }
+    if (!oneOf(r.correction_method, CORRECTION_METHODS, false)) fail(`${n} has an invalid correction method.`);
+  });
+
+  return { secret: file.workspace_secret, entries, citations, audit, assignments, results };
 }
 
 function json(v: unknown): string | null {
@@ -246,6 +270,33 @@ export async function importLedger(
         v.assignments.map((a): SqlParam[] => [
           ws, a.entry_id as string, a.customer_email_hash as string, a.arm as string, a.assigned_at as string,
         ]),
+      );
+
+      // Every recorded result keeps a version 1. An export from before versions existed has none, so
+      // one is made from the entry's own result, and its reason says so.
+      const newId = options.newId ?? (() => crypto.randomUUID());
+      const withVersions = new Set(v.results.map((r) => r.entry_id as string));
+      const versionRows: SqlParam[][] = v.results.map((r): SqlParam[] => [
+        r.id as string, ws, r.entry_id as string, r.version as number, r.recorded_at as string,
+        r.actor as string, r.reason as string, JSON.stringify(r.result), r.comparisons_count as number,
+        r.correction_method as string,
+      ]);
+      for (const e of v.entries) {
+        if (e.result === null || withVersions.has(e.id as string)) continue;
+        versionRows.push([
+          newId(), ws, e.id as string, 1, (e.launched_at as string | null) ?? now, "import",
+          "first readout, added on import from an export that had no versions", JSON.stringify(e.result),
+          (e.comparisons_count as number | null) ?? 0, (e.correction_method as string | null) ?? "exploratory_label",
+        ]);
+      }
+      await insertRows(
+        engine,
+        "ledger_result_versions",
+        [
+          "id", "workspace_id", "entry_id", "version", "recorded_at", "actor", "reason", "result",
+          "comparisons_count", "correction_method",
+        ],
+        versionRows,
       );
     });
   } catch {

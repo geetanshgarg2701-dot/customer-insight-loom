@@ -4,13 +4,22 @@
  * step goes through the same ledger, assignment and readout code a person
  * uses, so the demo shows the real engine. Each entry stores the true lift it
  * was generated with, so the screen can say where the readout should land.
+ *
+ * The entries are dated in the past with a clock this file controls, so each
+ * conversion window has really closed and the fixed horizon rule is not
+ * bypassed. The shared ledger keeps using real time.
  */
 import { assignAudience, verifyResults } from "../assignment/assign";
 import { resultRecord } from "../assignment/record";
 import type { SqlEngine } from "../intake/types";
-import { SYNTHETIC_ACTOR, type Ledger } from "../ledger/ledger";
+import { SYNTHETIC_ACTOR, createLedger, type Ledger } from "../ledger/ledger";
 import { powerCheck } from "../stats/power";
 import { DEMO_POOL_SIZE, demoEmail, demoResultRows } from "./synthetic";
+
+export const DEMO_WINDOW_HOURS = 168;
+
+const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 
 type DemoPlan = {
   title: string;
@@ -65,12 +74,11 @@ function sized(plan: DemoPlan) {
     minDetectableLift: plan.minDetectableLift,
     treatmentShare: plan.treatmentShare,
     audienceSize,
+    conversionWindowHours: DEMO_WINDOW_HOURS,
     syntheticTrueLift: plan.trueLift,
   };
   return { design, power: powerCheck({ ...plan, audienceSize }), audienceSize };
 }
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function draftAndAssign(ledger: Ledger, plan: DemoPlan) {
   const { design, power, audienceSize } = sized(plan);
@@ -105,7 +113,7 @@ async function readAndRecord(engine: SqlEngine, ledger: Ledger, entryId: string,
   await ledger.recordResult(
     entryId,
     {
-      result: resultRecord(verified.readout, verified.verification, new Date().toISOString()),
+      result: resultRecord(verified.readout, verified.verification, ledger.now().toISOString()),
       comparisonsCount: 1,
       correctionMethod: confirmatory ? "benjamini_hochberg" : "exploratory_label",
     },
@@ -120,32 +128,49 @@ export async function seedDemoLedger(input: { engine: SqlEngine; ledger: Ledger 
     throw new Error("Demo data goes into an empty ledger. This ledger already has entries.");
   }
 
-  // Confirmatory: registered, assigned, then launched, then read out.
+  // A clock the seed moves by hand. The workspace and secret come from the existing ledger tables.
+  const present = ledger.now().getTime();
+  let t = present - 30 * DAY_MS;
+  const sl = await createLedger(engine, { now: () => new Date(t) });
+  const at = (daysAgo: number, plusHours = 0) => {
+    t = present - daysAgo * DAY_MS + plusHours * HOUR_MS;
+  };
+
+  // Confirmatory: registered, assigned, then launched, then read out after the window closed.
   const c = PLANS.confirmatory;
-  const first = await draftAndAssign(ledger, c);
-  await ledger.register(first.entry.id, SYNTHETIC_ACTOR, { powerResult: first.power });
-  await assign(ledger, first.entry.id, c, first.audienceSize);
-  await wait(2);
-  const launched = await ledger.launch(first.entry.id, SYNTHETIC_ACTOR);
+  at(30);
+  const first = await draftAndAssign(sl, c);
+  at(30, 1);
+  await sl.register(first.entry.id, SYNTHETIC_ACTOR, { powerResult: first.power });
+  await assign(sl, first.entry.id, c, first.audienceSize);
+  at(29);
+  const launched = await sl.launch(first.entry.id, SYNTHETIC_ACTOR);
   if (launched.entryType !== "confirmatory") throw new Error("The demo confirmatory entry was not registered first.");
-  await readAndRecord(engine, ledger, first.entry.id, c, true);
+  at(21);
+  await readAndRecord(engine, sl, first.entry.id, c, true);
 
   // Exploratory: assigned and launched first, registered only afterwards.
   const x = PLANS.exploratory;
-  const second = await draftAndAssign(ledger, x);
-  await assign(ledger, second.entry.id, x, second.audienceSize);
-  await ledger.launch(second.entry.id, SYNTHETIC_ACTOR);
-  await wait(2);
-  await ledger.register(second.entry.id, SYNTHETIC_ACTOR, { powerResult: second.power });
-  await readAndRecord(engine, ledger, second.entry.id, x, false);
+  at(28);
+  const second = await draftAndAssign(sl, x);
+  await assign(sl, second.entry.id, x, second.audienceSize);
+  at(27);
+  await sl.launch(second.entry.id, SYNTHETIC_ACTOR);
+  at(26);
+  await sl.register(second.entry.id, SYNTHETIC_ACTOR, { powerResult: second.power });
+  at(19);
+  await readAndRecord(engine, sl, second.entry.id, x, false);
 
-  // Running: registered, assigned and launched, waiting for a results upload.
+  // Running: registered, assigned and launched 11 days ago. The window closed 4 days ago, so the
+  // readout is open and waiting for a results upload.
   const r = PLANS.running;
-  const third = await draftAndAssign(ledger, r);
-  await ledger.register(third.entry.id, SYNTHETIC_ACTOR, { powerResult: third.power });
-  await assign(ledger, third.entry.id, r, third.audienceSize);
-  await wait(2);
-  await ledger.launch(third.entry.id, SYNTHETIC_ACTOR);
+  at(12);
+  const third = await draftAndAssign(sl, r);
+  at(12, 1);
+  await sl.register(third.entry.id, SYNTHETIC_ACTOR, { powerResult: third.power });
+  await assign(sl, third.entry.id, r, third.audienceSize);
+  at(11);
+  await sl.launch(third.entry.id, SYNTHETIC_ACTOR);
 
   return [first.entry.id, second.entry.id, third.entry.id];
 }

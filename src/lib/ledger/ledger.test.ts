@@ -30,7 +30,12 @@ afterEach(async () => {
   await engine.close?.();
 });
 
-const DRAFT = { title: "Win back email", hypothesis: "A 10 percent offer lifts 30 day repurchase." };
+const WINDOW_HOURS = 168;
+const DRAFT = {
+  title: "Win back email",
+  hypothesis: "A 10 percent offer lifts 30 day repurchase.",
+  design: { conversionWindowHours: WINDOW_HOURS },
+};
 
 describe("entries", () => {
   it("creates a draft with no entry type yet and logs it", async () => {
@@ -125,6 +130,8 @@ describe("entries", () => {
     await ledger.register(e.id, "u");
     clock.tick();
     await ledger.launch(e.id, "u");
+    // The readout stays locked until the conversion window closes.
+    clock.tick(WINDOW_HOURS * 3600 + 1);
     const readable = await ledger.recordResult(
       e.id,
       { result, comparisonsCount: 3, correctionMethod: "benjamini_hochberg" },

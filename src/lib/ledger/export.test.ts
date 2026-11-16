@@ -17,26 +17,40 @@ afterEach(async () => {
   engines = [];
 });
 
+const WINDOW_HOURS = 168;
+
+/** A clock that moves one second per call, and can jump forward, for example past a conversion window. */
 function clock(start = "2026-11-16T09:00:00.000Z") {
   let t = Date.parse(start);
-  return () => new Date((t += 1000));
+  const now = () => new Date((t += 1000));
+  return Object.assign(now, { jump: (hours: number) => void (t += hours * 3_600_000) });
 }
 
 /** A small ledger with every kind of row: three entries in different states, a citation, assignments. */
 async function seeded(): Promise<Ledger> {
-  const ledger = await createLedger(await freshEngine(), { now: clock() });
+  const now = clock();
+  const ledger = await createLedger(await freshEngine(), { now });
   const a = await ledger.createDraft(
-    { title: "Confirmatory", hypothesis: "H1", frameworkTag: "PAS", design: { split: 0.9, mde: 0.01 } },
+    {
+      title: "Confirmatory",
+      hypothesis: "H1",
+      frameworkTag: "PAS",
+      design: { split: 0.9, mde: 0.01, conversionWindowHours: WINDOW_HOURS },
+    },
     "user_1",
   );
   await ledger.register(a.id, "user_1");
   await ledger.launch(a.id, "user_1");
+  now.jump(WINDOW_HOURS + 1);
   await ledger.recordResult(
     a.id,
     { result: { lift: 0.02, low: 0.01, high: 0.03 }, comparisonsCount: 1, correctionMethod: "benjamini_hochberg" },
     "user_1",
   );
-  const b = await ledger.createDraft({ title: "Exploratory", hypothesis: "H2" }, "user_1");
+  const b = await ledger.createDraft(
+    { title: "Exploratory", hypothesis: "H2", design: { conversionWindowHours: WINDOW_HOURS } },
+    "user_1",
+  );
   await ledger.launch(b.id, "user_1");
   await ledger.register(b.id, "user_1");
   const c = await ledger.createDraft({ title: "Draft", hypothesis: "H3" }, "ai");
@@ -58,6 +72,7 @@ describe("export", () => {
     expect(file.entries).toHaveLength(3);
     expect(file.citations).toHaveLength(1);
     expect(file.assignments).toHaveLength(2);
+    expect(file.results).toHaveLength(1);
     expect(file.audit.length).toBeGreaterThanOrEqual(8);
     // entry_type is computed, so it is never written.
     for (const e of file.entries) expect("entry_type" in e).toBe(false);
@@ -130,10 +145,15 @@ describe("import validation", { timeout: 30_000 }, () => {
   let base = "";
 
   beforeAll(async () => {
-    const source = await createLedger(await createNodeEngine({ isolated: true }), { now: clock() });
-    const a = await source.createDraft({ title: "Confirmatory", hypothesis: "H1" }, "u");
+    const now = clock();
+    const source = await createLedger(await createNodeEngine({ isolated: true }), { now });
+    const a = await source.createDraft(
+      { title: "Confirmatory", hypothesis: "H1", design: { conversionWindowHours: WINDOW_HOURS } },
+      "u",
+    );
     await source.register(a.id, "u");
     await source.launch(a.id, "u");
+    now.jump(WINDOW_HOURS + 1);
     await source.recordResult(
       a.id,
       { result: { lift: 0.02 }, comparisonsCount: 1, correctionMethod: "benjamini_hochberg" },

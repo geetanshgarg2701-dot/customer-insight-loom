@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assignAudience, verifyResults } from "../assignment/assign";
+import { verifyResultsWhenOpen } from "../assignment/gated";
+import { isReadoutOpen } from "../ledger/window";
 import { resultRecord } from "../assignment/record";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
@@ -135,6 +137,41 @@ describe("seedDemoLedger, plan 6.1 guided first run", () => {
     const x = exploratory.result as { lift: number };
     expect((exploratory.design as { syntheticTrueLift: number }).syntheticTrueLift).toBe(0);
     expect(Math.abs(x.lift)).toBeLessThan(0.07);
+  });
+
+  it("dates the demo in the past, so every conversion window has really closed", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    const [confirmatory, exploratory, running] = await ledger.listEntries();
+    const DAY = 86_400_000;
+    for (const e of [confirmatory, exploratory, running]) {
+      expect((e.design as { conversionWindowHours: number }).conversionWindowHours).toBe(168);
+      expect(Date.parse(e.launchedAt!)).toBeLessThan(Date.now() - 7 * DAY);
+      expect(isReadoutOpen(e, ledger.now())).toBe(true);
+    }
+    // The order that makes an entry confirmatory or exploratory survives the past dating.
+    expect(Date.parse(confirmatory.registeredAt!)).toBeLessThan(Date.parse(confirmatory.launchedAt!));
+    expect(Date.parse(exploratory.launchedAt!)).toBeLessThan(Date.parse(exploratory.registeredAt!));
+    // Each readable entry has exactly one result version, the first readout.
+    for (const e of [confirmatory, exploratory]) {
+      const versions = await ledger.listResults(e.id);
+      expect(versions.map((v) => [v.version, v.reason])).toEqual([[1, "first readout"]]);
+    }
+    expect(await ledger.listResults(running.id)).toEqual([]);
+  });
+
+  it("lets a visitor read out the running entry through the gate", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    const running = (await ledger.listEntries())[2];
+    const share = (running.design as { treatmentShare: number }).treatmentShare;
+    const { rows } = await demoResultRows({
+      ledger,
+      entryId: running.id,
+      baselineRate: 0.12,
+      trueLift: 0.04,
+      seed: 5,
+    });
+    const result = await verifyResultsWhenOpen({ engine, ledger, entryId: running.id, rows, treatmentShare: share });
+    expect(result.verification.unknown).toBe(0);
   });
 
   it("stores no email anywhere in the exported ledger", { timeout: 60_000 }, async () => {

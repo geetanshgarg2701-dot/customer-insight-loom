@@ -6,6 +6,7 @@
  */
 import { toPlainRow } from "../duckdb/normalize";
 import type { SqlEngine, SqlParam } from "../intake/types";
+import { assertReadoutOpen, conversionWindowHours } from "./window";
 
 export const LEDGER_SCHEMA_VERSION = 1;
 
@@ -61,6 +62,24 @@ export type Citation = {
 };
 
 export type AuditRow = { id: number; entryId: string; actor: string; action: string; at: string };
+
+/**
+ * Results are append only. Version 1 is the first readout and is also kept on the
+ * entry. Later versions never replace it, and each carries a reason.
+ */
+export type ResultVersion = {
+  id: string;
+  entryId: string;
+  version: number;
+  recordedAt: string;
+  actor: string;
+  reason: string;
+  result: Json;
+  comparisonsCount: number;
+  correctionMethod: CorrectionMethod;
+};
+
+export const FIRST_READOUT_REASON = "first readout";
 
 export type AssignmentRow = {
   entryId: string;
@@ -127,6 +146,10 @@ export const SCHEMA_SQL = [
   `CREATE TABLE IF NOT EXISTS assignments (
     workspace_id VARCHAR NOT NULL, entry_id VARCHAR NOT NULL, customer_email_hash VARCHAR NOT NULL,
     arm VARCHAR NOT NULL, assigned_at VARCHAR NOT NULL, PRIMARY KEY (entry_id, customer_email_hash))`,
+  `CREATE TABLE IF NOT EXISTS ledger_result_versions (
+    id VARCHAR PRIMARY KEY, workspace_id VARCHAR NOT NULL, entry_id VARCHAR NOT NULL, version INTEGER NOT NULL,
+    recorded_at VARCHAR NOT NULL, actor VARCHAR NOT NULL, reason VARCHAR NOT NULL, result VARCHAR NOT NULL,
+    comparisons_count INTEGER NOT NULL, correction_method VARCHAR NOT NULL, UNIQUE (entry_id, version))`,
 ];
 
 const ENTRY_SELECT = `SELECT e.*,
@@ -226,7 +249,14 @@ export async function ensureSchema(engine: SqlEngine): Promise<void> {
 
 /** Removes every ledger table. For tests and for a full reset of demo mode. */
 export async function dropLedgerTables(engine: SqlEngine): Promise<void> {
-  for (const t of ["assignments", "ledger_audit", "ledger_citations", "ledger_entries", "ledger_meta"]) {
+  for (const t of [
+    "ledger_result_versions",
+    "assignments",
+    "ledger_audit",
+    "ledger_citations",
+    "ledger_entries",
+    "ledger_meta",
+  ]) {
     await engine.exec(`DROP TABLE IF EXISTS ${t}`);
   }
 }
@@ -250,15 +280,23 @@ export async function insertRows(
 
 export interface Ledger {
   readonly workspaceId: string;
+  /** The clock this ledger stamps with. Checks that gate on time use it, so they agree with the stamps. */
+  now(): Date;
   createDraft(input: DraftInput, actor: string): Promise<LedgerEntry>;
   update(id: string, patch: EntryPatch, actor: string): Promise<LedgerEntry>;
   register(id: string, actor: string, extras?: { powerResult?: Json }): Promise<LedgerEntry>;
+  /** Needs a conversion window in the design, so the readout knows when it may open. */
   launch(id: string, actor: string): Promise<LedgerEntry>;
+  /**
+   * Refused until the conversion window closes. The first call records the result.
+   * Later calls add a numbered version and need a reason. Nothing is overwritten.
+   */
   recordResult(
     id: string,
-    input: { result: Json; comparisonsCount: number; correctionMethod: CorrectionMethod },
+    input: { result: Json; comparisonsCount: number; correctionMethod: CorrectionMethod; reason?: string },
     actor: string,
   ): Promise<LedgerEntry>;
+  listResults(entryId: string): Promise<ResultVersion[]>;
   close(id: string, actor: string): Promise<LedgerEntry>;
   getEntry(id: string): Promise<LedgerEntry>;
   listEntries(): Promise<LedgerEntry[]>;
@@ -281,6 +319,8 @@ export type LedgerExportFile = {
   citations: Record<string, unknown>[];
   audit: Record<string, unknown>[];
   assignments: Record<string, unknown>[];
+  /** Added after schema version 1 shipped. Optional on import, so older exports still load. */
+  results: Record<string, unknown>[];
 };
 
 /** Opens the ledger in this store, creating its tables and workspace on first use. */
@@ -334,8 +374,32 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
     checkText(actor, "Actor");
   }
 
+  async function insertVersion(
+    entryId: string,
+    version: number,
+    actor: string,
+    reason: string,
+    input: { result: Json; comparisonsCount: number },
+    correction: CorrectionMethod,
+  ): Promise<void> {
+    await engine.query("INSERT INTO ledger_result_versions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      newId(),
+      workspaceId,
+      entryId,
+      version,
+      stamp(),
+      actor,
+      reason,
+      toJsonParam(input.result) ?? "null",
+      input.comparisonsCount,
+      correction,
+    ]);
+  }
+
   const ledger: Ledger = {
     workspaceId,
+
+    now: () => now(),
 
     async createDraft(input, actor) {
       checkActor(actor);
@@ -404,6 +468,11 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
       if (e.status !== "draft" && e.status !== "registered") {
         throw new LedgerStateError("Only a draft or registered entry can launch.");
       }
+      if (conversionWindowHours(e.design) === null) {
+        throw new LedgerStateError(
+          "Set a conversion window in the design before launching, so the readout knows when it may open.",
+        );
+      }
       await setColumns(id, { launched_at: stamp(), status: "running" });
       await audit(id, actor, "launched");
       return getEntry(id);
@@ -420,14 +489,48 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
       if (e.launchedAt === null || (e.status !== "running" && e.status !== "readable")) {
         throw new LedgerStateError("A result can only be recorded for a launched, open entry.");
       }
-      await setColumns(id, {
-        result: toJsonParam(input.result),
-        comparisons_count: input.comparisonsCount,
-        correction_method: correction,
-        status: "readable",
-      });
-      await audit(id, actor, "result_recorded");
+      // The fixed horizon rule. Nothing below runs, and nothing is written, before the window closes.
+      assertReadoutOpen(e, now());
+
+      const [latest] = (
+        await engine.query("SELECT coalesce(max(version), 0) AS v FROM ledger_result_versions WHERE entry_id = ?", [id])
+      ).map(toPlainRow);
+      const nextVersion = Number(latest.v) + 1;
+
+      if (e.result === null) {
+        await setColumns(id, {
+          result: toJsonParam(input.result),
+          comparisons_count: input.comparisonsCount,
+          correction_method: correction,
+          status: "readable",
+        });
+        await insertVersion(id, nextVersion, actor, FIRST_READOUT_REASON, input, correction);
+        await audit(id, actor, "result_recorded");
+      } else {
+        const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+        if (reason === "") throw new RangeError("A new result version needs a reason.");
+        await insertVersion(id, nextVersion, actor, reason, input, correction);
+        await audit(id, actor, "result_version_recorded");
+      }
       return getEntry(id);
+    },
+
+    async listResults(entryId) {
+      return (
+        await engine.query("SELECT * FROM ledger_result_versions WHERE entry_id = ? ORDER BY version", [entryId])
+      )
+        .map(toPlainRow)
+        .map((r) => ({
+          id: String(r.id),
+          entryId: String(r.entry_id),
+          version: Number(r.version),
+          recordedAt: String(r.recorded_at),
+          actor: String(r.actor),
+          reason: String(r.reason),
+          result: parseJson(r.result),
+          comparisonsCount: Number(r.comparisons_count),
+          correctionMethod: r.correction_method as CorrectionMethod,
+        }));
     },
 
     async close(id, actor) {
@@ -581,6 +684,19 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
           arm: r.arm,
           assigned_at: r.assigned_at,
         }));
+      const results = (await engine.all("SELECT * FROM ledger_result_versions ORDER BY entry_id, version"))
+        .map(toPlainRow)
+        .map((r) => ({
+          id: r.id,
+          entry_id: r.entry_id,
+          version: Number(r.version),
+          recorded_at: r.recorded_at,
+          actor: r.actor,
+          reason: r.reason,
+          result: parseJson(r.result),
+          comparisons_count: Number(r.comparisons_count),
+          correction_method: r.correction_method,
+        }));
       return {
         schema_version: LEDGER_SCHEMA_VERSION,
         exported_at: stamp(),
@@ -590,6 +706,7 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
         citations,
         audit: auditRows,
         assignments,
+        results,
       };
     },
   };

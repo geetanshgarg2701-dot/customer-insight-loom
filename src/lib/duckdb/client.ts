@@ -1,5 +1,6 @@
 import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
-import { verifyResults } from "../assignment/assign";
+import type { verifyResults } from "../assignment/assign";
+import { verifyResultsWhenOpen } from "../assignment/gated";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
 import type { Intake, SqlEngine } from "../intake/types";
@@ -117,7 +118,7 @@ export async function verifyBrowserResults(
   const ledger = await getBrowserLedger();
   const engine = await createBrowserEngine();
   try {
-    return await verifyResults({ ...input, engine, ledger });
+    return await verifyResultsWhenOpen({ ...input, engine, ledger });
   } finally {
     await engine.close?.();
   }
