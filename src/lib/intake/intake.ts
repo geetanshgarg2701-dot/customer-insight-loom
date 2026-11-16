@@ -1,4 +1,5 @@
 import { isBlockedColumn } from "../redaction/columns";
+import { detectAll } from "../redaction/detectors";
 import { toPlainRow } from "../duckdb/normalize";
 import {
   CsvParseError,
@@ -171,8 +172,12 @@ export function createIntake(engine: SqlEngine): Intake {
       }
 
       headers = cells.slice(0, width).map((cell, index) => {
-        const name = stripBom(String(cell));
-        return { index, name, blocked: isBlockedColumn(name) };
+        const raw = stripBom(String(cell));
+        const blocked = isBlockedColumn(raw);
+        // A header that holds personal data, as in a file with no header row,
+        // is shown as a position so the data never reaches the screen.
+        const looksLikeData = detectAll(raw).length > 0;
+        return { index, name: looksLikeData ? `Column ${index + 1}` : raw, blocked };
       });
       return headers.map((h) => ({ ...h }));
     },

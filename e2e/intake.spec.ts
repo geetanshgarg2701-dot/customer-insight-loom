@@ -44,6 +44,24 @@ test("blocks identity columns and previews only the allowed ones", async ({ page
   }
 });
 
+test("a file with no header row never shows its first row on the page", async ({ page }) => {
+  await chooseFile(
+    page,
+    "no-header.csv",
+    "jane.doe@example.com,555-123-4567,great" + String.fromCharCode(10) + "sam.lee@example.com,555-987-6543,slow" + String.fromCharCode(10),
+  );
+
+  for (const masked of ["Column 1", "Column 2"]) {
+    const box = page.getByLabel(`Load column ${masked}`, { exact: true });
+    await expect(box).toBeDisabled();
+    await expect(box).not.toBeChecked();
+  }
+  const body = await page.locator("body").innerText();
+  for (const secret of ["jane.doe", "example.com", "555-123-4567"]) {
+    expect(body).not.toContain(secret);
+  }
+});
+
 test("reads the file with self-hosted DuckDB and sends nothing off the origin", async ({
   page,
   context,

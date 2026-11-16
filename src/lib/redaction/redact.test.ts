@@ -49,9 +49,9 @@ describe("redact: card", () => {
     expect(redact("3782 822463 10005").text).toBe("[CARD]");
   });
 
-  it("does not replace a 16 digit number that fails the Luhn test", () => {
+  it("replaces a 16 digit number that fails the Luhn test, because a mistyped card is still a card", () => {
     const r = redact("tracking 4242 4242 4242 4241 here");
-    expect(r.findings.filter((f) => f.type === "card")).toEqual([]);
+    expect(r.text).toBe("tracking [CARD] here");
   });
 });
 
@@ -109,7 +109,7 @@ describe("redact: general behavior", () => {
 
   it("counts findings per type", () => {
     const r = redact("a@example.com b@example.com 202-555-0143");
-    expect(r.counts).toEqual({ email: 2, phone: 1, card: 0, address: 0 });
+    expect(r.counts).toEqual({ email: 2, phone: 1, card: 0, address: 0, ssn: 0, ip: 0 });
   });
 
   it("a card number is not also reported as a phone", () => {
@@ -128,7 +128,7 @@ describe("redact: general behavior", () => {
     expect(redact("")).toEqual({
       text: "",
       findings: [],
-      counts: { email: 0, phone: 0, card: 0, address: 0 },
+      counts: { email: 0, phone: 0, card: 0, address: 0, ssn: 0, ip: 0 },
     });
   });
 

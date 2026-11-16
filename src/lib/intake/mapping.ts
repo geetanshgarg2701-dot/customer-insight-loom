@@ -1,4 +1,4 @@
-import { assertColumnAllowed } from "../redaction/columns";
+import { BlockedColumnError, assertColumnAllowed } from "../redaction/columns";
 import { MappingError } from "./errors";
 import type { Header, MappingEntry } from "./types";
 
@@ -22,8 +22,8 @@ export function defaultMapping(headers: readonly Header[]): MappingEntry[] {
 
 /**
  * Throws if the mapping may not be loaded. The blocked check runs the shared
- * redaction rule on the original header text and on the new name, and it does
- * not trust the blocked flag stored on the header.
+ * redaction rule on the header name and on the new name, and it also honors the
+ * blocked flag the intake set from the original header text.
  */
 export function validateMapping(
   headers: readonly Header[],
@@ -35,6 +35,9 @@ export function validateMapping(
     if (!entry.include) continue;
     const header = Number.isInteger(entry.source) ? headers[entry.source] : undefined;
     if (!header) throw new MappingError(`Source column ${entry.source} does not exist.`);
+    // The stored flag comes from the original text, which a masked name no
+    // longer shows, so it is checked as well as the shared rule on the name.
+    if (header.blocked) throw new BlockedColumnError();
     assertColumnAllowed(header.name);
 
     const target = entry.target.trim();

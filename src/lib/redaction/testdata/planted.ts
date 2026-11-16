@@ -234,7 +234,7 @@ export function generatePlanted(seed = 20260101): PlantedItem[] {
   return items;
 }
 
-export type Finding = { type: PlantedType; start: number; end: number };
+export type Finding = { type: string; start: number; end: number };
 export type RedactFn = (text: string) => { findings: readonly Finding[] };
 
 export type TypeScore = { type: PlantedType; total: number; caught: number; missed: number };

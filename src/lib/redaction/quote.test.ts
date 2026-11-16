@@ -16,7 +16,7 @@ describe("redactQuote", () => {
     });
     expect(q.text).toBe("Mail [EMAIL] or call [PHONE].");
     expect(q.stamp.passed).toBe(true);
-    expect(q.stamp.counts).toEqual({ email: 1, phone: 1, card: 0, address: 0 });
+    expect(q.stamp.counts).toEqual({ email: 1, phone: 1, card: 0, address: 0, ssn: 0, ip: 0 });
     expect(isRedactedQuote(q)).toBe(true);
   });
 
@@ -54,7 +54,7 @@ describe("quote store: an unredacted quote cannot be saved", () => {
     const forged = {
       text: "Mail jane@example.com",
       sourceColumn: "comment",
-      stamp: { passed: true, ruleVersion: "1", counts: { email: 0, phone: 0, card: 0, address: 0 } },
+      stamp: { passed: true, ruleVersion: "2", counts: { email: 0, phone: 0, card: 0, address: 0, ssn: 0, ip: 0 } },
     } as unknown as RedactedQuote;
     expect(() => store.saveQuote(forged)).toThrow(UnredactedQuoteError);
     expect(store.list()).toHaveLength(0);

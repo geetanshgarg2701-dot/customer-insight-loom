@@ -1,6 +1,6 @@
 # Redaction module: measured results and known limits
 
-Measured on commit ff0f5e6, Thursday November 12, 2026. Source: the planted set run in `src/lib/redaction/testdata/planted.ts`, scored by `planted.test.ts`.
+First measured on commit ff0f5e6, Thursday November 12, 2026. Rules updated to version 2 on Monday November 16, 2026, and the planted set was run again. Source: the planted set run in `src/lib/redaction/testdata/planted.ts`, scored by `planted.test.ts`.
 
 ## What was measured
 
@@ -14,7 +14,7 @@ The planted set has 200 synthetic items, 50 per type. Emails use reserved exampl
 | address | 50 | 46 | 4 |
 | all | 200 | 188 | 12 |
 
-The whole project had 97 passing tests at this commit, and `tsc --noEmit` was clean.
+The result is unchanged at version 2, because the planted set has no social security numbers or IP addresses and every planted card already had a valid checksum. The whole project had 419 passing tests after the version 2 change, and `tsc --noEmit` was clean.
 
 One real bug was found and fixed after the first run. The generic street rule matched "79684 in the new place" because "place" counts as a street suffix, and that match won over the PO box rule, so "PO Box" stayed readable. The PO box rule now runs first. Before the fix the address row was 45 of 50.
 
@@ -26,6 +26,19 @@ These are known limits for v1. They are not being tuned away, because tuning rul
 - **Spelled-out phones, 2:** a number written as words. Not detected.
 - **No street suffix, 3:** "8073 Broadway", "290 Route 93" and "164 Route 82". Not detected.
 - **Suffix in the middle, 1:** "8123 County Road 72". Partly matched, so part of the address would still show.
+
+## Rule version 2 changes
+
+- **Emails** are found by a bounded scan outward from each at sign, so time grows with the input length. Letters and digits from any script count, invisible characters inside an address are read as part of it, and `%40` and the full width at sign work as the at sign. The old single pattern took 8.7 seconds on one 100,000 character token.
+- **Cards** are any run of 13 to 19 digits with up to two spaces, dots or dashes between digits, with no checksum test. A mistyped card number is still a card number. Runs of 12 or fewer digits and 20 or more digits are left alone.
+- **New types:** US social security numbers written with dashes or spaces, and IPv4 addresses with no part above 255. Nine bare digits are not matched.
+- **Columns:** a column name that itself holds personal data is blocked, errors never repeat the column text, and a file with no header row shows its first row as "Column 1", "Column 2" and so on, never as the values.
+- **Quotes:** text over 20,000 characters is refused, not cut. A source column over 200 characters, or one that holds personal data, is refused. The store hands out frozen copies.
+- **Over-redaction is now possible and accepted:** a four part version string such as 1.2.3.4 reads as an IP address, and a 13 digit timestamp reads as a card.
+
+## Not covered in version 2
+
+Date of birth, seven digit phones, city and ZIP code, non-US postcodes and street formats, IBAN, social media handles and URLs, order numbers, IPv6, full width digits, and obfuscated forms such as "jane at example dot com".
 
 ## Other limits
 
@@ -39,6 +52,6 @@ These are known limits for v1. They are not being tuned away, because tuning rul
 
 - `saveQuote` accepts only a `RedactedQuote`. A plain object is a compile-time error, checked by `@ts-expect-error` in `quote.test.ts`.
 - A cast can forge a brand, so `redactQuote` also records each quote it issues in a private `WeakSet`, and `saveQuote` throws `UnredactedQuoteError` for anything not in it. Tests cover a plain object, a forged cast, a spread copy and a JSON round trip.
-- `redactQuote` throws `BlockedColumnError` for identity columns such as email, name, phone and address. It also re-runs redaction on its own output and refuses to issue a stamp if anything is still found.
+- `redactQuote` throws `BlockedColumnError` for identity columns such as email, name, phone and address, and `SourceColumnError` or `QuoteTooLongError` for the cases above. It also re-runs redaction on its own output and refuses to issue a stamp if anything is still found.
 - Column rules fail closed. `ip_address` and `email_sent_count` are blocked too. `campaign_name` and `product_name` are allowed.
 - The database side of this, a constraint that rejects quote rows without a redaction pass stamp, is still to come with the Supabase schema.

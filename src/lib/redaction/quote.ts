@@ -1,4 +1,5 @@
 import { assertColumnAllowed } from "./columns";
+import { detectAll } from "./detectors";
 import { redact } from "./redact";
 import { RULE_VERSION, type RedactionCounts } from "./types";
 
@@ -38,11 +39,34 @@ export class UnredactedQuoteError extends Error {
   }
 }
 
+/** Longest text accepted. Longer text is refused, never cut. */
+export const MAX_QUOTE_CHARS = 20000;
+const MAX_SOURCE_COLUMN_CHARS = 200;
+
+export class QuoteTooLongError extends Error {
+  constructor() {
+    super(`Quote text is longer than ${MAX_QUOTE_CHARS} characters and was refused, not cut.`);
+    this.name = "QuoteTooLongError";
+  }
+}
+
+/** Never repeats the column text, which may itself be personal data. */
+export class SourceColumnError extends Error {
+  constructor() {
+    super("The source column name was refused because it is too long or looks like personal data.");
+    this.name = "SourceColumnError";
+  }
+}
+
 const issued = new WeakSet<object>();
 
 /** The only way to make a RedactedQuote. */
 export function redactQuote(input: UnredactedQuote): RedactedQuote {
+  if (input.sourceColumn.length > MAX_SOURCE_COLUMN_CHARS || detectAll(input.sourceColumn).length > 0) {
+    throw new SourceColumnError();
+  }
   assertColumnAllowed(input.sourceColumn);
+  if (input.text.length > MAX_QUOTE_CHARS) throw new QuoteTooLongError();
   const result = redact(input.text);
   // Verify: redacted text must itself be clean, or the pass is refused.
   if (redact(result.text).findings.length > 0) {
@@ -77,14 +101,16 @@ export function createQuoteStore() {
   return {
     saveQuote(quote: RedactedQuote): void {
       if (!isRedactedQuote(quote)) throw new UnredactedQuoteError();
-      records.push({
-        text: quote.text,
-        sourceColumn: quote.sourceColumn,
-        ruleVersion: quote.stamp.ruleVersion,
-      });
+      records.push(
+        Object.freeze({
+          text: quote.text,
+          sourceColumn: quote.sourceColumn,
+          ruleVersion: quote.stamp.ruleVersion,
+        }),
+      );
     },
     list(): readonly StoredQuote[] {
-      return records;
+      return Object.freeze([...records]);
     },
   };
 }

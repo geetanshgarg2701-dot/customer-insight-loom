@@ -1,3 +1,5 @@
+import { detectAll } from "./detectors";
+
 /**
  * Column-level block list. A column that looks like an identity field must
  * never feed quote storage, whatever its values look like.
@@ -8,9 +10,10 @@
  * customer, ...). Names such as campaign_name or product_name are allowed.
  */
 
+/** The message and fields never hold the column text, which may itself be personal data. */
 export class BlockedColumnError extends Error {
-  constructor(public readonly column: string) {
-    super(`Column "${column}" is an identity column and cannot feed quote storage.`);
+  constructor() {
+    super("A column was refused because it looks like an identity column.");
     this.name = "BlockedColumnError";
   }
 }
@@ -40,6 +43,9 @@ function tokens(column: string): string[] {
 }
 
 export function isBlockedColumn(column: string): boolean {
+  // A header that is really data, such as an email address in a file with no
+  // header row, is blocked whatever its words are.
+  if (detectAll(column).length > 0) return true;
   const t = tokens(column);
   if (t.length === 0) return true; // unreadable name: fail closed
   if (t.join("") === "email") return true; // e-mail
@@ -51,7 +57,7 @@ export function isBlockedColumn(column: string): boolean {
 }
 
 export function assertColumnAllowed(column: string): void {
-  if (isBlockedColumn(column)) throw new BlockedColumnError(column);
+  if (isBlockedColumn(column)) throw new BlockedColumnError();
 }
 
 export function partitionColumns(columns: readonly string[]): {
