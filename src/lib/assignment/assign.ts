@@ -26,7 +26,7 @@ export type AssignResult = {
   rows: AssignedRow[];
 };
 
-function shareToThreshold(share: number): number {
+export function shareToThreshold(share: number): number {
   const pct = share * 100;
   if (!Number.isFinite(share) || share <= 0 || share >= 1 || Math.abs(pct - Math.round(pct)) > 1e-9) {
     throw new RangeError("Treatment share must be a whole percent from 1 to 99 percent.");

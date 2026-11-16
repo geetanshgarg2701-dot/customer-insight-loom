@@ -159,3 +159,64 @@ test("tells the user when an upload has no email column to match", async ({ page
   await expect(assign.getByLabel("Email column")).toBeVisible({ timeout: 30_000 });
   await expect(assign.getByRole("button", { name: "Assign audience" })).toBeDisabled();
 });
+
+test("rebuilds the same assignment file in a new session, and never leaks it to another entry", async ({ page }) => {
+  test.setTimeout(180_000);
+  await createEntry(page, "Rebuild check");
+  const design = page.getByRole("region", { name: "Design and power check" });
+  await design.getByLabel("Baseline conversion rate, percent").fill("30");
+  await design.getByLabel("Smallest lift to detect, percentage points").fill("15");
+  await design.getByLabel("Treatment share, percent").fill("50");
+  await design.getByLabel("People available").fill(String(N));
+  await design.getByRole("button", { name: "Run power check" }).click();
+  await design.getByRole("button", { name: "Register entry" }).click();
+  await expect(page.getByText("Status: registered")).toBeVisible();
+
+  const assign = page.getByRole("region", { name: "Assignment" });
+  const audience = { name: "audience.csv", mimeType: "text/csv", buffer: Buffer.from(audienceCsv()) };
+  await assign.getByLabel("Audience CSV").setInputFiles(audience);
+  await expect(assign.getByLabel("Email column")).toHaveValue("0", { timeout: 30_000 });
+  await assign.getByRole("button", { name: "Assign audience" }).click();
+  await expect(assign.getByText(`Assigned ${N} people`)).toBeVisible({ timeout: 60_000 });
+  const [first] = await Promise.all([
+    page.waitForEvent("download"),
+    assign.getByRole("button", { name: "Download assignment file" }).click(),
+  ]);
+  const original = fs.readFileSync((await first.path())!, "utf8");
+
+  // A second entry must not inherit the first entry's assignment or its download.
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await page.getByLabel("Title", { exact: true }).fill("Other entry");
+  await page.getByLabel("Hypothesis").fill("H");
+  await page.getByRole("button", { name: "Create draft" }).click();
+  await page.getByRole("link", { name: "Other entry" }).click();
+  await expect(page.getByRole("heading", { name: "Other entry" })).toBeVisible({ timeout: 30_000 });
+  await expect(assign.getByRole("button", { name: "Download assignment file" })).toHaveCount(0);
+  await expect(assign.getByText(/Assigned \d+ people/)).toHaveCount(0);
+
+  // Export, then reload. A new session starts with an empty ledger, so the download is gone.
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  const [exported] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export ledger" }).click(),
+  ]);
+  const exportPath = (await exported.path())!;
+  await page.goto("/ledger");
+  await expect(page.getByText("No entries yet")).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel("Import ledger file").setInputFiles(exportPath);
+  await expect(page.getByText("Imported 2 entries.")).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("link", { name: "Rebuild check" }).click();
+  await expect(assign.getByText(`${N} people were assigned earlier`)).toBeVisible({ timeout: 30_000 });
+  await expect(assign.getByRole("button", { name: "Download assignment file" })).toHaveCount(0);
+
+  await assign.getByLabel("Audience CSV").setInputFiles(audience);
+  await expect(assign.getByLabel("Email column")).toHaveValue("0", { timeout: 30_000 });
+  await assign.getByRole("button", { name: "Rebuild assignment file" }).click();
+  await expect(assign.getByText(`Rebuilt the file for ${N} of ${N} assigned people.`)).toBeVisible({ timeout: 60_000 });
+  const [second] = await Promise.all([
+    page.waitForEvent("download"),
+    assign.getByRole("button", { name: "Download assignment file" }).click(),
+  ]);
+  expect(fs.readFileSync((await second.path())!, "utf8")).toBe(original);
+  expect(await page.locator("body").innerText()).not.toContain("@example.com");
+});
