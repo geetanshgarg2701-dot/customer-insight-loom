@@ -132,8 +132,8 @@ export function EntryView() {
       <p>Hypothesis: {entry.hypothesis}</p>
       {entry.frameworkTag && <p>Framework tag: {entry.frameworkTag}</p>}
 
-      <DesignSection entry={entry} ledger={ledger} onChange={load} />
-      <AssignmentSection entry={entry} ledger={ledger} assignedCount={assigned} onChange={load} />
+      <DesignSection key={`design-${entry.id}`} entry={entry} ledger={ledger} onChange={load} />
+      <AssignmentSection key={`assign-${entry.id}`} entry={entry} ledger={ledger} assignedCount={assigned} onChange={load} />
 
       <section aria-labelledby="launch-h">
         <h2 id="launch-h">Launch</h2>
@@ -153,7 +153,7 @@ export function EntryView() {
         {!entry.launchedAt && assigned === 0 && <p>Assign the audience first.</p>}
       </section>
 
-      {entry.launchedAt && <ResultsSection entry={entry} ledger={ledger} onChange={load} />}
+      {entry.launchedAt && <ResultsSection key={`results-${entry.id}`} entry={entry} ledger={ledger} onChange={load} />}
 
       <section aria-labelledby="history-h">
         <h2 id="history-h">History</h2>
