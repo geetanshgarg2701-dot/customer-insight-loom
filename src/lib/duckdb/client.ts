@@ -1,6 +1,8 @@
 import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
+import { verifyResults } from "../assignment/assign";
 import { createIntake } from "../intake/intake";
 import type { Intake, SqlEngine } from "../intake/types";
+import { importLedger } from "../ledger/export";
 import { createLedger, type Ledger, type LedgerOptions } from "../ledger/ledger";
 import { selfHostedBundles } from "./bundles";
 
@@ -66,4 +68,45 @@ export async function createBrowserIntake(): Promise<Intake> {
 /** The demo mode ledger, kept in the same in-browser database. Persisted only by its export file. */
 export async function createBrowserLedger(options: LedgerOptions = {}): Promise<Ledger> {
   return createLedger(await createBrowserEngine(), options);
+}
+
+let ledgerPromise: Promise<Ledger> | null = null;
+
+/**
+ * The one ledger every screen shares. It lives as long as this page does, so
+ * moving between screens keeps it and a full page load starts it empty.
+ */
+export function getBrowserLedger(): Promise<Ledger> {
+  if (!ledgerPromise) {
+    ledgerPromise = createBrowserLedger();
+    ledgerPromise.catch(() => {
+      ledgerPromise = null;
+    });
+  }
+  return ledgerPromise;
+}
+
+/** Imports an export file into the shared ledger, which must be empty. Throws LedgerImportError otherwise. */
+export async function importBrowserLedger(file: unknown): Promise<Ledger> {
+  const ledger = await getBrowserLedger();
+  const engine = await createBrowserEngine();
+  try {
+    await importLedger(engine, file, {});
+  } finally {
+    await engine.close?.();
+  }
+  return ledger;
+}
+
+/** Checks an uploaded results file against the stored assignment and reads out the experiment. */
+export async function verifyBrowserResults(
+  input: Omit<Parameters<typeof verifyResults>[0], "engine" | "ledger">,
+): ReturnType<typeof verifyResults> {
+  const ledger = await getBrowserLedger();
+  const engine = await createBrowserEngine();
+  try {
+    return await verifyResults({ ...input, engine, ledger });
+  } finally {
+    await engine.close?.();
+  }
 }
