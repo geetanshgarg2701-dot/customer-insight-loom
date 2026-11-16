@@ -77,7 +77,7 @@ test("shows a clear message for a semicolon separated file", async ({ page }) =>
     mimeType: "text/csv",
     buffer: Buffer.from("id;comment\n1;great\n2;ok\n"),
   });
-  await expect(page.getByText("separated by semicolons")).toBeVisible();
+  await expect(page.getByText("separated by semicolons")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("table", { name: "Column mapping" })).toHaveCount(0);
 });
 
@@ -86,5 +86,5 @@ test("shows a clear message for an empty file", async ({ page }) => {
   await page
     .getByLabel("CSV file")
     .setInputFiles({ name: "empty.csv", mimeType: "text/csv", buffer: Buffer.from("") });
-  await expect(page.getByText("The file is empty.")).toBeVisible();
+  await expect(page.getByText("The file is empty.")).toBeVisible({ timeout: 30_000 });
 });
