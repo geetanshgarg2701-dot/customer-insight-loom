@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatPoints } from "@/lib/app/format";
 import { getBrowserLedger } from "@/lib/duckdb/client";
+import { readoutOpensAt } from "@/lib/ledger/window";
 import type { AuditRow, Ledger, LedgerEntry } from "@/lib/ledger/ledger";
 import { Nav } from "../../nav";
 import { AssignmentSection } from "./assignment-section";
@@ -142,7 +143,10 @@ export function EntryView() {
           exploratory. Send from your own tool, using the assignment file, then launch here.
         </p>
         {entry.launchedAt ? (
-          <p>Launched at {entry.launchedAt}.</p>
+          <p>
+            Launched at {entry.launchedAt}.
+            {readoutOpensAt(entry) ? ` Results unlock at ${readoutOpensAt(entry)!.toISOString()}.` : ""}
+          </p>
         ) : (
           <p>
             <button type="button" disabled={busy || !canLaunch} onClick={() => void onLaunch()}>

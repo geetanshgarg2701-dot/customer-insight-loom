@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { guessColumn } from "@/lib/app/columns";
 import { formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
 import { downloadText } from "@/lib/app/download";
@@ -8,7 +8,8 @@ import { verifyBrowserResults } from "@/lib/duckdb/client";
 import type { Verification } from "@/lib/assignment/assign";
 import { resultRecord } from "@/lib/assignment/record";
 import { demoResultRows, demoResultsCsv, seedFromId } from "@/lib/demo/synthetic";
-import type { Ledger, LedgerEntry } from "@/lib/ledger/ledger";
+import type { Ledger, LedgerEntry, ResultVersion } from "@/lib/ledger/ledger";
+import { ReadoutLockedError, assertReadoutOpen } from "@/lib/ledger/window";
 import type { ExperimentReadout } from "@/lib/stats/experiment";
 import { useCsvColumns } from "./use-csv-columns";
 
@@ -43,9 +44,40 @@ export function ResultsSection({
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [versions, setVersions] = useState<ResultVersion[]>([]);
+  const [reason, setReason] = useState("");
+  const [, setTick] = useState(0);
 
   const share = treatmentShareOf(entry);
   const names = csv.headers?.map((h) => h.name);
+
+  // The fixed horizon rule. The screen asks the same check the ledger enforces, with the ledger's clock.
+  let lockMessage: string | null = null;
+  try {
+    assertReadoutOpen(entry, ledger.now());
+  } catch (e) {
+    lockMessage = e instanceof ReadoutLockedError ? e.message : "Results are locked.";
+  }
+  const locked = lockMessage !== null;
+  const launched = entry.status === "running" || entry.status === "readable";
+
+  // While locked, look at the clock once a second so the section opens by itself when the window closes.
+  useEffect(() => {
+    if (!locked || !launched) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [locked, launched]);
+
+  // Every recorded version of the result, oldest first.
+  useEffect(() => {
+    let cancelled = false;
+    void ledger.listResults(entry.id).then((list) => {
+      if (!cancelled) setVersions(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ledger, entry.id, entry.result, entry.status]);
 
   // The person's own choices win. Until then columns named like email, group and converted are pre-selected.
   const cols = {
@@ -86,12 +118,15 @@ export function ResultsSection({
         entry.id,
         {
           // Aggregates only. No email, no hash and no row level data.
-          result: resultRecord(outcome.readout, outcome.verification, new Date().toISOString()),
+          result: resultRecord(outcome.readout, outcome.verification, ledger.now().toISOString()),
           comparisonsCount: 1,
           correctionMethod: entry.entryType === "confirmatory" ? "benjamini_hochberg" : "exploratory_label",
+          // The first result needs no reason. Any later one is a new version and must say why.
+          reason: entry.result === null ? undefined : reason,
         },
         "user",
       );
+      setReason("");
       await onChange();
     } catch (e) {
       setError(messageOf(e));
@@ -176,7 +211,15 @@ export function ResultsSection({
       {error && <p role="alert">{error}</p>}
       {csv.error && <p role="alert">{csv.error}</p>}
 
-      {entry.status === "running" || entry.status === "readable" ? (
+      {launched && locked && (
+        <>
+          <p role="status">Results are locked.</p>
+          <p>{lockMessage}</p>
+          <p>The upload opens by itself when the window closes. Nothing is read out and nothing is created before then.</p>
+        </>
+      )}
+
+      {launched && !locked ? (
         <>
           {entry.status === "running" && demoLift !== null && (
             <p>
@@ -270,15 +313,67 @@ export function ResultsSection({
                 the send, within the interval shown. It is {formatPoints(r.readout.lift)} on a base of{" "}
                 {formatPercent(r.readout.controlRate)}.
               </p>
-              {entry.status === "running" && (
+              {entry.result === null ? (
                 <p>
                   <button type="button" disabled={busy} onClick={() => void onRecord()}>
                     Record result in ledger
                   </button>
                 </p>
+              ) : (
+                <>
+                  <p>
+                    This entry already has a recorded result. A new readout is kept as a new version, and the first
+                    result is never replaced.
+                  </p>
+                  <p>
+                    <label>
+                      Reason for a new version{" "}
+                      <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} />
+                    </label>
+                  </p>
+                  <p>
+                    <button
+                      type="button"
+                      disabled={busy || reason.trim() === "" || entry.status === "closed"}
+                      onClick={() => void onRecord()}
+                    >
+                      Record a new version
+                    </button>
+                  </p>
+                </>
               )}
             </>
           )}
+        </>
+      )}
+
+      {versions.length > 0 && (
+        <>
+          <h3>Result versions</h3>
+          <p>Results are append only. Version 1 is the first readout, and a later version never replaces it.</p>
+          <table aria-label="Result versions">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Recorded at</th>
+                <th>Reason</th>
+                <th>Lift</th>
+              </tr>
+            </thead>
+            <tbody>
+              {versions.map((v) => {
+                const lift = (v.result as { lift?: unknown } | null)?.lift;
+                return (
+                  <tr key={v.id}>
+                    <td>{v.version}</td>
+                    <td>{v.recordedAt}</td>
+                    <td>{v.reason}</td>
+                    <td>{typeof lift === "number" ? formatSignedPoints(lift) : "not available"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </>
       )}
 

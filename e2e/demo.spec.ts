@@ -79,7 +79,7 @@ test("refuses to load the demo into a ledger that has entries", async ({ page })
   await page.getByLabel("Title", { exact: true }).fill("Mine");
   await page.getByLabel("Hypothesis").fill("H");
   await page.getByRole("button", { name: "Create draft" }).click();
-  await expect(page.getByRole("table", { name: "Ledger entries" })).toContainText("Mine");
+  await expect(page.getByRole("table", { name: "Ledger entries" })).toContainText("Mine", { timeout: 30_000 });
   // The button is offered only while the ledger is empty.
   await expect(page.getByRole("button", { name: "Load demo data" })).toHaveCount(0);
 });

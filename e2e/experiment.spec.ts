@@ -71,6 +71,16 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await expect(page.getByText("Status: running")).toBeVisible();
   await expect(page.getByText("Type: Confirmatory")).toBeVisible();
 
+  // The fixed horizon rule: results stay locked until the 168 hour window closes, and the upload is hidden.
+  const locked = page.getByRole("region", { name: "Results" });
+  await expect(locked.getByText("Results are locked.")).toBeVisible();
+  await expect(locked.getByText(/Results unlock at \d{4}-\d{2}-\d{2}T.*168 hour conversion window/)).toBeVisible();
+  await expect(locked.getByLabel("Results CSV")).toHaveCount(0);
+  // Move the page clock to 8 days after launch. The section opens by itself.
+  await page.clock.setFixedTime(new Date(Date.now() + 8 * 24 * 3600 * 1000));
+  await expect(locked.getByLabel("Results CSV")).toBeVisible({ timeout: 15_000 });
+  await expect(locked.getByText("Results are locked.")).toHaveCount(0);
+
   // Results: the user's send tool returns the file with a converted column.
   const lines = assignmentFile.split("\r\n").filter(Boolean);
   const results = [
@@ -97,6 +107,11 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await expect(readout.getByText(/Significant: yes/)).toBeVisible();
   await readout.getByRole("button", { name: "Record result in ledger" }).click();
   await expect(page.getByText("Status: readable")).toBeVisible();
+  // The first result is version 1, and a second readout would need a reason and become version 2.
+  const versions = readout.getByRole("table", { name: "Result versions" });
+  await expect(versions.getByRole("row")).toHaveCount(2);
+  await expect(versions).toContainText("first readout");
+  await expect(readout.getByRole("button", { name: "Record a new version" })).toBeDisabled();
 
   // The ledger list keeps its state across client side navigation.
   await page.getByRole("link", { name: "Ledger", exact: true }).click();

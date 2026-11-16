@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatPercent, formatPoints } from "@/lib/app/format";
 import type { Ledger, LedgerEntry } from "@/lib/ledger/ledger";
+import { MAX_WINDOW_HOURS, conversionWindowHours } from "@/lib/ledger/window";
 import { powerCheck, type PowerResult } from "@/lib/stats/power";
 
 type DesignJson = {
@@ -10,6 +11,7 @@ type DesignJson = {
   minDetectableLift: number;
   treatmentShare: number;
   audienceSize: number;
+  conversionWindowHours?: number;
 };
 
 function asDesign(v: unknown): DesignJson | null {
@@ -46,6 +48,9 @@ export function DesignSection({
   const [lift, setLift] = useState(stored ? pctText(stored.minDetectableLift) : "2");
   const [share, setShare] = useState(stored ? pctText(stored.treatmentShare) : "90");
   const [audience, setAudience] = useState(stored ? String(stored.audienceSize) : "10000");
+  const [windowHours, setWindowHours] = useState(
+    stored?.conversionWindowHours !== undefined ? String(stored.conversionWindowHours) : "168",
+  );
   const [power, setPower] = useState<PowerResult | null>(
     locked && entry.powerResult ? (entry.powerResult as PowerResult) : null,
   );
@@ -53,7 +58,7 @@ export function DesignSection({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const key = [baseline, lift, share, audience].join("|");
+  const key = [baseline, lift, share, audience, windowHours].join("|");
   const fresh = locked || (power !== null && checkedKey === key);
   const disabled = locked || busy;
 
@@ -66,7 +71,11 @@ export function DesignSection({
         minDetectableLift: Number(lift) / 100,
         treatmentShare: Number(share) / 100,
         audienceSize: Number(audience),
+        conversionWindowHours: Number(windowHours),
       };
+      if (conversionWindowHours(design) === null) {
+        throw new RangeError(`The conversion window must be more than 0 and at most ${MAX_WINDOW_HOURS} hours.`);
+      }
       const result = powerCheck(design);
       await ledger.update(entry.id, { design }, "user");
       setPower(result);
@@ -127,6 +136,13 @@ export function DesignSection({
           <input type="number" value={audience} disabled={disabled} onChange={(e) => setAudience(e.target.value)} />
         </label>
       </p>
+      <p>
+        <label>
+          Conversion window, hours{" "}
+          <input type="number" value={windowHours} disabled={disabled} onChange={(e) => setWindowHours(e.target.value)} />
+        </label>{" "}
+        Results unlock only after this window closes, so nobody can peek early. 168 hours is 7 days.
+      </p>
       {!locked && (
         <p>
           <button type="button" disabled={disabled} onClick={() => void onRun()}>
@@ -158,6 +174,10 @@ export function DesignSection({
                   Baseline {formatPercent(Number(baseline) / 100)}, detect {formatPoints(Number(lift) / 100)}, treatment
                   share {formatPercent(Number(share) / 100, 0)}
                 </td>
+              </tr>
+              <tr>
+                <th scope="row">Conversion window</th>
+                <td>{windowHours} hours</td>
               </tr>
             </tbody>
           </table>
