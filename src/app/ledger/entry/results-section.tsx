@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { guessColumn } from "@/lib/app/columns";
 import { formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
+import { downloadText } from "@/lib/app/download";
 import { verifyBrowserResults } from "@/lib/duckdb/client";
 import type { Verification } from "@/lib/assignment/assign";
+import { resultRecord } from "@/lib/assignment/record";
+import { demoResultRows, demoResultsCsv, seedFromId } from "@/lib/demo/synthetic";
 import type { Ledger, LedgerEntry } from "@/lib/ledger/ledger";
 import type { ExperimentReadout } from "@/lib/stats/experiment";
 import { useCsvColumns } from "./use-csv-columns";
@@ -79,29 +82,11 @@ export function ResultsSection({
     setBusy(true);
     setError(null);
     try {
-      const r = outcome.readout;
       await ledger.recordResult(
         entry.id,
         {
           // Aggregates only. No email, no hash and no row level data.
-          result: {
-            lift: r.readout.lift,
-            interval_low: r.readout.interval.low,
-            interval_high: r.readout.interval.high,
-            significant: r.readout.significant,
-            alpha: r.readout.alpha,
-            p_value: r.readout.pValue,
-            treatment_rate: r.readout.treatmentRate,
-            control_rate: r.readout.controlRate,
-            sample_sizes: r.readout.sampleSizes,
-            srm_pass: r.srm.pass,
-            srm_p_value: r.srm.pValue,
-            pending: r.counts.treatment.pending + r.counts.control.pending,
-            verification: outcome.verification,
-            computed_at: new Date().toISOString(),
-            engine_version: r.readout.engineVersion,
-            method: r.readout.method,
-          },
+          result: resultRecord(outcome.readout, outcome.verification, new Date().toISOString()),
           comparisonsCount: 1,
           correctionMethod: entry.entryType === "confirmatory" ? "benjamini_hochberg" : "exploratory_label",
         },
@@ -114,6 +99,40 @@ export function ResultsSection({
       setBusy(false);
     }
   }
+
+  async function onDemoResults() {
+    const d = entry.design as Partial<Record<"baselineRate" | "minDetectableLift" | "syntheticTrueLift", number>> | null;
+    if (!d || typeof d.baselineRate !== "number" || typeof d.minDetectableLift !== "number") return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { rows, matched } = await demoResultRows({
+        ledger,
+        entryId: entry.id,
+        baselineRate: d.baselineRate,
+        trueLift: typeof d.syntheticTrueLift === "number" ? d.syntheticTrueLift : d.minDetectableLift,
+        seed: seedFromId(entry.id),
+        pendingShare: 0.02,
+      });
+      if (matched === 0) {
+        setError("No one in this entry came from the demo audience, so there is no demo results file to make.");
+        return;
+      }
+      downloadText(`demo-results-${entry.id}.csv`, "text/csv", demoResultsCsv(rows));
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const design = entry.design as Partial<Record<"minDetectableLift" | "syntheticTrueLift", number>> | null;
+  const demoLift =
+    design && typeof design.syntheticTrueLift === "number"
+      ? design.syntheticTrueLift
+      : design && typeof design.minDetectableLift === "number"
+        ? design.minDetectableLift
+        : null;
 
   async function onClose() {
     setBusy(true);
@@ -159,6 +178,15 @@ export function ResultsSection({
 
       {entry.status === "running" || entry.status === "readable" ? (
         <>
+          {entry.status === "running" && demoLift !== null && (
+            <p>
+              <button type="button" disabled={busy} onClick={() => void onDemoResults()}>
+                Download demo results file
+              </button>{" "}
+              For people from the demo audience only. Synthetic outcomes with a true lift of{" "}
+              {formatPoints(demoLift)}, and about 2 percent of windows left open.
+            </p>
+          )}
           <p>
             <label>
               Results CSV{" "}

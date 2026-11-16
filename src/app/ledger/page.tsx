@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { getBrowserLedger, importBrowserLedger } from "@/lib/duckdb/client";
+import { getBrowserLedger, importBrowserLedger, seedBrowserDemo } from "@/lib/duckdb/client";
 import { downloadText } from "@/lib/app/download";
+import { demoAudienceCsv } from "@/lib/demo/synthetic";
 import { FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
 import { Nav } from "../nav";
 
@@ -58,6 +59,21 @@ export default function LedgerPage() {
       setHypothesis("");
       setTag("");
       await refresh();
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onLoadDemo() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await seedBrowserDemo();
+      await refresh();
+      setNotice("Loaded 3 synthetic demo entries.");
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -151,7 +167,18 @@ export default function LedgerPage() {
       <section aria-labelledby="entries">
         <h2 id="entries">Entries</h2>
         {entries === null && <p>Loading</p>}
-        {entries !== null && entries.length === 0 && <p>No entries yet. Create a draft above.</p>}
+        {entries !== null && entries.length === 0 && (
+          <>
+            <p>No entries yet. Create a draft above, or load the demo.</p>
+            <p>
+              <button type="button" disabled={busy} onClick={() => void onLoadDemo()}>
+                Load demo data
+              </button>{" "}
+              Adds three synthetic entries, each labeled synthetic: one confirmatory with a result, one
+              exploratory, and one still running that you can read out yourself.
+            </p>
+          </>
+        )}
         {entries !== null && entries.length > 0 && (
           <table aria-label="Ledger entries">
             <thead>
@@ -170,12 +197,34 @@ export default function LedgerPage() {
                   </td>
                   <td>{e.status}</td>
                   <td>{e.entryType ? TYPE_LABEL[e.entryType] : "Not set"}</td>
-                  <td>{e.provenance === "imported" ? "Imported, times not verified" : "This browser"}</td>
+                  <td>
+                    {[
+                      e.synthetic ? "Synthetic demo data" : null,
+                      e.provenance === "imported" ? "Imported, times not verified" : e.synthetic ? null : "This browser",
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+      </section>
+
+      <section aria-labelledby="demo">
+        <h2 id="demo">Demo audience</h2>
+        <p>
+          <button
+            type="button"
+            onClick={() => downloadText("demo-audience.csv", "text/csv", demoAudienceCsv(5000))}
+          >
+            Download demo audience
+          </button>{" "}
+          5,000 synthetic people at the reserved example.invalid domain, so no address can reach anyone. Use it
+          to try assignment on your own entry. Once launched, the entry page can make a matching demo results
+          file.
+        </p>
       </section>
 
       <section aria-labelledby="keep">

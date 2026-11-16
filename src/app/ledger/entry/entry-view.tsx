@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { formatPoints } from "@/lib/app/format";
 import { getBrowserLedger } from "@/lib/duckdb/client";
 import type { AuditRow, Ledger, LedgerEntry } from "@/lib/ledger/ledger";
 import { Nav } from "../../nav";
@@ -112,7 +113,22 @@ export function EntryView() {
       {error && <p role="alert">{error}</p>}
       <p>Status: {entry.status}</p>
       <p>Type: {entry.entryType ? TYPE_LABEL[entry.entryType] : "Not set"}</p>
-      <p>Source: {entry.provenance === "imported" ? "Imported, times not verified" : "This browser"}</p>
+      <p>
+        Source:{" "}
+        {[
+          entry.synthetic ? "Synthetic demo data" : null,
+          entry.provenance === "imported" ? "Imported, times not verified" : entry.synthetic ? null : "This browser",
+        ]
+          .filter(Boolean)
+          .join(", ")}
+      </p>
+      {typeof (entry.design as { syntheticTrueLift?: unknown } | null)?.syntheticTrueLift === "number" && (
+        <p>
+          This entry was generated with a true lift of{" "}
+          {formatPoints((entry.design as { syntheticTrueLift: number }).syntheticTrueLift)}. A correct readout&apos;s
+          interval contains it about 95 times in 100.
+        </p>
+      )}
       <p>Hypothesis: {entry.hypothesis}</p>
       {entry.frameworkTag && <p>Framework tag: {entry.frameworkTag}</p>}
 
