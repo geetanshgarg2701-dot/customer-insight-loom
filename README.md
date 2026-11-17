@@ -28,7 +28,7 @@ npm run dev        # http://localhost:3000
 ```bash
 npm test           # unit tests
 npm run lint
-npx tsc --noEmit   # type check
+npm run typecheck   # type check; first asks Next.js to generate the types it adds
 npm run test:e2e   # browser tests, which start the dev server themselves
 ```
 
