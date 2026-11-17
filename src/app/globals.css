@@ -220,3 +220,45 @@ legend {
   border-left: 3px solid var(--danger);
   padding-left: 0.75rem;
 }
+
+footer[aria-label="Site"] {
+  border-top: 1px solid var(--line);
+  max-width: 64rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0.8rem 1rem 1.5rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.25rem;
+}
+footer[aria-label="Site"] a {
+  color: var(--text);
+}
+
+details {
+  margin: 0 0 var(--gap);
+  max-width: 70ch;
+}
+summary {
+  cursor: pointer;
+  color: var(--accent);
+  text-underline-offset: 0.18em;
+}
+summary:hover {
+  text-decoration: underline;
+}
+summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+details[open] > summary {
+  margin-bottom: 0.5rem;
+}
+dt {
+  font-weight: 600;
+  margin-top: 0.7rem;
+}
+dd {
+  margin: 0.15rem 0 0 0;
+}

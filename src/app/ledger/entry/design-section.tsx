@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatPercent, formatPoints } from "@/lib/app/format";
+import { explainPower } from "@/lib/app/explain";
+import { formatCount, formatPercent, formatPoints } from "@/lib/app/format";
 import type { Ledger, LedgerEntry } from "@/lib/ledger/ledger";
 import { MAX_WINDOW_HOURS, conversionWindowHours } from "@/lib/ledger/window";
 import { powerCheck, type PowerResult } from "@/lib/stats/power";
@@ -159,13 +160,13 @@ export function DesignSection({
               <tr>
                 <th scope="row">Required per arm</th>
                 <td>
-                  {power.requiredTreatment} treatment, {power.requiredControl} control
+                  {formatCount(power.requiredTreatment)} treatment, {formatCount(power.requiredControl)} control
                 </td>
               </tr>
               <tr>
                 <th scope="row">Available per arm</th>
                 <td>
-                  {power.availableTreatment} treatment, {power.availableControl} control
+                  {formatCount(power.availableTreatment)} treatment, {formatCount(power.availableControl)} control
                 </td>
               </tr>
               {typeof power.smallestDetectableLift === "number" && (
@@ -187,6 +188,26 @@ export function DesignSection({
               </tr>
             </tbody>
           </table>
+          {fresh && (
+            <details>
+              <summary>How these numbers were worked out</summary>
+              <dl>
+                {explainPower(power, {
+                  baselineRate: Number(baseline) / 100,
+                  minDetectableLift: Number(lift) / 100,
+                  treatmentShare: Number(share) / 100,
+                  audienceSize: Number(audience),
+                }).map((e) => (
+                  <div key={e.label}>
+                    <dt>
+                      {e.label}: {e.value}
+                    </dt>
+                    <dd>{e.how}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          )}
           {power.pass && typeof power.smallestDetectableLift === "number" && (
             <p>
               Passing means this audience can detect a lift of {formatPoints(Number(lift) / 100)} or more. A real lift

@@ -43,7 +43,11 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await design.getByLabel("People available").fill(String(N));
   await design.getByRole("button", { name: "Run power check" }).click();
   await expect(design.getByText("Power check passed")).toBeVisible();
-  await expect(design.getByText("Smallest lift this audience can detect")).toBeVisible();
+  await expect(design.getByRole("rowheader", { name: "Smallest lift this audience can detect" })).toBeVisible();
+  // The numbers can be explained from the values they came from, and read the same as in the table.
+  await design.getByText("How these numbers were worked out").click();
+  await expect(design.getByText(/Required per arm: [\d,]+ treatment, [\d,]+ control/)).toBeVisible();
+  await expect(design.getByText(/exact two proportion sample size/)).toBeVisible();
   await design.getByRole("button", { name: "Register entry" }).click();
   await expect(page.getByText("Status: registered")).toBeVisible();
 
@@ -107,8 +111,14 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await readout.getByRole("button", { name: "Verify and read out" }).click();
   await expect(readout.getByText("Readout: readable")).toBeVisible({ timeout: 60_000 });
   await expect(readout.getByRole("table", { name: "Verification" })).toContainText(String(N));
-  await expect(readout.getByText(/Newcombe/)).toBeVisible();
-  await expect(readout.getByText(/Significant: yes/)).toBeVisible();
+  // The method line sits below the collapsed explanation, so the last match is the one on show.
+  await expect(readout.getByText(/Newcombe/).last()).toBeVisible();
+  await expect(readout.locator("p", { hasText: /^Significant: yes$/ })).toBeVisible();
+  await readout.getByText("How these numbers were worked out").click();
+  await expect(readout.getByText(/Treatment rate: [\d.]+ percent/)).toBeVisible();
+  // The explanation and the method line both name it. The explanation is open and comes first.
+  await expect(readout.getByText(/Newcombe hybrid score method, method 10 in Newcombe 1998/).first()).toBeVisible();
+  await expect(readout.getByText(/converted of [\d,]+ people in the treatment group/)).toBeVisible();
   await expect(readout.getByText(/of the control group reported receiving the email/)).toBeVisible();
   await expect(readout.getByText(/assigned to the send/).first()).toBeVisible();
   await readout.getByRole("button", { name: "Record result in ledger" }).click();

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { guessColumn } from "@/lib/app/columns";
-import { formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
+import { formatCount, formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
+import { explainReadout } from "@/lib/app/explain";
 import { describeVerdict } from "@/lib/app/verdict";
 import { downloadText } from "@/lib/app/download";
 import { verifyBrowserResults } from "@/lib/duckdb/client";
@@ -327,11 +328,24 @@ export function ResultsSection({
                   <tr>
                     <th scope="row">People counted</th>
                     <td>
-                      {r.readout.sampleSizes.treatment} treatment, {r.readout.sampleSizes.control} control
+                      {formatCount(r.readout.sampleSizes.treatment)} treatment, {formatCount(r.readout.sampleSizes.control)} control
                     </td>
                   </tr>
                 </tbody>
               </table>
+              <details>
+                <summary>How these numbers were worked out</summary>
+                <dl>
+                  {explainReadout(r.readout, r.counts).map((e) => (
+                    <div key={e.label}>
+                      <dt>
+                        {e.label}: {e.value}
+                      </dt>
+                      <dd>{e.how}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
               <p>{verdict.label}</p>
               <p>{verdict.text}</p>
               {r.delivery && <p>Delivery: {r.delivery.note}</p>}

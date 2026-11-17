@@ -9,5 +9,5 @@ test("home page says what the app is and links to the working screens", async ({
   }
   // The create-next-app placeholder is gone.
   await expect(page.getByText(/Deploy Now|edit the/)).toHaveCount(0);
-  await expect(page.getByText("early version")).toBeVisible();
+  await expect(page.getByRole("main").getByText("early version")).toBeVisible();
 });

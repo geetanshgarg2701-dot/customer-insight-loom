@@ -1,5 +1,10 @@
 const NOT_AVAILABLE = "not available";
 
+/** A whole number of people with thousands separators, the same everywhere a count is shown. */
+export function formatCount(n: number): string {
+  return Number.isFinite(n) ? n.toLocaleString("en-US") : NOT_AVAILABLE;
+}
+
 /** A proportion as a percent, for example 0.1235 becomes 12.35 percent. */
 export function formatPercent(proportion: number, digits = 2): string {
   if (!Number.isFinite(proportion)) return NOT_AVAILABLE;

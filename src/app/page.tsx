@@ -11,7 +11,7 @@ export default function Home() {
         the result once, after the conversion window closes. When a result is too small to tell, it says so plainly.
       </p>
       <p>
-        Your files stay in your browser. There is no account, and nothing you load is sent to a server.
+        Your files stay in your browser. There is no account, and nothing you load is sent to a server. See <Link href="/privacy">Privacy</Link> for the details.
       </p>
 
       <section aria-labelledby="today">
