@@ -71,17 +71,17 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Landing page | BUILT | An early version: what it is, what works today, and a plain statement that it is untried on real data. |
 | 404 page | BUILT | In the editorial style, returns a real 404 status, links home. |
 | Favicon | BUILT | An own icon, `src/app/icon.svg`, replacing the starter template's. |
-| Accessibility checks with axe, phone width tests | PARTIAL | A phone width test runs on every screen, 375 pixels with no sideways scroll. `axe-core` is not installed. |
+| Accessibility: axe, keyboard and phone width tests | PARTIAL | axe-core against WCAG 2.0 and 2.1 A and AA on 13 screens and states, including data loaded, a filter chosen and an explanation open, 0 confirmed violations after one real fix, and 0 items needing review. Keyboard tests cover Tab order with no trap, Space and Enter on filters, and a visible focus ring. Every chart has its numbers as text. A phone width test runs on every screen. Not done: a manual screen reader pass, which only a person can do, and respecting reduced motion in the charts. A clean automated scan does not prove a screen is accessible. |
 
 ## Tests today
 
-On this date: 573 unit tests, 31 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 573 unit tests, 46 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
 Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budgets, and the item estimates are SPECULATION. No hours were tracked while building, so nothing below is measured. Use it to compare scope, not to promise a date.
 
-**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 were left. The design system, the real home page and the phone width pass then took about 10 more, so about 188 were left. The first three pipeline views then took about 20 more, so about 168 were left. The lost status and the cohort ladder then took about 10 more, so about 158 were left. Privacy and terms pages, the 404 page, the icon and the explanations on the power check and readout then took about 4 more, so about 154 were left. The top paths table and the what if for the journeys then took about 14 more, so about 140 were left. The period comparison then took about 6 more, so about 134 are left and about 217 are done, which is 217 of 351, or about 62 percent. Against about 51 percent by item count.
+**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 were left. The design system, the real home page and the phone width pass then took about 10 more, so about 188 were left. The first three pipeline views then took about 20 more, so about 168 were left. The lost status and the cohort ladder then took about 10 more, so about 158 were left. Privacy and terms pages, the 404 page, the icon and the explanations on the power check and readout then took about 4 more, so about 154 were left. The top paths table and the what if for the journeys then took about 14 more, so about 140 were left. The period comparison then took about 6 more, so about 134 were left. The accessibility checks then took about 4 more, so about 130 are left and about 221 are done, which is 221 of 351, or about 63 percent. Against about 51 percent by item count.
 
 | Not started item | Hours |
 |---|---|
@@ -96,10 +96,10 @@ Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budg
 | Pilot accounts, a Supabase client | 12 |
 | Name redaction | 8 |
 | Click to explain on the remaining numbers | 4 |
-| Accessibility checks with axe, keyboard pass | 7 |
-| **Total** | **134** |
+| Manual screen reader pass, reduced motion in charts | 3 |
+| **Total** | **130** |
 
-At 12 to 15 hours a week that is about 9 to 12 weeks, so late January if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 20 of the 134 hours and hold the success metric the testers are asked about.
+At 12 to 15 hours a week that is about 9 to 12 weeks, so late January if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 20 of the 130 hours and hold the success metric the testers are asked about.
 
 **What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 88, which is about 6 to 7 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.
 
@@ -109,3 +109,4 @@ Only two runtime packages are used beyond the app shell. This is a record, becau
 
 - `@duckdb/duckdb-wasm` 1.32.0, approved in the first week, self hosted.
 - `echarts` 6.1.0, approved by the owner on 2026-11-17 for the journey charts. Apache-2.0, published 2026-05-19, with `zrender` and `tslib` as its own dependencies. Loaded only in the browser and only with the bar chart, flow chart, tooltip, grid, accessibility and canvas parts. `npm audit` lists 7 moderate findings, all in the lint toolchain through `minimatch`, none in ECharts, and they predate it.
+- `@axe-core/playwright` 4.14.0, a development dependency only, approved by the owner on 2026-11-17 for automated accessibility checks. MPL-2.0, a file level license, and it never ships to visitors. Its one dependency is `axe-core` 4.14.0, also MPL-2.0. `npm audit` still lists the same 7 moderate findings in the lint toolchain, none from axe.
