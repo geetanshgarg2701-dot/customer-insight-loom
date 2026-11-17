@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection } from "@/lib/charts/crossfilter";
+import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection, type TopPaths } from "@/lib/charts/crossfilter";
+import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
+import { formatPercent } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
 import { Nav } from "../nav";
@@ -15,6 +17,8 @@ const TITLES: Record<JourneyDimension, string> = {
 };
 
 const ROWS = 100_000;
+const RARITY = [0.01, 0.02, 0.05] as const;
+const CHANGES = [-10, 5, 10, 20] as const;
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -89,17 +93,23 @@ export default function JourneysPage() {
   const [counts, setCounts] = useState<Partial<Record<JourneyDimension, Count[]>>>({});
   const [edges, setEdges] = useState<SankeyEdge[]>([]);
   const [elapsed, setElapsed] = useState<number | null>(null);
+  const [rarity, setRarity] = useState<(typeof RARITY)[number]>(0.02);
+  const [paths, setPaths] = useState<TopPaths | null>(null);
+  const [whatStep, setWhatStep] = useState(1);
+  const [whatPoints, setWhatPoints] = useState<(typeof CHANGES)[number]>(10);
 
-  const refresh = useCallback(async (next: Selection) => {
+  const refresh = useCallback(async (next: Selection, minShare: number) => {
     const b = board.current;
     if (!b) return;
     const started = performance.now();
-    const [byDimension, flow] = await Promise.all([
+    const [byDimension, flow, topped] = await Promise.all([
       Promise.all(JOURNEY_DIMENSIONS.map((d) => b.counts(d, next))),
       b.flow(next),
+      b.paths(minShare, next),
     ]);
     setCounts(Object.fromEntries(JOURNEY_DIMENSIONS.map((d, i) => [d, byDimension[i]])));
     setEdges(flow);
+    setPaths(topped);
     setElapsed(Math.round(performance.now() - started));
   }, []);
 
@@ -109,7 +119,7 @@ export default function JourneysPage() {
     try {
       board.current = await createBrowserJourneyBoard(ROWS);
       setLoaded(true);
-      await refresh({});
+      await refresh({}, rarity);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -123,7 +133,7 @@ export default function JourneysPage() {
     const next: Selection = { ...selection, [dimension]: nextValues };
     setSelection(next);
     try {
-      await refresh(next);
+      await refresh(next, rarity);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -131,7 +141,16 @@ export default function JourneysPage() {
 
   async function clearAll() {
     setSelection({});
-    await refresh({});
+    await refresh({}, rarity);
+  }
+
+  async function pickRarity(value: (typeof RARITY)[number]) {
+    setRarity(value);
+    try {
+      await refresh(selection, value);
+    } catch (e) {
+      setError(messageOf(e));
+    }
   }
 
   useEffect(() => {
@@ -146,6 +165,11 @@ export default function JourneysPage() {
     const first = edges.filter((e) => e.source.startsWith("1. ")).reduce((n, e) => n + e.value, 0);
     return first;
   }, [edges]);
+  const stages = useMemo(() => stageCountsFromFlow(edges), [edges]);
+  const scenario = useMemo(
+    () => (stages.length >= 2 ? whatIf(stages, { fromStep: whatStep, points: whatPoints }) : null),
+    [stages, whatStep, whatPoints],
+  );
   const anySelected = JOURNEY_DIMENSIONS.some((d) => (selection[d] ?? []).length > 0);
 
   return (
@@ -226,6 +250,87 @@ export default function JourneysPage() {
                 ))}
               </tbody>
             </table>
+          </section>
+
+          <section aria-labelledby="h-paths">
+            <h2 id="h-paths">Top paths</h2>
+            <p>
+              The routes customers actually took, detours included, largest first. A path used by fewer than the share
+              below is merged into one group instead of being listed, so the totals still add up to the flow above.
+            </p>
+            <p role="group" aria-label="Rarity threshold">
+              {RARITY.map((r) => (
+                <button key={r} type="button" aria-pressed={rarity === r} onClick={() => void pickRarity(r)}>
+                  Merge paths under {formatPercent(r, 0)}
+                </button>
+              ))}
+            </p>
+            {paths && (
+              <table aria-label="Top paths">
+                <thead>
+                  <tr>
+                    <th>Path</th>
+                    <th>Customers</th>
+                    <th>Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paths.paths.map((p) => (
+                    <tr key={p.path}>
+                      <td>{p.path}</td>
+                      <td>{p.count.toLocaleString("en-US")}</td>
+                      <td>{formatPercent(p.share, 1)}</td>
+                    </tr>
+                  ))}
+                  {paths.other.paths > 0 && (
+                    <tr>
+                      <td>
+                        Other paths, {paths.other.paths} routes each under {formatPercent(paths.minShare, 0)}
+                      </td>
+                      <td>{paths.other.count.toLocaleString("en-US")}</td>
+                      <td>{formatPercent(paths.other.share, 1)}</td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row">All customers shown</th>
+                    <td>{paths.total.toLocaleString("en-US")}</td>
+                    <td>{formatPercent(1, 1)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </section>
+
+          <section aria-labelledby="h-whatif">
+            <h2 id="h-whatif">What if</h2>
+            <p>If one step kept more of the people who reach it, how many more would reach the end?</p>
+            <p role="group" aria-label="Step to change">
+              {stages.slice(0, -1).map((s, i) => (
+                <button key={s.stage} type="button" aria-pressed={whatStep === i} onClick={() => setWhatStep(i)}>
+                  {s.stage} to {stages[i + 1].stage}
+                </button>
+              ))}
+            </p>
+            <p role="group" aria-label="Change in percentage points">
+              {CHANGES.map((c) => (
+                <button key={c} type="button" aria-pressed={whatPoints === c} onClick={() => setWhatPoints(c)}>
+                  {c > 0 ? `+${c}` : c} points
+                </button>
+              ))}
+            </p>
+            {scenario && (
+              <>
+                <p>
+                  {scenario.step} now keeps {formatPercent(scenario.currentRate, 1)} of the people who reach it. At{" "}
+                  {formatPercent(scenario.newRate, 1)}, about {Math.round(Math.abs(scenario.extraAtEnd)).toLocaleString("en-US")}{" "}
+                  {scenario.extraAtEnd >= 0 ? "more" : "fewer"} people would reach {stages[stages.length - 1].stage}, a change of{" "}
+                  {formatPercent(scenario.extraShare, 1)}.
+                </p>
+                <p>{scenario.note}</p>
+              </>
+            )}
           </section>
         </>
       )}

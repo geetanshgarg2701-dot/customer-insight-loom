@@ -63,7 +63,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 | Item | Status | Evidence and gap |
 |---|---|---|
-| Journeys: three linked bar charts and a flow chart with drop off, on 100,000 synthetic customers | PARTIAL | `/journeys`, `src/lib/charts`. The chart coordinator is built and measured: 110 ms in the browser for a full update, against the plan's guess of 1 second. 4 of the 13 visuals, no replay, no what if, no top paths table. |
+| Journeys: three linked bar charts, a flow chart with drop off, a top paths table and a what if, on 100,000 synthetic customers | PARTIAL | `/journeys`, `src/lib/charts`. The coordinator is measured at 135 ms in the browser for a full update. Top paths merge rare routes into one labeled group and reconcile with the flow, plan test 9. The what if changes one step and says what it assumes, and it is not a forecast. Not built: replay and the remaining visuals from the plan's list of 13. |
 | Pipeline views: stage funnel, time in stage, stalled deals, cohort ladder, on 100,000 synthetic deals | PARTIAL | `/pipeline`, `src/lib/charts/pipeline.ts`. Deals are won, lost or open, and only open deals can be stalled. The cohort ladder compares months of entry inside a fixed window and flags months still maturing. Measured 164 ms in the browser for a full update. Not built: period comparison and the forecast fan. |
 | AI features | NOT STARTED | Hosted AI is off until the free plan terms are confirmed. |
 | Design system | BUILT | Quiet editorial, chosen by the owner on 2026-11-17, in `src/app/globals.css`: warm paper, serif type, system fonts, one light palette. Contrast at least 5.2 to 1. Every screen fits a phone at 375 pixels, tested. |
@@ -75,19 +75,19 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 546 unit tests, 31 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 563 unit tests, 31 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
 Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budgets, and the item estimates are SPECULATION. No hours were tracked while building, so nothing below is measured. Use it to compare scope, not to promise a date.
 
-**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 were left. The design system, the real home page and the phone width pass then took about 10 more, so about 188 were left. The first three pipeline views then took about 20 more, so about 168 were left. The lost status and the cohort ladder then took about 10 more, so about 158 were left. Privacy and terms pages, the 404 page, the icon and the explanations on the power check and readout then took about 4 more, so about 154 are left and about 197 are done, which is 197 of 351, or about 56 percent. Against about 51 percent by item count.
+**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 were left. The design system, the real home page and the phone width pass then took about 10 more, so about 188 were left. The first three pipeline views then took about 20 more, so about 168 were left. The lost status and the cohort ladder then took about 10 more, so about 158 were left. Privacy and terms pages, the 404 page, the icon and the explanations on the power check and readout then took about 4 more, so about 154 were left. The top paths table and the what if for the journeys then took about 14 more, so about 140 are left and about 211 are done, which is 211 of 351, or about 60 percent. Against about 51 percent by item count.
 
 | Not started item | Hours |
 |---|---|
 | Design system | 0 |
 | Webhook ingestion, and screens for identity and time rules | 12 |
-| Journey views, the rest of M16 | 28 |
+| Journey views, replay and the remaining visuals | 14 |
 | Pipeline views, the rest of M17 | 12 |
 | Evidence chain, M6 | 14 |
 | AI features with evals, including the in browser model, M8, M13, M15 | 30 |
@@ -97,11 +97,11 @@ Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budg
 | Name redaction | 8 |
 | Click to explain on the remaining numbers | 4 |
 | Accessibility checks with axe, keyboard pass | 7 |
-| **Total** | **154** |
+| **Total** | **140** |
 
-At 12 to 15 hours a week that is about 10 to 13 weeks, so late January to mid February if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 40 of the 154 hours and hold the success metric the testers are asked about.
+At 12 to 15 hours a week that is about 9 to 12 weeks, so late January if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 26 of the 140 hours and hold the success metric the testers are asked about.
 
-**What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 106, which is about 7 to 9 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.
+**What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 88, which is about 6 to 7 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.
 
 ## Dependencies
 

@@ -30,6 +30,36 @@ describe("syntheticJourneys", () => {
     expect(rate("new") - rate("returning")).toBeGreaterThan(0.25);
   });
 
+  it("records the full path, with a Search detour before Product and a Support detour after Cart", () => {
+    const rows = syntheticJourneys(40_000, 4);
+    for (const row of rows) {
+      expect(row.path[0]).toBe("Visit");
+      // Remove the detours and what is left is exactly the main steps that were reached.
+      const main = row.path.filter((step) => step !== "Search" && step !== "Support");
+      expect(main).toEqual(row.steps.filter((x) => x !== null));
+      const search = row.path.indexOf("Search");
+      if (search >= 0) expect(row.path[search + 1]).toBe("Product");
+      const support = row.path.indexOf("Support");
+      if (support >= 0) expect(row.path[support - 1]).toBe("Cart");
+    }
+    expect(rows.some((r) => r.path.includes("Search"))).toBe(true);
+    expect(rows.some((r) => r.path.includes("Support"))).toBe(true);
+  });
+
+  it("plants known effects: Search visitors reach the cart more, and Support callers buy less", () => {
+    const rows = syntheticJourneys(120_000, 6);
+    const toCart = (withSearch: boolean) => {
+      const atProduct = rows.filter((r) => r.path.includes("Product") && r.path.includes("Search") === withSearch);
+      return atProduct.filter((r) => r.path.includes("Cart")).length / atProduct.length;
+    };
+    expect(toCart(true)).toBeGreaterThan(toCart(false) + 0.05);
+    const buys = (withSupport: boolean) => {
+      const atCart = rows.filter((r) => r.path.includes("Cart") && r.path.includes("Support") === withSupport);
+      return atCart.filter((r) => r.path.includes("Purchase")).length / atCart.length;
+    };
+    expect(buys(true)).toBeLessThan(buys(false) - 0.1);
+  });
+
   it("uses only reserved synthetic labels, never an email or a name", () => {
     const rows = syntheticJourneys(200, 2);
     for (const r of rows) expect(JSON.stringify(r)).not.toMatch(/@|\d{3}-\d{4}/);

@@ -24,6 +24,30 @@ test("linked charts filter each other on 100,000 synthetic journeys, and the upd
   await expect(page.getByRole("figure", { name: /Flow of customers between steps/ })).toBeVisible();
   await expect(page.locator("canvas")).toHaveCount(4);
 
+  // Top paths: every customer is in exactly one row, the rare paths are merged and labeled, and detours show up.
+  const pathsTable = page.getByRole("table", { name: "Top paths" });
+  await expect(pathsTable).toContainText("Search");
+  await expect(pathsTable).toContainText("Support");
+  const customerSum = async () => {
+    const rows = await pathsTable.getByRole("row").allInnerTexts();
+    return rows
+      .filter((r) => !/^Path|^All customers/.test(r))
+      .reduce((n, r) => n + Number(r.split(/\t/)[1].replace(/,/g, "")), 0);
+  };
+  expect(await customerSum()).toBe(100_000);
+  await expect(pathsTable.getByRole("row", { name: /^All customers shown 100,000/ })).toBeVisible();
+  await page.getByRole("group", { name: "Rarity threshold" }).getByRole("button", { name: "Merge paths under 5 percent" }).click();
+  await expect(pathsTable).toContainText("Other paths");
+  await expect.poll(customerSum).toBe(100_000);
+
+  // What if: one step is changed, and the answer says what it assumes and that it is not a forecast.
+  await page.getByRole("group", { name: "Step to change" }).getByRole("button", { name: "Product to Cart" }).click();
+  await page.getByRole("group", { name: "Change in percentage points" }).getByRole("button", { name: "+10 points" }).click();
+  await expect(page.getByText(/more people would reach Purchase/)).toBeVisible();
+  await expect(page.getByText(/not a forecast/)).toBeVisible();
+  await page.getByRole("group", { name: "Change in percentage points" }).getByRole("button", { name: "-10 points" }).click();
+  await expect(page.getByText(/fewer people would reach Purchase/)).toBeVisible();
+
   // Choosing the segment "new" with the keyboard route narrows every other chart and the flow.
   const flow = page.getByRole("table", { name: "Flow between steps" });
   const before = await flow.getByRole("row").count();

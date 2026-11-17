@@ -1,7 +1,17 @@
 import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import type { verifyResults } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
-import { countsBy, loadJourneys, sankeyEdges, type Count, type JourneyDimension, type SankeyEdge, type Selection } from "../charts/crossfilter";
+import {
+  countsBy,
+  loadJourneys,
+  sankeyEdges,
+  topPaths,
+  type Count,
+  type JourneyDimension,
+  type SankeyEdge,
+  type Selection,
+  type TopPaths,
+} from "../charts/crossfilter";
 import {
   cohortLadder,
   dwellHistogram,
@@ -147,6 +157,7 @@ export type JourneyBoard = {
   rows: number;
   counts(dimension: JourneyDimension, selection: Selection): Promise<Count[]>;
   flow(selection: Selection): Promise<SankeyEdge[]>;
+  paths(minShare: number, selection: Selection): Promise<TopPaths>;
   close(): Promise<void>;
 };
 
@@ -159,6 +170,7 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     rows,
     counts: (dimension, selection) => countsBy(engine, table, dimension, selection),
     flow: (selection) => sankeyEdges(engine, table, selection),
+    paths: (minShare, selection) => topPaths(engine, table, selection, { minShare }),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

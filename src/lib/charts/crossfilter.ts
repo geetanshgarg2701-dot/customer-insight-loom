@@ -20,6 +20,7 @@ export type Selection = Partial<Record<JourneyDimension, string[]>>;
 
 const TABLE_NAME = /^[a-z_][a-z0-9_]*$/;
 const STEP_COLUMNS = ["s1", "s2", "s3", "s4"] as const;
+const PATH_SEPARATOR = " > ";
 
 function checkTable(table: string): void {
   if (!TABLE_NAME.test(table)) throw new RangeError("Table name must be lower case letters, digits and underscores.");
@@ -59,13 +60,13 @@ export function whereClause(selection: Selection, except?: string): { sql: strin
 export async function loadJourneys(engine: SqlEngine, table: string, rows: readonly JourneyRow[]): Promise<void> {
   checkTable(table);
   await engine.exec(
-    `CREATE OR REPLACE TABLE ${table} (channel VARCHAR, segment VARCHAR, s1 VARCHAR, s2 VARCHAR, s3 VARCHAR, s4 VARCHAR, reached VARCHAR)`,
+    `CREATE OR REPLACE TABLE ${table} (channel VARCHAR, segment VARCHAR, s1 VARCHAR, s2 VARCHAR, s3 VARCHAR, s4 VARCHAR, reached VARCHAR, path VARCHAR)`,
   );
   await insertRows(
     engine,
     table,
-    ["channel", "segment", ...STEP_COLUMNS, "reached"],
-    rows.map((r) => [r.channel, r.segment, ...r.steps, r.reached]),
+    ["channel", "segment", ...STEP_COLUMNS, "reached", "path"],
+    rows.map((r) => [r.channel, r.segment, ...r.steps, r.reached, r.path.join(PATH_SEPARATOR)]),
   );
 }
 
@@ -110,4 +111,68 @@ export async function sankeyEdges(engine: SqlEngine, table: string, selection: S
   }
   const rows = await engine.query(`${pieces.join(" UNION ALL ")} ORDER BY 1, 2`, params);
   return rows.map(toPlainRow).map((r) => ({ source: String(r.source), target: String(r.target), value: Number(r.value) }));
+}
+
+export type PathRow = {
+  path: string;
+  count: number;
+  share: number;
+  /** The last step on the path. */
+  endsAt: string;
+  endsInPurchase: boolean;
+};
+
+export type TopPaths = {
+  /** Customers matching the selection. Every one is in exactly one path or in the merged group. */
+  total: number;
+  /** Paths used by less than this share of customers are merged into one group, and the group says how many. */
+  minShare: number;
+  paths: PathRow[];
+  other: { count: number; share: number; paths: number };
+};
+
+/**
+ * The actual paths customers took, detours included, largest first. A path used by less than `minShare` of the
+ * customers is merged into one labeled group instead of being shown or dropped, so the totals still add up to the
+ * flow, plan test 9.
+ */
+export async function topPaths(
+  engine: SqlEngine,
+  table: string,
+  selection: Selection,
+  options: { minShare: number },
+): Promise<TopPaths> {
+  checkTable(table);
+  if (!Number.isFinite(options.minShare) || options.minShare < 0 || options.minShare > 1) {
+    throw new RangeError("The rarity threshold must be between 0 and 1.");
+  }
+  const where = whereClause(selection);
+  const rows = (
+    await engine.query(
+      `SELECT path, count(*) AS count FROM ${table} ${where.sql} GROUP BY path ORDER BY count DESC, path`,
+      where.params,
+    )
+  ).map(toPlainRow);
+  const all = rows.map((r) => ({ path: String(r.path), count: Number(r.count) }));
+  const total = all.reduce((n, p) => n + p.count, 0);
+  const kept: PathRow[] = [];
+  let mergedCount = 0;
+  let mergedPaths = 0;
+  for (const p of all) {
+    const share = total === 0 ? 0 : p.count / total;
+    if (share >= options.minShare) {
+      const steps = p.path.split(PATH_SEPARATOR);
+      const endsAt = steps[steps.length - 1];
+      kept.push({ path: p.path, count: p.count, share, endsAt, endsInPurchase: endsAt === "Purchase" });
+    } else {
+      mergedCount += p.count;
+      mergedPaths++;
+    }
+  }
+  return {
+    total,
+    minShare: options.minShare,
+    paths: kept,
+    other: { count: mergedCount, share: total === 0 ? 0 : mergedCount / total, paths: mergedPaths },
+  };
 }
