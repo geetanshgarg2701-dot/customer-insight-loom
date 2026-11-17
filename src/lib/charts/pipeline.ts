@@ -10,7 +10,7 @@ import { buildWhere } from "./crossfilter";
  * stage is elapsed time, never calendar days, so a clock change cannot move it.
  */
 
-export const PIPELINE_DIMENSIONS = ["segment", "source", "stage"] as const;
+export const PIPELINE_DIMENSIONS = ["segment", "source", "stage", "status"] as const;
 export type PipelineDimension = (typeof PIPELINE_DIMENSIONS)[number];
 export type PipelineSelection = Partial<Record<PipelineDimension, string[]>>;
 
@@ -29,13 +29,13 @@ export function pipelineWhere(selection: PipelineSelection, except?: string): { 
 export async function loadPipeline(engine: SqlEngine, table: string, rows: readonly PipelineRow[]): Promise<void> {
   checkTable(table);
   await engine.exec(
-    `CREATE OR REPLACE TABLE ${table} (segment VARCHAR, source VARCHAR, e1 TIMESTAMP, e2 TIMESTAMP, e3 TIMESTAMP, e4 TIMESTAMP, stage VARCHAR)`,
+    `CREATE OR REPLACE TABLE ${table} (segment VARCHAR, source VARCHAR, e1 TIMESTAMP, e2 TIMESTAMP, e3 TIMESTAMP, e4 TIMESTAMP, stage VARCHAR, lost_at TIMESTAMP, status VARCHAR)`,
   );
   await insertRows(
     engine,
     table,
-    ["segment", "source", ...STAGE_COLUMNS, "stage"],
-    rows.map((r) => [r.segment, r.source, ...r.entered, r.stage]),
+    ["segment", "source", ...STAGE_COLUMNS, "stage", "lost_at", "status"],
+    rows.map((r) => [r.segment, r.source, ...r.entered, r.stage, r.lostAt, r.status]),
   );
 }
 
@@ -137,7 +137,7 @@ export type Stalled = { stage: string; count: number; medianIdleDays: number };
 
 /**
  * Open deals with no movement for at least `thresholdDays` as of a cutoff, by the stage they are stuck in. A won deal
- * is never stalled. Idle time is elapsed time since the last stage entry.
+ * and a lost deal are closed, so neither is ever stalled. Idle time is elapsed time since the last stage entry.
  */
 export async function stalledByStage(
   engine: SqlEngine,
@@ -156,8 +156,8 @@ export async function stalledByStage(
 
   const rows = await engine.query(
     `SELECT stage, count(*) AS count, quantile_cont(idle, 0.5) AS median FROM (` +
-      `SELECT stage, date_diff('second', COALESCE(e4, e3, e2, e1), CAST(? AS TIMESTAMP)) / ${DAY_SECONDS}.0 AS idle ` +
-      `FROM ${table} ${where.sql}) WHERE stage <> 'Won' AND idle >= ? GROUP BY stage ` +
+      `SELECT stage, status, date_diff('second', COALESCE(e4, e3, e2, e1), CAST(? AS TIMESTAMP)) / ${DAY_SECONDS}.0 AS idle ` +
+      `FROM ${table} ${where.sql}) WHERE status = 'open' AND idle >= ? GROUP BY stage ` +
       `ORDER BY CASE stage ${PIPELINE_STAGES.map((s, i) => `WHEN '${s}' THEN ${i}`).join(" ")} ELSE 9 END`,
     [asOf, ...where.params, options.thresholdDays],
   );
@@ -166,4 +166,67 @@ export async function stalledByStage(
     count: Number(r.count),
     medianIdleDays: Number(r.median),
   }));
+}
+
+export type CohortRow = {
+  /** The month the deals entered the first stage, in UTC, as YYYY-MM. */
+  cohort: string;
+  deals: number;
+  /** Deals that reached each stage within the window of entering. */
+  reachedQualified: number;
+  reachedProposal: number;
+  reachedWon: number;
+  qualifiedShare: number;
+  proposalShare: number;
+  wonShare: number;
+  /** True when the newest deal in the cohort has had the whole window by the cutoff, so cohorts compare fairly. */
+  mature: boolean;
+  latestEntry: string | null;
+};
+
+/**
+ * Do newer cohorts reach stages faster or slower? Shares are of the deals that entered in that month, counting only
+ * stage entries within `windowDays` of entering, elapsed time, closing instant inside. A cohort whose newest deal has
+ * not had the whole window is flagged as still maturing, because comparing it with older cohorts would be unfair.
+ */
+export async function cohortLadder(
+  engine: SqlEngine,
+  table: string,
+  options: { windowDays: number; asOf: string },
+  selection: PipelineSelection,
+): Promise<CohortRow[]> {
+  checkTable(table);
+  if (!Number.isFinite(options.windowDays) || options.windowDays <= 0) {
+    throw new RangeError("The window must be above 0 days.");
+  }
+  const asOfMs = Date.parse(options.asOf);
+  if (!Number.isFinite(asOfMs)) throw new RangeError("The cutoff is not a time.");
+  const asOf = new Date(asOfMs).toISOString().slice(0, 19).replace("T", " ");
+  const windowSeconds = Math.round(options.windowDays * DAY_SECONDS);
+  const where = pipelineWhere(selection);
+  const within = (c: string) => `count(*) FILTER (WHERE ${c} IS NOT NULL AND date_diff('second', e1, ${c}) <= ${windowSeconds})`;
+
+  const rows = await engine.query(
+    `SELECT strftime(e1, '%Y-%m') AS cohort, count(*) AS deals, ` +
+      `${within("e2")} AS q, ${within("e3")} AS p, ${within("e4")} AS w, ` +
+      `max(e1) AS latest, max(e1) <= CAST(? AS TIMESTAMP) - to_seconds(${windowSeconds}) AS mature ` +
+      `FROM ${table} ${where.sql} GROUP BY 1 ORDER BY 1`,
+    [asOf, ...where.params],
+  );
+  return rows.map(toPlainRow).map((r) => {
+    const deals = Number(r.deals);
+    const share = (n: unknown) => (deals === 0 ? 0 : Number(n) / deals);
+    return {
+      cohort: String(r.cohort),
+      deals,
+      reachedQualified: Number(r.q),
+      reachedProposal: Number(r.p),
+      reachedWon: Number(r.w),
+      qualifiedShare: share(r.q),
+      proposalShare: share(r.p),
+      wonShare: share(r.w),
+      mature: Boolean(r.mature),
+      latestEntry: r.latest === null || r.latest === undefined ? null : String(r.latest),
+    };
+  });
 }

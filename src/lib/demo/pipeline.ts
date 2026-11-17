@@ -6,7 +6,8 @@ import { mulberry32 } from "../stats/honesty";
  *
  * Planted facts: enterprise deals sit in Proposal about three times longer than small ones and win less often.
  * Times are UTC text without a zone, the form the database reads. Deals that have not reached a stage by the cutoff
- * have no time for it, and a deal that went quiet simply stops at its last stage.
+ * have no time for it. A deal that stops moving is marked lost some weeks later, unless that time is after the cutoff,
+ * in which case it is still open. Open deals are the only ones that can be stalled.
  */
 
 export const PIPELINE_STAGES = ["Lead", "Qualified", "Proposal", "Won"] as const;
@@ -23,7 +24,13 @@ export type PipelineRow = {
   entered: (string | null)[];
   /** The furthest stage reached. */
   stage: (typeof PIPELINE_STAGES)[number];
+  /** When a stalled deal was closed as lost, or null. */
+  lostAt: string | null;
+  status: "won" | "lost" | "open";
 };
+
+/** Median days between a deal going quiet and someone marking it lost. */
+const LOST_WAIT_DAYS = 25;
 
 const DAY_MS = 86_400_000;
 const PICK_SEGMENT: readonly [(typeof PIPELINE_SEGMENTS)[number], number][] = [["smb", 0.5], ["mid", 0.3], ["enterprise", 0.2]];
@@ -68,16 +75,26 @@ export function syntheticPipeline(count: number, seed: number): PipelineRow[] {
     const entered: (string | null)[] = PIPELINE_STAGES.map(() => null);
     entered[0] = utcText(at);
     let reached = 1;
+    let quit = false;
     for (let s = 0; s < 3; s++) {
-      if (rng() >= CONTINUE[segment][s]) break;
+      if (rng() >= CONTINUE[segment][s]) {
+        quit = true;
+        break;
+      }
       const dwell = MEDIAN_DAYS[segment][s] * Math.exp(0.7 * normal()) * DAY_MS;
       const next = Math.floor((at + dwell) / 1000) * 1000;
-      if (next > asOf) break; // has not happened yet at the cutoff
+      if (next > asOf) break; // has not happened yet at the cutoff, so the deal is still open
       at = next;
       entered[s + 1] = utcText(at);
       reached++;
     }
-    rows.push({ segment, source, entered, stage: PIPELINE_STAGES[reached - 1] });
+    let lostAt: string | null = null;
+    if (quit) {
+      const lostMs = Math.floor((at + LOST_WAIT_DAYS * Math.exp(0.8 * normal()) * DAY_MS) / 1000) * 1000;
+      if (lostMs <= asOf) lostAt = utcText(lostMs);
+    }
+    const stage = PIPELINE_STAGES[reached - 1];
+    rows.push({ segment, source, entered, stage, lostAt, status: stage === "Won" ? "won" : lostAt ? "lost" : "open" });
   }
   return rows;
 }

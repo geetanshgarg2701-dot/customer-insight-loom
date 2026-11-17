@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PIPELINE_DIMENSIONS, type Count, type PipelineDimension, type PipelineSelection } from "@/lib/charts/pipeline";
-import type { DwellHistogram, FunnelStage, Stalled } from "@/lib/charts/pipeline";
+import type { CohortRow, DwellHistogram, FunnelStage, Stalled } from "@/lib/charts/pipeline";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent } from "@/lib/app/format";
@@ -15,10 +15,13 @@ const TITLES: Record<PipelineDimension, string> = {
   segment: "Segment",
   source: "Source",
   stage: "Furthest stage",
+  status: "Status",
 };
 const ROWS = 100_000;
 const THRESHOLDS = [14, 30, 60] as const;
 const STAGE_STEPS = [0, 1, 2] as const;
+const WINDOWS = [30, 60, 90] as const;
+const STATUS_ORDER = ["open", "won", "lost"];
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -104,22 +107,26 @@ export default function PipelinePage() {
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
   const [dwell, setDwell] = useState<DwellHistogram | null>(null);
   const [stalled, setStalled] = useState<Stalled[]>([]);
+  const [cohortWindow, setCohortWindow] = useState<(typeof WINDOWS)[number]>(60);
+  const [cohorts, setCohorts] = useState<CohortRow[]>([]);
   const [elapsed, setElapsed] = useState<number | null>(null);
 
-  const refresh = useCallback(async (next: PipelineSelection, step: number, days: number) => {
+  const refresh = useCallback(async (next: PipelineSelection, step: number, days: number, windowDays: number) => {
     const b = board.current;
     if (!b) return;
     const started = performance.now();
-    const [byDimension, f, d, s] = await Promise.all([
+    const [byDimension, f, d, s, c] = await Promise.all([
       Promise.all(PIPELINE_DIMENSIONS.map((dim) => b.counts(dim, next))),
       b.funnel(next),
       b.dwell(step, next),
       b.stalled(days, next),
+      b.cohorts(windowDays, next),
     ]);
     setCounts(Object.fromEntries(PIPELINE_DIMENSIONS.map((dim, i) => [dim, byDimension[i]])));
     setFunnel(f);
     setDwell(d);
     setStalled(s);
+    setCohorts(c);
     setElapsed(Math.round(performance.now() - started));
   }, []);
 
@@ -129,7 +136,7 @@ export default function PipelinePage() {
     try {
       board.current = await createBrowserPipelineBoard(ROWS);
       setLoaded(true);
-      await refresh({}, stageStep, threshold);
+      await refresh({}, stageStep, threshold, cohortWindow);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -137,9 +144,9 @@ export default function PipelinePage() {
     }
   }
 
-  async function run(next: PipelineSelection, step = stageStep, window = threshold) {
+  async function run(next: PipelineSelection, step = stageStep, days = threshold, windowDays = cohortWindow) {
     try {
-      await refresh(next, step, window);
+      await refresh(next, step, days, windowDays);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -161,6 +168,11 @@ export default function PipelinePage() {
   async function pickThreshold(value: (typeof THRESHOLDS)[number]) {
     setThreshold(value);
     await run(selection, stageStep, value);
+  }
+
+  async function pickWindow(value: (typeof WINDOWS)[number]) {
+    setCohortWindow(value);
+    await run(selection, stageStep, threshold, value);
   }
 
   async function clearAll() {
@@ -213,8 +225,8 @@ export default function PipelinePage() {
             {PIPELINE_DIMENSIONS.map((d) => {
               const list = counts[d] ?? [];
               const selected = selection[d] ?? [];
-              const order = d === "stage" ? [...PIPELINE_STAGES] : null;
-              const sorted = order ? [...list].sort((a, b) => order.indexOf(a.value as never) - order.indexOf(b.value as never)) : list;
+              const order: string[] | null = d === "stage" ? [...PIPELINE_STAGES] : d === "status" ? STATUS_ORDER : null;
+              const sorted = order ? [...list].sort((a, b) => order.indexOf(a.value) - order.indexOf(b.value)) : list;
               return (
                 <p key={d} role="group" aria-label={`Filter by ${TITLES[d].toLowerCase()}`}>
                   {TITLES[d]}:{" "}
@@ -293,9 +305,8 @@ export default function PipelinePage() {
           <section aria-labelledby="h-stalled">
             <h2 id="h-stalled">Stalled deals</h2>
             <p>
-              Open deals with no movement for at least this long, by the stage they are stuck in. In this demo a deal that
-              stops moving is never marked lost, so old quiet deals stay in the count and the idle times run long. A real
-              pipeline would close them as lost.
+              Open deals with no movement for at least this long, by the stage they are stuck in. A deal that someone
+              has closed as lost is not stalled, so it is not counted here.
             </p>
             <p role="group" aria-label="Stalled for at least">
               {THRESHOLDS.map((t) => (
@@ -322,6 +333,47 @@ export default function PipelinePage() {
                     <td>{s.stage}</td>
                     <td>{s.count.toLocaleString("en-US")}</td>
                     <td>{days(s.medianIdleDays)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section aria-labelledby="h-cohorts">
+            <h2 id="h-cohorts">Cohort ladder</h2>
+            <p>
+              Do newer deals reach each stage faster or slower? Each row is the deals that entered in one month, and each
+              figure is the share that reached the stage within the window below, counting elapsed time from entry. A month
+              whose newest deal has not had the whole window is marked as still maturing, because comparing it with older
+              months would be unfair.
+            </p>
+            <p role="group" aria-label="Cohort window">
+              {WINDOWS.map((w) => (
+                <button key={w} type="button" aria-pressed={cohortWindow === w} onClick={() => void pickWindow(w)}>
+                  Within {w} days
+                </button>
+              ))}
+            </p>
+            <table aria-label="Cohort ladder">
+              <thead>
+                <tr>
+                  <th>Entered</th>
+                  <th>Deals</th>
+                  <th>Reached Qualified</th>
+                  <th>Reached Proposal</th>
+                  <th>Reached Won</th>
+                  <th>Comparable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cohorts.map((c) => (
+                  <tr key={c.cohort}>
+                    <td>{c.cohort}</td>
+                    <td>{c.deals.toLocaleString("en-US")}</td>
+                    <td>{formatPercent(c.qualifiedShare, 1)}</td>
+                    <td>{formatPercent(c.proposalShare, 1)}</td>
+                    <td>{formatPercent(c.wonShare, 1)}</td>
+                    <td>{c.mature ? "yes" : "still maturing"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -42,6 +42,32 @@ describe("syntheticPipeline", () => {
     expect(days("enterprise")).toBeGreaterThan(days("smb") * 2);
   });
 
+  it("marks a deal won, lost or open, and a lost deal went quiet before the cutoff", () => {
+    const asOf = Date.parse(PIPELINE_AS_OF);
+    const utc = (t: string) => Date.parse(t.replace(" ", "T") + "Z");
+    let lost = 0;
+    for (const r of rows) {
+      if (r.stage === "Won") {
+        expect(r.status).toBe("won");
+        expect(r.lostAt).toBeNull();
+        continue;
+      }
+      expect(["lost", "open"]).toContain(r.status);
+      if (r.status === "lost") {
+        lost++;
+        const last = r.entered.filter((e) => e !== null).at(-1) as string;
+        expect(r.lostAt).not.toBeNull();
+        expect(utc(r.lostAt!)).toBeGreaterThanOrEqual(utc(last));
+        expect(utc(r.lostAt!)).toBeLessThanOrEqual(asOf);
+      } else {
+        expect(r.lostAt).toBeNull();
+      }
+    }
+    // Most deals that went nowhere are marked lost, and some are still open.
+    expect(lost).toBeGreaterThan(rows.filter((r) => r.status === "open").length);
+    expect(rows.filter((r) => r.status === "open").length).toBeGreaterThan(0);
+  });
+
   it("uses only labels, never an email or a name", () => {
     for (const r of rows.slice(0, 300)) expect(JSON.stringify(r)).not.toMatch(/@/);
   });

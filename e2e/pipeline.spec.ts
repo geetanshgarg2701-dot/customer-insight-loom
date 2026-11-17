@@ -54,6 +54,25 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
   // The label changes at once and the count a moment later, so wait for the count.
   await expect.poll(stalledCount).toBeLessThan(at30);
 
+  // A deal closed as lost is not stalled. Filtering to lost deals leaves nothing stalled.
+  const status = page.getByRole("group", { name: "Filter by status" });
+  await expect(status.getByRole("button", { name: /^lost, / })).toBeVisible();
+  await status.getByRole("button", { name: /^lost, / }).click();
+  await expect(page.getByText(/^0 open deals have not moved for 60 days or more/)).toBeVisible();
+  await status.getByRole("button", { name: /^lost, / }).click();
+
+  // The cohort ladder: months of entry, the newest still maturing, and a longer window reaches more.
+  const ladder = page.getByRole("table", { name: "Cohort ladder" });
+  await expect.poll(async () => (await ladder.getByRole("row").count()) > 6).toBe(true);
+  await expect(ladder.getByRole("row").last()).toContainText("still maturing");
+  const wonShare = async () => {
+    const cells = await ladder.getByRole("row").nth(2).getByRole("cell").allInnerTexts();
+    return parseFloat(cells[4]);
+  };
+  const won60 = await wonShare();
+  await page.getByRole("group", { name: "Cohort window" }).getByRole("button", { name: "Within 90 days" }).click();
+  await expect.poll(wonShare).toBeGreaterThanOrEqual(won60);
+
   // The measured time is on the page. The plan's target is 1 second, a guess that this run checks.
   const ms = Number(/Updated in (\d+) ms/.exec(await page.getByText(/Updated in \d+ ms/).innerText())![1]);
   console.log(`browser pipeline update on 100,000 rows: ${ms} ms`);

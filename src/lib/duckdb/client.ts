@@ -3,11 +3,13 @@ import type { verifyResults } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
 import { countsBy, loadJourneys, sankeyEdges, type Count, type JourneyDimension, type SankeyEdge, type Selection } from "../charts/crossfilter";
 import {
+  cohortLadder,
   dwellHistogram,
   loadPipeline,
   pipelineCounts,
   stageFunnel,
   stalledByStage,
+  type CohortRow,
   type Count as PipelineCount,
   type DwellHistogram,
   type FunnelStage,
@@ -172,6 +174,7 @@ export type PipelineBoard = {
   funnel(selection: PipelineSelection): Promise<FunnelStage[]>;
   dwell(stageIndex: number, selection: PipelineSelection): Promise<DwellHistogram>;
   stalled(thresholdDays: number, selection: PipelineSelection): Promise<Stalled[]>;
+  cohorts(windowDays: number, selection: PipelineSelection): Promise<CohortRow[]>;
   close(): Promise<void>;
 };
 
@@ -187,6 +190,7 @@ export async function createBrowserPipelineBoard(rows = 100_000, seed = 21): Pro
     funnel: (selection) => stageFunnel(engine, table, selection),
     dwell: (stageIndex, selection) => dwellHistogram(engine, table, stageIndex, selection),
     stalled: (thresholdDays, selection) => stalledByStage(engine, table, { thresholdDays, asOf: PIPELINE_AS_OF }, selection),
+    cohorts: (windowDays, selection) => cohortLadder(engine, table, { windowDays, asOf: PIPELINE_AS_OF }, selection),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

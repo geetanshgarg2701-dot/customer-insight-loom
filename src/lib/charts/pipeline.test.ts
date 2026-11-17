@@ -4,6 +4,7 @@ import type { SqlEngine } from "../intake/types";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import {
   PIPELINE_DIMENSIONS,
+  cohortLadder,
   dwellHistogram,
   loadPipeline,
   pipelineCounts,
@@ -38,7 +39,7 @@ describe("pipelineWhere", () => {
   });
 
   it("knows its own dimensions", () => {
-    expect([...PIPELINE_DIMENSIONS]).toEqual(["segment", "source", "stage"]);
+    expect([...PIPELINE_DIMENSIONS]).toEqual(["segment", "source", "stage", "status"]);
   });
 });
 
@@ -99,16 +100,25 @@ describe("stalledByStage", () => {
     expect(s.every((x) => x.count > 0 && x.medianIdleDays >= 30)).toBe(true);
   });
 
+  it("leaves out lost deals, which are closed, not stalled", async () => {
+    const stalled = (await stalledByStage(engine, TABLE, { thresholdDays: 0, asOf: PIPELINE_AS_OF }, {})).reduce((n, x) => n + x.count, 0);
+    const byStatus = await pipelineCounts(engine, TABLE, "status", {});
+    const count = (v: string) => byStatus.find((c) => c.value === v)?.count ?? 0;
+    expect(stalled).toBe(count("open"));
+    expect(count("lost")).toBeGreaterThan(count("open"));
+    expect(count("won") + count("lost") + count("open")).toBe(ROWS);
+  });
+
   it("finds more stalled customers at a shorter threshold than a longer one", async () => {
     const total = async (days: number) =>
       (await stalledByStage(engine, TABLE, { thresholdDays: days, asOf: PIPELINE_AS_OF }, {})).reduce((n, x) => n + x.count, 0);
     expect(await total(14)).toBeGreaterThan(await total(60));
   });
 
-  it("agrees with the funnel: stalled plus moved on plus won equals everyone who reached the stage", async () => {
-    // At the strictest threshold of 0 days, every open customer is stalled at their current stage.
+  it("agrees with the status counts: at a threshold of 0 every open deal is stalled at its stage", async () => {
+    // At a threshold of 0 days, every open deal is stalled at its current stage.
     const s = await stalledByStage(engine, TABLE, { thresholdDays: 0, asOf: PIPELINE_AS_OF }, {});
-    const open = (await pipelineCounts(engine, TABLE, "stage", {})).filter((c) => c.value !== "Won").reduce((n, c) => n + c.count, 0);
+    const open = (await pipelineCounts(engine, TABLE, "status", {})).find((c) => c.value === "open")!.count;
     expect(s.reduce((n, x) => n + x.count, 0)).toBe(open);
   });
 
@@ -131,5 +141,66 @@ describe("speed on 100,000 customers", () => {
     const ms = performance.now() - started;
     console.log(`pipeline update on ${ROWS} rows in Node: ${ms.toFixed(0)} ms`);
     expect(ms).toBeLessThan(1000);
+  });
+});
+
+describe("cohortLadder, plan section on the cohort ladder", () => {
+  it("groups deals by the month they entered, in UTC, and every deal is in exactly one cohort", async () => {
+    const ladder = await cohortLadder(engine, TABLE, { windowDays: 60, asOf: PIPELINE_AS_OF }, {});
+    expect(ladder.reduce((n, c) => n + c.deals, 0)).toBe(ROWS);
+    const months = ladder.map((c) => c.cohort);
+    expect(months).toEqual([...months].sort());
+    for (const m of months) expect(m).toMatch(/^\d{4}-\d{2}$/);
+  });
+
+  it("never reaches more of a later stage than an earlier one, and shares are between 0 and 1", async () => {
+    const ladder = await cohortLadder(engine, TABLE, { windowDays: 60, asOf: PIPELINE_AS_OF }, {});
+    for (const c of ladder) {
+      expect(c.reachedProposal).toBeLessThanOrEqual(c.reachedQualified);
+      expect(c.reachedWon).toBeLessThanOrEqual(c.reachedProposal);
+      expect(c.reachedQualified).toBeLessThanOrEqual(c.deals);
+      for (const share of [c.qualifiedShare, c.proposalShare, c.wonShare]) {
+        expect(share).toBeGreaterThanOrEqual(0);
+        expect(share).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("marks a cohort mature only when every deal in it has had the whole window", async () => {
+    const asOf = Date.parse(PIPELINE_AS_OF);
+    const ladder = await cohortLadder(engine, TABLE, { windowDays: 60, asOf: PIPELINE_AS_OF }, {});
+    const last = ladder[ladder.length - 1];
+    // The newest month ends at the cutoff, so its deals have not had 60 days.
+    expect(last.mature).toBe(false);
+    expect(ladder.some((c) => c.mature)).toBe(true);
+    for (const c of ladder.filter((x) => x.mature)) {
+      const [y, m] = c.cohort.split("-").map(Number);
+      const monthEnd = Date.UTC(y, m, 1);
+      // A mature cohort's newest possible entry, the end of its month, plus the window, is not after the cutoff.
+      expect(monthEnd - 1 + 60 * 86_400_000).toBeLessThanOrEqual(asOf + 31 * 86_400_000);
+      expect(c.latestEntry).not.toBeNull();
+    }
+  });
+
+  it("matches the funnel when the window is long enough to cover everything", async () => {
+    const ladder = await cohortLadder(engine, TABLE, { windowDays: 10_000, asOf: PIPELINE_AS_OF }, {});
+    const funnel = await stageFunnel(engine, TABLE, {});
+    expect(ladder.reduce((n, c) => n + c.reachedQualified, 0)).toBe(funnel[1].count);
+    expect(ladder.reduce((n, c) => n + c.reachedProposal, 0)).toBe(funnel[2].count);
+    expect(ladder.reduce((n, c) => n + c.reachedWon, 0)).toBe(funnel[3].count);
+  });
+
+  it("counts fewer wins inside a short window than a long one, and the closing instant counts as inside", async () => {
+    const win = async (days: number) =>
+      (await cohortLadder(engine, TABLE, { windowDays: days, asOf: PIPELINE_AS_OF }, {})).reduce((n, c) => n + c.reachedWon, 0);
+    expect(await win(30)).toBeLessThan(await win(90));
+  });
+
+  it("respects the filters and refuses a bad window or time", async () => {
+    const all = await cohortLadder(engine, TABLE, { windowDays: 60, asOf: PIPELINE_AS_OF }, {});
+    const ent = await cohortLadder(engine, TABLE, { windowDays: 60, asOf: PIPELINE_AS_OF }, { segment: ["enterprise"] });
+    expect(ent.reduce((n, c) => n + c.deals, 0)).toBeLessThan(all.reduce((n, c) => n + c.deals, 0));
+    await expect(cohortLadder(engine, TABLE, { windowDays: 0, asOf: PIPELINE_AS_OF }, {})).rejects.toThrow(RangeError);
+    await expect(cohortLadder(engine, TABLE, { windowDays: 60, asOf: "soon" }, {})).rejects.toThrow(RangeError);
   });
 });
