@@ -66,6 +66,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Journeys: three linked bar charts and a flow chart with drop off, on 100,000 synthetic customers | PARTIAL | `/journeys`, `src/lib/charts`. The chart coordinator is built and measured: 110 ms in the browser for a full update, against the plan's guess of 1 second. 4 of the 13 visuals, no replay, no what if, no top paths table. |
 | Pipeline views | NOT STARTED | |
 | AI features | NOT STARTED | Hosted AI is off until the free plan terms are confirmed. |
+| Design system | PARTIAL | Three directions as tokens on `/journeys`, switchable live: quiet editorial, dense analytics, friendly. The owner has not chosen yet, and no other screen is styled. Contrast checked, at least 5.2 to 1. |
 | Privacy and terms pages | NOT STARTED | |
 | Landing page | PARTIAL | A home page exists. |
 | 404 page | PARTIAL | The Next.js default. |
