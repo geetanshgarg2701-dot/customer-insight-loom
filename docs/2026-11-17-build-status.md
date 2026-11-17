@@ -40,7 +40,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 |---|---|---|
 | CSV intake in the browser, column mapping, blocked columns | BUILT | `src/lib/intake`, DuckDB-Wasm in a worker, self hosted |
 | Redaction for email, phone, card, social security number, IPv4, street address | BUILT | `src/lib/redaction`, version 2, limits in `2026-11-12-redaction-known-limits.md` |
-| Name redaction | NOT STARTED | Names are not covered. |
+| Name redaction | NOT STARTED | Names are not covered. Researched on 2026-11-17, see `2026-11-17-name-redaction-findings.md`: possible with a 29 MB model, but no screen reads free text yet and the best small model still misses about 1 name in 5, so it is deferred. |
 | Quote storage that refuses unredacted text | PARTIAL | In memory only, and no screen saves quotes. The database checks only that a stamp exists. |
 | Compliance check with consent and suppression | NOT STARTED | Part C calls it must have. |
 | Delete all control | NOT STARTED | |
