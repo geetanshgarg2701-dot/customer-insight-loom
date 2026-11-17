@@ -48,6 +48,18 @@ Labels: BUILT means the code or schema already settles it. DECIDE means a person
 - **DECIDE.** Either start the session window after the checkpoint, or drop the questions about unbuilt features from early sessions. Recommendation: drop questions 3, 4 and 6 from early sessions, because that keeps the dates the testers were already offered.
 - **EDIT.** Fix the three row totals.
 
-## What was not changed
+## Done in Part B on 2026-11-17
 
-No plan part was edited. Part B is the only plan part in this repository, and its edits above are a separate step. The local parts need the same edits, and I can make them on request.
+Part B is the only plan part in this repository, and these edits are made in `docs/2026-11-12-part-b-sections-6-9-13.md`:
+
+- Section 6.3 A/A band: 36 to 64 became 37 to 64, with the false alarm rate and a rerun instead of an immediate engine fix. The 2 of 3 seeds rule was not written in, because it is still a DECIDE item above.
+- Section 6.3 planted lift: the promise is now the computed floor, 382 at power 0.80, with the reason the literal rule was dropped.
+- The result field in the ledger table: it holds the first, locked result, and later readouts are numbered versions.
+- The quotas row: Sentry removed, error tracking limits marked UNVERIFIED.
+
+## Not changed
+
+- Parts A, C and D. They stay local, and the same edits apply to them: the Sentry rows, framework tags, the Mosaic spike length, redaction timing, the DuckDB version, the result versions line and the schedule rows.
+- Part B line 47, the assignment export. It says the decision is open. The build follows Part A, but I did not rewrite a sentence that still asks for your confirmation.
+- CUPED in Part B line 55, because it is a DECIDE item above.
+- CLAUDE.md.
