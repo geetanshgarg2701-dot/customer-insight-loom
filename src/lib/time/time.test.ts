@@ -110,3 +110,27 @@ describe("a local time with no zone, plan section 5.7", () => {
     expect(parseLocalTime("2026-13-40 99:99", CHICAGO)).toEqual({ status: "invalid" });
   });
 });
+
+describe("speed, so a large file of events cannot freeze the page", () => {
+  it("cuts 100,000 events into days in well under 2 seconds", () => {
+    const events = Array.from({ length: 100_000 }, (_, i) => new Date(Date.parse("2026-01-01T00:00:00Z") + i * 1_000_000).toISOString());
+    const started = performance.now();
+    const counts = dailyCounts(events, CHICAGO);
+    const ms = performance.now() - started;
+    console.log(`dailyCounts on 100,000 events: ${ms.toFixed(0)} ms`);
+    expect([...counts.values()].reduce((a, b) => a + b, 0)).toBe(100_000);
+    expect(ms).toBeLessThan(2000);
+  });
+
+  it("reads 20,000 local times with no zone in under 2 seconds", () => {
+    const started = performance.now();
+    for (let i = 0; i < 20_000; i++) {
+      const day = String(1 + (i % 28)).padStart(2, "0");
+      const hour = String(i % 24).padStart(2, "0");
+      parseLocalTime(`2026-06-${day} ${hour}:30`, CHICAGO);
+    }
+    const ms = performance.now() - started;
+    console.log(`parseLocalTime on 20,000 times: ${ms.toFixed(0)} ms`);
+    expect(ms).toBeLessThan(2000);
+  });
+});

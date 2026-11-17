@@ -33,13 +33,35 @@ export function isWindowOpen(entryAt: string, windowHours: number, cutoffAt: str
   return instant(cutoffAt, "cutoff") <= instant(entryAt, "entry time") + windowHours * HOUR_MS;
 }
 
+/**
+ * Building an Intl formatter costs about 60 microseconds, and it was being built for every event, which made cutting
+ * 100,000 events into days take over 6 seconds. Each zone's formatter is built once and kept. A name the zone database
+ * does not know throws on the first use and is not kept, so a bad name cannot poison the cache.
+ */
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function formatterFor(cache: Map<string, Intl.DateTimeFormat>, timeZone: string, options: Intl.DateTimeFormatOptions) {
+  let f = cache.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", { timeZone, ...options });
+    cache.set(timeZone, f);
+  }
+  return f;
+}
+
 /** The calendar date of an instant in the named zone, as YYYY-MM-DD. */
 export function localDayKey(isoInstant: string, timeZone: string): string {
   const ms = instant(isoInstant, "time");
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
-    .formatToParts(new Date(ms))
-    .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  let year = "";
+  let month = "";
+  let day = "";
+  for (const p of formatterFor(dayFormatters, timeZone, { year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(ms))) {
+    if (p.type === "year") year = p.value;
+    else if (p.type === "month") month = p.value;
+    else if (p.type === "day") day = p.value;
+  }
+  return `${year}-${month}-${day}`;
 }
 
 /** Counts per local day. Events with no usable timestamp are left out and counted in `excluded`. */
@@ -63,7 +85,7 @@ export function dailyCounts(timestamps: readonly string[], timeZone: string): Da
 /** The zone's offset from UTC at an instant, in minutes. */
 function offsetMinutes(timeZone: string, ms: number): number {
   const name =
-    new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset", hour: "numeric" })
+    formatterFor(offsetFormatters, timeZone, { timeZoneName: "longOffset", hour: "numeric" })
       .formatToParts(new Date(ms))
       .find((p) => p.type === "timeZoneName")?.value ?? "GMT";
   const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(name);
