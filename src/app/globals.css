@@ -1,26 +1,222 @@
 @import "tailwindcss";
 
+/*
+ * Quiet editorial, chosen by the owner on 2026-11-17: warm paper, serif type, thin rules. System fonts only, so no
+ * font file is downloaded. One light palette on purpose. Text on its background was checked for at least 4.5 to 1:
+ * text 15.9, muted 6.6, accent 7.3. Every rule below uses these tokens, so the look changes in one place.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #faf8f4;
+  --panel: #faf8f4;
+  --text: #1f1d1a;
+  --muted: #5e584e;
+  --line: #cfc7b8;
+  --accent: #8a3b12;
+  --accent-text: #faf8f4;
+  --danger: #8f1d1d;
+  --font: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  --size: 17px;
+  --gap: 1.25rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--bg);
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--size);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+main {
+  width: 100%;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.9em;
+  line-height: 1.15;
+  font-weight: 600;
+  margin: 1rem 0 var(--gap);
+}
+h2 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 0 0 0.4em;
+}
+p {
+  margin: 0 0 var(--gap);
+  max-width: 70ch;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 0.18em;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+small {
+  color: var(--muted);
+}
+
+ul,
+ol {
+  margin: 0 0 var(--gap);
+  padding-left: 1.4rem;
+  max-width: 70ch;
+}
+ul {
+  list-style: disc;
+}
+ol {
+  list-style: decimal;
+}
+li {
+  margin-bottom: 0.4em;
+}
+
+nav[aria-label="Main"] {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+}
+nav[aria-label="Main"] a {
+  color: var(--text);
+}
+nav[aria-label="Main"] a:hover {
+  color: var(--accent);
+}
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: var(--gap);
+  margin-bottom: var(--gap);
+}
+figure {
+  margin: 0 0 0.5rem;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.3em 0.9em;
+  margin: 0 0.5em 0.5em 0;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* A toggle, such as a chart filter: plain text that turns to an accent underline when pressed. */
+button[aria-pressed] {
+  border-width: 0 0 1px 0;
+  padding: 0.1em 0.2em;
+  margin-right: 1em;
+}
+button[aria-pressed="true"] {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.25em 0.5em;
+  max-width: 100%;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #efece6;
+  color: var(--muted);
+}
+input[type="file"] {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding-left: 0;
+}
+/* A file picker is wider than a phone by default, so its label takes the full row. */
+label:has(input[type="file"]) {
+  display: block;
+  max-width: 100%;
+}
+textarea {
+  display: block;
+  width: min(100%, 36rem);
+  min-height: 5rem;
+}
+label {
+  display: inline-block;
+  margin-bottom: 0.4rem;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--gap);
+}
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.3em 0.6em;
+  border-bottom: 1px solid var(--line);
+}
+table.flow td:last-child,
+table.flow th:last-child {
+  text-align: right;
+}
+
+fieldset {
+  border: 1px solid var(--line);
+  padding: var(--gap);
+  margin: 0 0 var(--gap);
+}
+legend {
+  padding: 0 0.4em;
+  color: var(--muted);
+}
+[role="alert"] {
+  color: var(--danger);
+  border-left: 3px solid var(--danger);
+  padding-left: 0.75rem;
 }

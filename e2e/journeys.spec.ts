@@ -52,22 +52,3 @@ test("linked charts filter each other on 100,000 synthetic journeys, and the upd
 
   expect(foreign).toEqual([]);
 });
-
-test("the style switcher changes the page, and the choice is remembered in this browser", async ({ page }) => {
-  await page.goto("/journeys");
-  const board = page.locator(".board");
-  await expect(board).toHaveAttribute("data-style", "editorial");
-
-  await page.getByRole("radio", { name: /Dense analytics/ }).check();
-  await expect(board).toHaveAttribute("data-style", "dense");
-  // The page really changes: the board background is dark in the dense direction.
-  const bg = await board.evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(bg).toBe("rgb(15, 20, 25)");
-
-  await page.getByRole("radio", { name: /Friendly/ }).check();
-  await expect(board).toHaveAttribute("data-style", "friendly");
-
-  await page.reload();
-  await expect(page.getByRole("radio", { name: /Friendly/ })).toBeChecked();
-  await expect(page.locator(".board")).toHaveAttribute("data-style", "friendly");
-});

@@ -66,26 +66,26 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Journeys: three linked bar charts and a flow chart with drop off, on 100,000 synthetic customers | PARTIAL | `/journeys`, `src/lib/charts`. The chart coordinator is built and measured: 110 ms in the browser for a full update, against the plan's guess of 1 second. 4 of the 13 visuals, no replay, no what if, no top paths table. |
 | Pipeline views | NOT STARTED | |
 | AI features | NOT STARTED | Hosted AI is off until the free plan terms are confirmed. |
-| Design system | PARTIAL | Three directions as tokens on `/journeys`, switchable live: quiet editorial, dense analytics, friendly. The owner has not chosen yet, and no other screen is styled. Contrast checked, at least 5.2 to 1. |
+| Design system | BUILT | Quiet editorial, chosen by the owner on 2026-11-17, in `src/app/globals.css`: warm paper, serif type, system fonts, one light palette. Contrast at least 5.2 to 1. Every screen fits a phone at 375 pixels, tested. |
 | Privacy and terms pages | NOT STARTED | |
-| Landing page | PARTIAL | A home page exists. |
-| 404 page | PARTIAL | The Next.js default. |
-| Favicon | PARTIAL | The default icon file. |
-| Accessibility checks with axe, phone width tests | NOT STARTED | Neither `axe-core` nor a phone viewport run is in the repository. |
+| Landing page | BUILT | An early version: what it is, what works today, and a plain statement that it is untried on real data. |
+| 404 page | PARTIAL | The Next.js default, now in the editorial style. |
+| Favicon | PARTIAL | The default icon file. The page title is now "Evidence ledger". |
+| Accessibility checks with axe, phone width tests | PARTIAL | A phone width test runs on every screen, 375 pixels with no sideways scroll. `axe-core` is not installed. |
 
 ## Tests today
 
-On this date: 493 unit tests, 16 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 493 unit tests, 22 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
 Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budgets, and the item estimates are SPECULATION. No hours were tracked while building, so nothing below is measured. Use it to compare scope, not to promise a date.
 
-**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 are left and about 153 are done, which is 153 of 351, or about 44 percent. Against about 51 percent by item count.
+**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 were left. The design system, the real home page and the phone width pass then took about 10 more, so about 188 are left and about 163 are done, which is 163 of 351, or about 46 percent. Against about 51 percent by item count.
 
 | Not started item | Hours |
 |---|---|
-| Design system | 8 |
+| Design system | 0 |
 | Webhook ingestion, and screens for identity and time rules | 12 |
 | Journey views, the rest of M16 | 28 |
 | Pipeline views, M17 | 42 |
@@ -95,11 +95,11 @@ Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budg
 | Compliance check, delete all, usage meter, keep alive | 14 |
 | Pilot accounts, a Supabase client | 12 |
 | Name redaction | 8 |
-| Click to explain, privacy and terms, landing and 404 | 10 |
-| Accessibility checks and phone width tests | 10 |
-| **Total** | **198** |
+| Click to explain, privacy and terms, 404 and favicon | 8 |
+| Accessibility checks with axe, keyboard pass | 7 |
+| **Total** | **188** |
 
-At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 70 of the 198 hours and hold the success metric the testers are asked about.
+At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 70 of the 188 hours and hold the success metric the testers are asked about.
 
 **What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 170, which is about 11 to 14 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.
 

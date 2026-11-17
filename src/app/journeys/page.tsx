@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection } from "@/lib/charts/crossfilter";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
-import "./styles.css";
-import { CHART_THEMES, STYLE_LABELS, STYLE_NAMES, type ChartTheme, type StyleName } from "./themes";
+import { CHART_THEME, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
   channel: "Channel",
@@ -19,42 +18,6 @@ const ROWS = 100_000;
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
-}
-
-const STYLE_KEY = "journeys-style";
-const DEFAULT_STYLE: StyleName = "editorial";
-
-// The chosen style is remembered in this browser only. It is a convenience, so a blocked store changes nothing
-// except that the choice is not kept after a reload. The module variable keeps the choice for this page load.
-let chosen: StyleName | null = null;
-const styleListeners = new Set<() => void>();
-
-function readStyle(): StyleName {
-  if (chosen) return chosen;
-  try {
-    const saved = window.localStorage.getItem(STYLE_KEY);
-    if (saved && (STYLE_NAMES as readonly string[]).includes(saved)) return saved as StyleName;
-  } catch {
-    // Private window or blocked storage: use the default.
-  }
-  return DEFAULT_STYLE;
-}
-
-function subscribeStyle(callback: () => void): () => void {
-  styleListeners.add(callback);
-  return () => {
-    styleListeners.delete(callback);
-  };
-}
-
-function chooseStyle(next: StyleName): void {
-  chosen = next;
-  try {
-    window.localStorage.setItem(STYLE_KEY, next);
-  } catch {
-    // Not remembered after a reload, still applied now.
-  }
-  styleListeners.forEach((listener) => listener());
 }
 
 function barOption(counts: Count[], selected: string[], theme: ChartTheme): ChartOption {
@@ -126,8 +89,6 @@ export default function JourneysPage() {
   const [counts, setCounts] = useState<Partial<Record<JourneyDimension, Count[]>>>({});
   const [edges, setEdges] = useState<SankeyEdge[]>([]);
   const [elapsed, setElapsed] = useState<number | null>(null);
-  const style = useSyncExternalStore(subscribeStyle, readStyle, () => DEFAULT_STYLE);
-  const theme = CHART_THEMES[style];
 
   const refresh = useCallback(async (next: Selection) => {
     const b = board.current;
@@ -190,28 +151,11 @@ export default function JourneysPage() {
   return (
     <main>
       <Nav />
-      <div className="board" data-style={style}>
       <h1>Journeys</h1>
       <p>
         Synthetic data only, so no real customer is shown. A click on a bar, or a button under it, filters the other
         charts and the flow. Everything runs in this browser.
       </p>
-
-      <fieldset>
-        <legend>Style</legend>
-        {STYLE_NAMES.map((name) => (
-          <label key={name} className="style-choice">
-            <input
-              type="radio"
-              name="style"
-              value={name}
-              checked={style === name}
-              onChange={() => chooseStyle(name)}
-            />{" "}
-            {STYLE_LABELS[name].title} <small>{STYLE_LABELS[name].blurb}</small>
-          </label>
-        ))}
-      </fieldset>
 
       {!loaded && (
         <p>
@@ -241,7 +185,7 @@ export default function JourneysPage() {
                 <h2 id={`h-${d}`}>{TITLES[d]}</h2>
                 <Chart
                   label={`${TITLES[d]}, customers per value`}
-                  option={barOption(list, selected, theme)}
+                  option={barOption(list, selected, CHART_THEME)}
                   height={180}
                   onSelect={(name) => void toggle(d, name)}
                 />
@@ -263,8 +207,8 @@ export default function JourneysPage() {
 
           <section aria-labelledby="h-flow">
             <h2 id="h-flow">Flow between steps</h2>
-            <Chart label="Flow of customers between steps, with drop off" option={sankeyOption(edges, theme)} height={320} />
-            <table aria-label="Flow between steps">
+            <Chart label="Flow of customers between steps, with drop off" option={sankeyOption(edges, CHART_THEME)} height={320} />
+            <table className="flow" aria-label="Flow between steps">
               <thead>
                 <tr>
                   <th>From</th>
@@ -285,7 +229,6 @@ export default function JourneysPage() {
           </section>
         </>
       )}
-      </div>
     </main>
   );
 }
