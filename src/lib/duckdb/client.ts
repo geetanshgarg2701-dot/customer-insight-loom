@@ -6,7 +6,7 @@ import { createIntake } from "../intake/intake";
 import type { Intake, SqlEngine } from "../intake/types";
 import { importLedger } from "../ledger/export";
 import { createLedger, type Ledger, type LedgerOptions } from "../ledger/ledger";
-import { selfHostedBundles } from "./bundles";
+import { duckdbPath, selfHostedBundles } from "./bundles";
 
 let dbPromise: Promise<AsyncDuckDB> | null = null;
 
@@ -20,7 +20,7 @@ function getDuckDb(): Promise<AsyncDuckDB> {
   if (!dbPromise) {
     dbPromise = (async () => {
       const duckdb = await import("@duckdb/duckdb-wasm");
-      const bundle = await duckdb.selectBundle(selfHostedBundles());
+      const bundle = await duckdb.selectBundle(selfHostedBundles(duckdbPath(process.env.NEXT_PUBLIC_BASE_PATH)));
       const worker = new Worker(bundle.mainWorker!);
       const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
       await db.instantiate(bundle.mainModule, bundle.pthreadWorker);

@@ -18,3 +18,12 @@ export function selfHostedBundles(basePath = "/duckdb"): SelfHostedBundles {
     },
   };
 }
+
+/**
+ * Where the DuckDB files live when the site is served under a prefix, such as a GitHub Pages project page at
+ * /evidence-ledger. Next.js adds the prefix to its own links and files but not to a URL built by hand.
+ */
+export function duckdbPath(sitePrefix: string | undefined): string {
+  const prefix = (sitePrefix ?? "").trim().replace(/^\/+|\/+$/g, "");
+  return prefix === "" ? "/duckdb" : `/${prefix}/duckdb`;
+}

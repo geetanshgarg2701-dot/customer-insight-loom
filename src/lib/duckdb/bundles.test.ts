@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selfHostedBundles } from "./bundles";
+import { duckdbPath, selfHostedBundles } from "./bundles";
 
 describe("selfHostedBundles", () => {
   it("points every file at the app's own origin under /duckdb by default", () => {
@@ -26,5 +26,24 @@ describe("selfHostedBundles", () => {
       x.mainWorker,
     ]);
     for (const u of urls) expect(u).not.toMatch(/^[a-z]+:\/\//i);
+  });
+});
+
+describe("duckdbPath", () => {
+  it("is /duckdb with no site prefix", () => {
+    expect(duckdbPath(undefined)).toBe("/duckdb");
+    expect(duckdbPath("")).toBe("/duckdb");
+  });
+
+  it("puts a site prefix in front, for a project page such as /evidence-ledger", () => {
+    expect(duckdbPath("/evidence-ledger")).toBe("/evidence-ledger/duckdb");
+    expect(duckdbPath("/evidence-ledger/")).toBe("/evidence-ledger/duckdb");
+    expect(duckdbPath("evidence-ledger")).toBe("/evidence-ledger/duckdb");
+  });
+
+  it("feeds selfHostedBundles so the wasm and worker load under the prefix", () => {
+    const b = selfHostedBundles(duckdbPath("/evidence-ledger"));
+    expect(b.eh.mainModule).toBe("/evidence-ledger/duckdb/duckdb-eh.wasm");
+    expect(b.mvp.mainWorker).toBe("/evidence-ledger/duckdb/duckdb-browser-mvp.worker.js");
   });
 });
