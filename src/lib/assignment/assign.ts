@@ -10,7 +10,8 @@
 import type { SqlEngine, SqlParam } from "../intake/types";
 import { insertRows, type Arm, type Ledger } from "../ledger/ledger";
 import { experimentReadout, type ExperimentReadout } from "../stats/experiment";
-import { FORMULA_START, bucketOf, customerHash, looksLikeEmail, normalizeEmail, unprotect } from "./hash";
+import { csvCell } from "../app/csv";
+import { bucketOf, customerHash, looksLikeEmail, normalizeEmail, unprotect } from "./hash";
 
 const HASH_BATCH = 1000;
 
@@ -81,11 +82,7 @@ export async function assignAudience(input: {
   return { assigned: records.length, treatment, control: records.length - treatment, duplicates, invalid, rows };
 }
 
-export function csvCell(value: string): string {
-  // A leading quote stops spreadsheets from running a cell as a formula.
-  const safe = FORMULA_START.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
+export { csvCell };
 
 /** The download for the user's send tool: their email, the group, the entry. */
 export function assignmentCsv(rows: readonly AssignedRow[], entryId: string): string {

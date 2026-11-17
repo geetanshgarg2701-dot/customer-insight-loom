@@ -6,7 +6,9 @@ import { getBrowserLedger, importBrowserLedger, seedBrowserDemo } from "@/lib/du
 import { downloadText } from "@/lib/app/download";
 import { demoAudienceCsv } from "@/lib/demo/synthetic";
 import { familywiseLine } from "@/lib/ledger/familywise";
-import { FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
+import { ledgerCsv } from "@/lib/ledger/csv";
+import { NO_FILTER, filterEntries, type EntryFilter } from "@/lib/ledger/filter";
+import { STATUSES, FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
 import { Nav } from "../nav";
 
 function messageOf(error: unknown): string {
@@ -23,6 +25,7 @@ export default function LedgerPage() {
   const [title, setTitle] = useState("");
   const [hypothesis, setHypothesis] = useState("");
   const [tag, setTag] = useState<"" | FrameworkTag>("");
+  const [filter, setFilter] = useState<EntryFilter>(NO_FILTER);
 
   const refresh = useCallback(async () => {
     try {
@@ -97,6 +100,20 @@ export default function LedgerPage() {
     }
   }
 
+  async function onExportCsv() {
+    setError(null);
+    setNotice(null);
+    try {
+      const ledger = await getBrowserLedger();
+      const list = await ledger.listEntries();
+      const counts = new Map<string, number>();
+      for (const e of list) counts.set(e.id, (await ledger.listResults(e.id)).length);
+      downloadText(`evidence-ledger-${ledger.now().toISOString().slice(0, 10)}.csv`, "text/csv", ledgerCsv(list, counts));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
+
   async function onImport(file: File | undefined) {
     if (!file) return;
     setBusy(true);
@@ -121,6 +138,8 @@ export default function LedgerPage() {
   }
 
   const family = entries ? familywiseLine(entries) : null;
+  const visible = entries ? filterEntries(entries, filter) : null;
+  const filtered = JSON.stringify(filter) !== JSON.stringify(NO_FILTER);
 
   return (
     <main>
@@ -183,6 +202,58 @@ export default function LedgerPage() {
           </>
         )}
         {entries !== null && entries.length > 0 && (
+          <fieldset>
+            <legend>Show</legend>
+            <p>
+              <label>
+                Status{" "}
+                <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value as EntryFilter["status"] })}>
+                  <option value="all">All</option>
+                  {STATUSES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </label>{" "}
+              <label>
+                Type{" "}
+                <select value={filter.type} onChange={(e) => setFilter({ ...filter, type: e.target.value as EntryFilter["type"] })}>
+                  <option value="all">All</option>
+                  <option value="confirmatory">Confirmatory</option>
+                  <option value="exploratory">Exploratory</option>
+                  <option value="none">Not set</option>
+                </select>
+              </label>{" "}
+              <label>
+                Framework tag{" "}
+                <select value={filter.tag} onChange={(e) => setFilter({ ...filter, tag: e.target.value as EntryFilter["tag"] })}>
+                  <option value="all">All</option>
+                  {FRAMEWORK_TAGS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                  <option value="none">No tag</option>
+                </select>
+              </label>{" "}
+              <label>
+                Search{" "}
+                <input type="search" value={filter.text} onChange={(e) => setFilter({ ...filter, text: e.target.value })} />
+              </label>{" "}
+              <button type="button" disabled={!filtered} onClick={() => setFilter(NO_FILTER)}>
+                Clear filters
+              </button>
+            </p>
+            <p role="status">
+              Showing {visible?.length ?? 0} of {entries.length} {entries.length === 1 ? "entry" : "entries"}.
+            </p>
+          </fieldset>
+        )}
+        {entries !== null && entries.length > 0 && visible !== null && visible.length === 0 && (
+          <p>No entry matches these filters.</p>
+        )}
+        {entries !== null && entries.length > 0 && visible !== null && visible.length > 0 && (
           <table aria-label="Ledger entries">
             <thead>
               <tr>
@@ -193,7 +264,7 @@ export default function LedgerPage() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e) => (
+              {(visible ?? []).map((e) => (
                 <tr key={e.id}>
                   <td>
                     <Link href={`/ledger/entry?id=${e.id}`}>{e.title}</Link>
@@ -236,7 +307,15 @@ export default function LedgerPage() {
         <p>
           <button type="button" onClick={() => void onExport()}>
             Export ledger
+          </button>{" "}
+          <button type="button" onClick={() => void onExportCsv()}>
+            Export as CSV
           </button>
+        </p>
+        <p>
+          The ledger file can be imported again. The CSV is for a spreadsheet, one row per entry with its status and first
+          result. It holds no design, no assignment and no address. A spreadsheet will show a quote before any text that
+          starts like a formula, which is deliberate protection.
         </p>
         <p>
           <label>

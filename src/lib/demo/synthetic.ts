@@ -4,7 +4,7 @@
  * Outcomes come from a seeded generator with a known true lift, so the screen
  * can say where the readout should land.
  */
-import { csvCell } from "../assignment/assign";
+import { csvCell } from "../app/csv";
 import { customerHash } from "../assignment/hash";
 import type { Arm, Ledger } from "../ledger/ledger";
 import { mulberry32 } from "../stats/honesty";

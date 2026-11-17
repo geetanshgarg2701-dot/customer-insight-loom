@@ -27,7 +27,8 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Ledger entries, registration, launch, confirmatory or exploratory label | BUILT | `src/lib/ledger/ledger.ts` |
 | Ledger level false positive line | BUILT | `familywise.ts`, shown on the ledger screen |
 | Audit trail | BUILT | `ledger_audit`, written by triggers in the database |
-| Ledger export and import as a file | PARTIAL | A JSON file with a validator. A CSV export is not built. |
+| Ledger export and import as a file | BUILT | A JSON file that imports again, with a validator, and a CSV for a spreadsheet, one row per entry with its status and first result, in `src/lib/ledger/csv.ts`. The CSV holds no design, no assignment and no address, and puts a quote in front of any text that starts like a formula, so a spreadsheet cannot run it. Tested, including a title written as a formula. |
+| Ledger filters and search | BUILT | By status, type, framework tag and text, combined, with the number shown. `src/lib/ledger/filter.ts`. The text is matched as plain text, never as a pattern. |
 | Assignment by keyed hash, rebuild, results upload and check | BUILT | `src/lib/assignment` |
 | Received column in the results upload, delivery shares and a rough scaled lift | BUILT | `src/lib/stats/delivery.ts`. Optional. The readout itself is never changed. The scaled lift is a rough division by the delivery gap, with no interval. |
 | Synthetic demo data | BUILT | `src/lib/demo` |
@@ -75,7 +76,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 597 unit tests, 48 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 616 unit tests, 51 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
