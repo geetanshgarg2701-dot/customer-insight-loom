@@ -70,6 +70,13 @@ You asked me to keep going and ask only about important things. These were small
 - **R3-8.** A test now forces the clean output check to fire, and the known limits doc scopes the quote guarantee to the in memory store.
 - **R4-6.** `2026-11-17-build-status.md` is the one status table.
 
+## Added after the first pass
+
+- **2 of 3 seeds rule.** Written into Part B section 6.3, with a note that the methods page runs one seed and does not apply it yet.
+- **Tester questions.** The tester doc now says to ask only questions whose feature is built. Today only questions 1, 2 and 7 apply. Questions 3 to 6 and the success metric need the journey and pipeline views, the evidence chain and the pain ranking, none of which exist. This is a larger problem than the schedule dates: the validation plan cannot measure its own success metric with the current build.
+- **Pilot data.** Settled as sample data only. The tester doc already says so, and the redaction limits doc says why.
+- **Privacy note.** The tracked tester doc names a school in its message template, and it is in the git history. The repository returned 404 to an unauthenticated request on 2026-11-17, so it is private. Before the repository is ever made public, that line and the history need a decision.
+
 ## Not changed
 
 - Parts A, C and D. They stay local, and the same edits apply to them: the Sentry rows, framework tags, the Mosaic spike length, redaction timing, the DuckDB version, the result versions line and the schedule rows.

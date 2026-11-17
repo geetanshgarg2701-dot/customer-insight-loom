@@ -60,6 +60,8 @@ Fill this in over the next three weeks. Send nothing before Dec 7.
 
 Record every answer as written.
 
+Ask only the questions whose feature exists on the session date, using `docs/2026-11-17-build-status.md`. On 2026-11-17 that is questions 1, 2 and 7. Questions 3 and 5 need the journey and pipeline views, question 4 needs the evidence chain, and question 6 needs the pain ranking. None of those is built, so asking them would test a feature the tester cannot see. Added 2026-11-17, review finding R4-4.
+
 1. Describe the look and feel in one word.
 2. Did it feel different from other marketing tools you use.
 3. Did the journey and pipeline views show you something you did not already know, and what.
@@ -67,5 +69,7 @@ Record every answer as written.
 5. Find the step where most people leave. Record found or not found, and seconds taken.
 6. Did the pain ranking match your view, and which pain did you underrate or miss.
 7. Was an inconclusive result useful to you.
+
+The success metric below needs the journey and pipeline views, which are not built. If they are not built by the session date, the metric cannot be measured, and the case study must say so instead of replacing it with a different metric after the fact.
 
 Success metric, set now and not changed after seeing results: at least 3 of 5 testers find the step where the most people leave, in the demo, within 3 minutes, without help. The 3 of 5 and 3 minutes thresholds are judgment, not a benchmark.
