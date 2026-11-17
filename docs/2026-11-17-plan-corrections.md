@@ -57,6 +57,19 @@ Part B is the only plan part in this repository, and these edits are made in `do
 - The result field in the ledger table: it holds the first, locked result, and later readouts are numbered versions.
 - The quotas row: Sentry removed, error tracking limits marked UNVERIFIED.
 
+## Also done on 2026-11-17, decided without waiting
+
+You asked me to keep going and ask only about important things. These were small and reversible, so I took the recommendation. Each can be reversed in one edit.
+
+- **R1-8 CUPED.** Part B now puts CUPED in version 2 and requires the analysis choice at registration. This settles the CUPED row above.
+- **R1-9 revenue.** Part B no longer promises lift times audience times one order value, which can have the wrong sign. The helper in the code states its equal order value assumption in its note.
+- **R1-11 and R1-12.** Part B gives the exact sample size formula, the corrected reason for choosing Benjamini Hochberg, and notes that Holm is the plan for fewer than 10 comparisons. Neither correction method is applied on any screen yet.
+- **R1-6.** A significant result whose interval reaches below half of its own lift now carries a line saying significant results from small tests run high. The review proposed a rule based on power at the observed lift, but that power is only a rescaling of the p value, so it is about 0.5 or more for every significant result and the warning would almost never fire.
+- **R1-7.** The ledger screen shows how many confirmatory tests have a result and the chance that at least one reads significant if none had a real effect.
+- **R1-13.** The readout method text now names the pooled z test used for ordering and says it can disagree with the interval for very small counts.
+- **R3-8.** A test now forces the clean output check to fire, and the known limits doc scopes the quote guarantee to the in memory store.
+- **R4-6.** `2026-11-17-build-status.md` is the one status table.
+
 ## Not changed
 
 - Parts A, C and D. They stay local, and the same edits apply to them: the Sentry rows, framework tags, the Mosaic spike length, redaction timing, the DuckDB version, the result versions line and the schedule rows.

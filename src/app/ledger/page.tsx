@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getBrowserLedger, importBrowserLedger, seedBrowserDemo } from "@/lib/duckdb/client";
 import { downloadText } from "@/lib/app/download";
 import { demoAudienceCsv } from "@/lib/demo/synthetic";
+import { familywiseLine } from "@/lib/ledger/familywise";
 import { FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
 import { Nav } from "../nav";
 
@@ -119,6 +120,8 @@ export default function LedgerPage() {
     }
   }
 
+  const family = entries ? familywiseLine(entries) : null;
+
   return (
     <main>
       <Nav />
@@ -210,6 +213,7 @@ export default function LedgerPage() {
             </tbody>
           </table>
         )}
+        {family && <p>{family.text}</p>}
       </section>
 
       <section aria-labelledby="demo">

@@ -118,7 +118,10 @@ export function readout(input: {
       `Lift is the treatment conversion rate minus the control conversion rate. ` +
       `The ${percent(1 - alpha)} interval uses the Newcombe hybrid score method, ` +
       `method 10 in Newcombe 1998, built from Wilson score intervals. ` +
-      `Significant means the interval excludes zero. Fixed horizon: read once, after the conversion window closes.`,
+      `Significant means the interval excludes zero. ` +
+      `The p value is from the pooled two proportion z test. It orders tests for Benjamini Hochberg and is not used for the ` +
+      `significant call, so for very small counts the two can disagree. ` +
+      `Fixed horizon: read once, after the conversion window closes.`,
     engineVersion: STATS_ENGINE_VERSION,
   };
 }
@@ -148,8 +151,9 @@ export function incrementalRevenue(
     estimate: result.lift * scale,
     low: result.interval.low * scale,
     high: result.interval.high * scale,
-    note: "Revenue carries extra spread beyond this range because order values vary.",
+    note:
+      "Revenue carries extra spread beyond this range because order values vary. This assumes the same average order value in both arms. If the send changes order value, for example through a discount, the sign can be wrong, so compare revenue per recipient in each arm instead.",
     method:
-      "Lift and its interval endpoints multiplied by the treated audience size and the average order value from the same window.",
+      "Lift and its interval endpoints multiplied by the treated audience size and one average order value from the same window, which assumes the order value is equal in both arms.",
   };
 }

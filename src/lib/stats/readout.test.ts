@@ -98,3 +98,29 @@ describe("incrementalRevenue", () => {
     expect(rev.note).toMatch(/order values vary/);
   });
 });
+
+describe("the second test is named, review finding R1-13", () => {
+  it("shows the significance call and the p value can disagree for small counts", () => {
+    // 4 of 20 against 0 of 20: the interval includes zero, yet the pooled z p value is below 0.05.
+    const r = readout({ treatment: { n: 20, conversions: 4 }, control: { n: 20, conversions: 0 } });
+    expect(r.significant).toBe(false);
+    expect(r.pValue).toBeLessThan(0.05);
+    expect(r.method).toMatch(/pooled two proportion z test/);
+    expect(r.method).toMatch(/orders tests for Benjamini Hochberg/);
+    expect(r.method).toMatch(/can disagree/);
+  });
+});
+
+describe("incrementalRevenue assumption, review finding R1-9", () => {
+  it("can have the wrong sign when order value differs, and the note says so", () => {
+    // Control 10 percent at 50 dollars, treatment 12 percent at 40 dollars, 10,000 treated.
+    const shortcut = incrementalRevenue({ lift: 0.02, interval: { low: 0.01, high: 0.03 } }, 10_000, 50);
+    expect(shortcut.estimate).toBeCloseTo(10_000, 6);
+    // Revenue per recipient is 0.10 * 50 = 5.00 against 0.12 * 40 = 4.80, a true loss of 2,000 on 10,000 people.
+    const truth = (0.12 * 40 - 0.1 * 50) * 10_000;
+    expect(truth).toBeCloseTo(-2_000, 6);
+    expect(Math.sign(shortcut.estimate)).not.toBe(Math.sign(truth));
+    expect(shortcut.note).toMatch(/same average order value in both arms/);
+    expect(shortcut.note).toMatch(/revenue per recipient/);
+  });
+});
