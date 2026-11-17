@@ -7,6 +7,7 @@ Labels: SOURCED has a URL and the date I read it. INFERRED is my reasoning from 
 ## 1. What is ready
 
 - The app builds as a static copy with one command, `npm run build:static`, and a browser test proves the copy works under a project prefix with no request to any other host. 73.5 MiB in 90 files.
+- A fresh clone works. On 2026-11-17 the committed files were cloned into an empty folder, installed with `npm ci`, and checked: 597 unit tests, the type check, lint, the production build, the static build, the static browser test and all 48 browser tests passed. This found one real problem, that the type check failed on a clone because Next.js generates a type it needs, and it is fixed with `npm run typecheck`.
 - Automated accessibility checks, keyboard tests and a phone width test pass on every screen. See `2026-11-17-build-status.md`.
 - Privacy and terms pages exist, and a test fails if the code starts using storage, cookies, network calls, outside addresses or an analytics package.
 - The app says plainly that it is an early version, untried on real customer data, and that names are not removed.
