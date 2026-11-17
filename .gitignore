@@ -31,3 +31,8 @@ next-env.d.ts
 
 # Static export for a host with no server, see docs/2026-11-17-static-mirror.md
 /out/
+
+# Plan parts A, C and D hold personal details and stay on this machine, see docs/2026-11-17-plan-corrections.md
+docs/2026-11-11-part-a-*.md
+docs/2026-11-11-part-c-*.md
+docs/2026-11-11-part-d-*.md
