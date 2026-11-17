@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Evidence ledger
 
-## Getting Started
+A free ledger for email experiments. You record the bet before you send, hold back a control group, and read the result once, after the conversion window closes. When a result is too small to tell, it says so plainly.
 
-First, run the development server:
+It runs entirely in your browser. Your files are read on your own computer, held in memory, and never uploaded. There is no account and no tracking. See `/privacy` in the app for the details, and `src/lib/app/privacy-claims.test.ts` for the test that keeps those claims true.
+
+**This is an early version.** It has not been tried on real customer data, and it does not remove personal names from text. A current, honest list of what is built and what is not is in [docs/2026-11-17-build-status.md](docs/2026-11-17-build-status.md).
+
+## What works today
+
+- **Ledger.** Record a hypothesis, check that the audience is large enough, assign a holdout by a keyed hash, and read out the result. The design locks at registration, results stay locked until the conversion window closes, and later readouts are numbered versions.
+- **Data intake.** Load a CSV in the browser with DuckDB, map its columns, and preview 20 rows. Columns that look like personal data are blocked.
+- **Journeys and pipeline.** Linked charts, a flow with drop off, top paths, a what if, a stage funnel, time in stage, stalled deals, a cohort ladder and a period comparison. These run on synthetic data.
+- **Methods.** The checks that ran on generated data to test the statistics, with the counts.
+- **Explanations.** The main numbers can say how they were worked out, built from the real values.
+
+## Run it
+
+Needs Node.js. It was developed on Node 26.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install        # also copies the DuckDB files into public/duckdb
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Check it
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test           # unit tests
+npm run lint
+npx tsc --noEmit   # type check
+npm run test:e2e   # browser tests, which start the dev server themselves
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The browser tests use Playwright. To use a browser you already have installed instead of downloading one, set `PW_CHANNEL`, for example `PW_CHANNEL=msedge`.
 
-## Learn More
+## A static copy
 
-To learn more about Next.js, take a look at the following resources:
+The app needs no server, so it can be served as plain files.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build:static                        # for a site of its own, or a custom domain
+npm run build:static -- your-repo-name      # for a project page served under /your-repo-name
+npm run test:static                         # tests a build made with the prefix evidence-ledger
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The copy is written to `out/`. On Windows in Git Bash, write the prefix without a leading slash, because Git Bash rewrites a leading slash. The script prints the size of the copy and warns about hosts that cap the size of one file. See [docs/2026-11-17-release-checklist.md](docs/2026-11-17-release-checklist.md) before publishing it anywhere.
 
-## Deploy on Vercel
+## Layout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Folder | What is in it |
+|---|---|
+| `src/app` | The screens, in Next.js App Router |
+| `src/lib/stats` | The statistics: power, readout, sample ratio check, correction, honesty checks |
+| `src/lib/ledger`, `src/lib/assignment` | The ledger, the fixed horizon rule, assignment and results |
+| `src/lib/redaction` | Rule based redaction and its known limits |
+| `src/lib/charts`, `src/lib/demo` | Chart queries and the synthetic data they run on |
+| `supabase` | Database migrations and tests for the pilot schema. They have been applied to a test project only. |
+| `docs` | Decisions, measured results, known limits and the build status |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Rules this project keeps
+
+It costs nothing to run. Every number on screen comes from code, and the tests for statistics code are written first. Customer data stays in the browser. A new dependency is asked about before it is added, and the list so far is at the end of the build status document.
+
+## License
+
+No license has been chosen yet.

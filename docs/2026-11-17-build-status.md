@@ -56,8 +56,8 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Time rules, plan sections 5.7 and 5.8 | PARTIAL | `src/lib/time`: elapsed time windows, days cut in the workspace zone, the March 8 and November 1 days, local times that do not exist or happen twice. A library with tests, no screen yet. |
 | Webhook ingestion | NOT STARTED | A browser only app has no server to receive one. This needs a decision. |
 | Keep alive | NOT STARTED | |
-| Static copy for a host with no server | BUILT | Built and tested locally. Not deployed. See `2026-11-17-static-mirror.md`. |
-| Deployed demo link | NOT STARTED | Not decided. |
+| Static copy for a host with no server | BUILT | One command, `npm run build:static`, tested with and without a prefix. Not deployed. See `2026-11-17-static-mirror.md` and the release checklist. |
+| Deployed demo link | NOT STARTED | Ready to deploy, not deployed. `npm run build:static` and `docs/2026-11-17-release-checklist.md`, which lists the steps only the owner can take: legal review, a screen reader pass, the repository history and the host. |
 
 ## Product surface
 
@@ -75,7 +75,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 593 unit tests, 48 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 597 unit tests, 48 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
