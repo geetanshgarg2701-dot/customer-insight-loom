@@ -63,7 +63,8 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 | Item | Status | Evidence and gap |
 |---|---|---|
-| Journey and pipeline modules with the 13 visuals | NOT STARTED | |
+| Journeys: three linked bar charts and a flow chart with drop off, on 100,000 synthetic customers | PARTIAL | `/journeys`, `src/lib/charts`. The chart coordinator is built and measured: 110 ms in the browser for a full update, against the plan's guess of 1 second. 4 of the 13 visuals, no replay, no what if, no top paths table. |
+| Pipeline views | NOT STARTED | |
 | AI features | NOT STARTED | Hosted AI is off until the free plan terms are confirmed. |
 | Privacy and terms pages | NOT STARTED | |
 | Landing page | PARTIAL | A home page exists. |
@@ -73,19 +74,19 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 478 unit tests, 15 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 493 unit tests, 16 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
 Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budgets, and the item estimates are SPECULATION. No hours were tracked while building, so nothing below is measured. Use it to compare scope, not to promise a date.
 
-**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 are left and about 139 are done, which is 139 of 351, or about 40 percent. Against about 51 percent by item count.
+**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 were left. The chart coordinator and the first journey view then took about 14 more, so about 198 are left and about 153 are done, which is 153 of 351, or about 44 percent. Against about 51 percent by item count.
 
 | Not started item | Hours |
 |---|---|
-| Design system and the chart coordinator spike | 14 |
+| Design system | 8 |
 | Webhook ingestion, and screens for identity and time rules | 12 |
-| Journey views, M16 | 36 |
+| Journey views, the rest of M16 | 28 |
 | Pipeline views, M17 | 42 |
 | Evidence chain, M6 | 14 |
 | AI features with evals, including the in browser model, M8, M13, M15 | 30 |
@@ -95,8 +96,15 @@ Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budg
 | Name redaction | 8 |
 | Click to explain, privacy and terms, landing and 404 | 10 |
 | Accessibility checks and phone width tests | 10 |
-| **Total** | **212** |
+| **Total** | **198** |
 
-At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 78 of the 212 hours and hold the success metric the testers are asked about.
+At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 70 of the 198 hours and hold the success metric the testers are asked about.
 
 **What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 170, which is about 11 to 14 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.
+
+## Dependencies
+
+Only two runtime packages are used beyond the app shell. This is a record, because the project rule is to ask before adding one.
+
+- `@duckdb/duckdb-wasm` 1.32.0, approved in the first week, self hosted.
+- `echarts` 6.1.0, approved by the owner on 2026-11-17 for the journey charts. Apache-2.0, published 2026-05-19, with `zrender` and `tslib` as its own dependencies. Loaded only in the browser and only with the bar chart, flow chart, tooltip, grid, accessibility and canvas parts. `npm audit` lists 7 moderate findings, all in the lint toolchain through `minimatch`, none in ECharts, and they predate it.

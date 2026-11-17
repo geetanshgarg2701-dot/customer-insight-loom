@@ -1,6 +1,8 @@
 import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import type { verifyResults } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
+import { countsBy, loadJourneys, sankeyEdges, type Count, type JourneyDimension, type SankeyEdge, type Selection } from "../charts/crossfilter";
+import { syntheticJourneys } from "../demo/journeys";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
 import type { Intake, SqlEngine } from "../intake/types";
@@ -122,4 +124,28 @@ export async function verifyBrowserResults(
   } finally {
     await engine.close?.();
   }
+}
+
+/** What the journey screen may ask of its data. Fixed questions only, never arbitrary SQL. */
+export type JourneyBoard = {
+  rows: number;
+  counts(dimension: JourneyDimension, selection: Selection): Promise<Count[]>;
+  flow(selection: Selection): Promise<SankeyEdge[]>;
+  close(): Promise<void>;
+};
+
+/** Loads synthetic journeys into the in-browser database for the linked charts. No real data is involved. */
+export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Promise<JourneyBoard> {
+  const engine = await createBrowserEngine();
+  const table = "journeys";
+  await loadJourneys(engine, table, syntheticJourneys(rows, seed));
+  return {
+    rows,
+    counts: (dimension, selection) => countsBy(engine, table, dimension, selection),
+    flow: (selection) => sankeyEdges(engine, table, selection),
+    close: async () => {
+      await engine.exec(`DROP TABLE IF EXISTS ${table}`);
+      await engine.close?.();
+    },
+  };
 }
