@@ -29,6 +29,10 @@ export default function Home() {
             <Link href="/journeys">Journeys</Link>. Linked charts of where customers drop off, on synthetic data.
           </li>
           <li>
+            <Link href="/pipeline">Pipeline</Link>. Where deals wait, how long they sit in each stage, and which ones
+            have stalled, on synthetic data.
+          </li>
+          <li>
             <Link href="/methods">Methods</Link>. The checks that ran on generated data to test the calculator, with
             the counts.
           </li>

@@ -31,17 +31,29 @@ function checkDimension(name: string): asserts name is JourneyDimension {
   }
 }
 
-export function whereClause(selection: Selection, except?: string): { sql: string; params: string[] } {
-  if (except !== undefined) checkDimension(except);
+/**
+ * The filter for any set of linked charts. The allowed list is fixed in code, because each key becomes a column
+ * name. Values are bound as parameters. A chart's own dimension is left out, so it keeps showing its choices.
+ */
+export function buildWhere(
+  selection: Partial<Record<string, string[]>>,
+  allowed: readonly string[],
+  except?: string,
+): { sql: string; params: string[] } {
+  if (except !== undefined && !allowed.includes(except)) throw new RangeError("That is not a chart dimension.");
   const parts: string[] = [];
   const params: string[] = [];
   for (const [key, values] of Object.entries(selection)) {
-    checkDimension(key);
+    if (!allowed.includes(key)) throw new RangeError("That is not a chart dimension.");
     if (key === except || !values || values.length === 0) continue;
     parts.push(`"${key}" IN (${values.map(() => "?").join(", ")})`);
     params.push(...values);
   }
   return { sql: parts.length ? `WHERE ${parts.join(" AND ")}` : "", params };
+}
+
+export function whereClause(selection: Selection, except?: string): { sql: string; params: string[] } {
+  return buildWhere(selection, JOURNEY_DIMENSIONS, except);
 }
 
 export async function loadJourneys(engine: SqlEngine, table: string, rows: readonly JourneyRow[]): Promise<void> {

@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+import { PIPELINE_AS_OF, PIPELINE_STAGES, syntheticPipeline } from "./pipeline";
+
+const DAY = 86_400_000;
+
+describe("syntheticPipeline", () => {
+  const rows = syntheticPipeline(30_000, 5);
+
+  it("is identical for the same seed and different for another", () => {
+    expect(syntheticPipeline(300, 1)).toEqual(syntheticPipeline(300, 1));
+    expect(syntheticPipeline(300, 1)).not.toEqual(syntheticPipeline(300, 2));
+  });
+
+  it("starts everyone in the first stage, in order, and never moves a stage into the future", () => {
+    const asOf = Date.parse(PIPELINE_AS_OF);
+    for (const r of rows) {
+      expect(r.entered[0]).not.toBeNull();
+      const reached = r.entered.filter((e) => e !== null) as string[];
+      expect(r.entered.slice(0, reached.length).every((e) => e !== null)).toBe(true);
+      expect(r.entered.slice(reached.length).every((e) => e === null)).toBe(true);
+      const times = reached.map((e) => Date.parse(e.replace(" ", "T") + "Z"));
+      for (let i = 1; i < times.length; i++) expect(times[i]).toBeGreaterThanOrEqual(times[i - 1]);
+      expect(times[times.length - 1]).toBeLessThanOrEqual(asOf);
+      expect(r.stage).toBe(PIPELINE_STAGES[reached.length - 1]);
+    }
+  });
+
+  it("writes every time as UTC text without a zone, the form the database reads", () => {
+    for (const r of rows.slice(0, 500)) {
+      for (const e of r.entered) if (e !== null) expect(e).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    }
+  });
+
+  it("plants a known fact: enterprise deals sit in Proposal far longer than small ones", () => {
+    const days = (segment: string) => {
+      const d = rows
+        .filter((r) => r.segment === segment && r.entered[2] && r.entered[3])
+        .map((r) => (Date.parse(r.entered[3]!.replace(" ", "T") + "Z") - Date.parse(r.entered[2]!.replace(" ", "T") + "Z")) / DAY)
+        .sort((a, b) => a - b);
+      return d[Math.floor(d.length / 2)];
+    };
+    expect(days("enterprise")).toBeGreaterThan(days("smb") * 2);
+  });
+
+  it("uses only labels, never an email or a name", () => {
+    for (const r of rows.slice(0, 300)) expect(JSON.stringify(r)).not.toMatch(/@/);
+  });
+});

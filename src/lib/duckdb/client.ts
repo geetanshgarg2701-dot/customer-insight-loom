@@ -2,7 +2,21 @@ import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import type { verifyResults } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
 import { countsBy, loadJourneys, sankeyEdges, type Count, type JourneyDimension, type SankeyEdge, type Selection } from "../charts/crossfilter";
+import {
+  dwellHistogram,
+  loadPipeline,
+  pipelineCounts,
+  stageFunnel,
+  stalledByStage,
+  type Count as PipelineCount,
+  type DwellHistogram,
+  type FunnelStage,
+  type PipelineDimension,
+  type PipelineSelection,
+  type Stalled,
+} from "../charts/pipeline";
 import { syntheticJourneys } from "../demo/journeys";
+import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
 import type { Intake, SqlEngine } from "../intake/types";
@@ -143,6 +157,36 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     rows,
     counts: (dimension, selection) => countsBy(engine, table, dimension, selection),
     flow: (selection) => sankeyEdges(engine, table, selection),
+    close: async () => {
+      await engine.exec(`DROP TABLE IF EXISTS ${table}`);
+      await engine.close?.();
+    },
+  };
+}
+
+/** What the pipeline screen may ask of its data. Fixed questions only, never arbitrary SQL. */
+export type PipelineBoard = {
+  rows: number;
+  asOf: string;
+  counts(dimension: PipelineDimension, selection: PipelineSelection): Promise<PipelineCount[]>;
+  funnel(selection: PipelineSelection): Promise<FunnelStage[]>;
+  dwell(stageIndex: number, selection: PipelineSelection): Promise<DwellHistogram>;
+  stalled(thresholdDays: number, selection: PipelineSelection): Promise<Stalled[]>;
+  close(): Promise<void>;
+};
+
+/** Loads a synthetic pipeline into the in-browser database for the pipeline charts. No real data is involved. */
+export async function createBrowserPipelineBoard(rows = 100_000, seed = 21): Promise<PipelineBoard> {
+  const engine = await createBrowserEngine();
+  const table = "pipeline";
+  await loadPipeline(engine, table, syntheticPipeline(rows, seed));
+  return {
+    rows,
+    asOf: PIPELINE_AS_OF,
+    counts: (dimension, selection) => pipelineCounts(engine, table, dimension, selection),
+    funnel: (selection) => stageFunnel(engine, table, selection),
+    dwell: (stageIndex, selection) => dwellHistogram(engine, table, stageIndex, selection),
+    stalled: (thresholdDays, selection) => stalledByStage(engine, table, { thresholdDays, asOf: PIPELINE_AS_OF }, selection),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();
