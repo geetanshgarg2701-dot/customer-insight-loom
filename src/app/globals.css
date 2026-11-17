@@ -204,6 +204,12 @@ td {
   padding: 0.3em 0.6em;
   border-bottom: 1px solid var(--line);
 }
+/* A table whose first column is a short name, such as a stage. The page breaks long words anywhere so nothing overflows,
+   but that squeezed a name like Qualified into two lines. Keep the name whole. */
+table.short-first td:first-child,
+table.short-first th:first-child {
+  white-space: nowrap;
+}
 table.flow td:last-child,
 table.flow th:last-child {
   text-align: right;

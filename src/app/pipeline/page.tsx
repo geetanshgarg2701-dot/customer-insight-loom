@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PIPELINE_DIMENSIONS, type Count, type PipelineDimension, type PipelineSelection } from "@/lib/charts/pipeline";
-import type { CohortRow, DwellHistogram, FunnelStage, PeriodComparison, Stalled } from "@/lib/charts/pipeline";
+import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "@/lib/charts/pipeline";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
-import { explainCohorts, explainDwell, explainFunnel, explainPeriods, explainStalled } from "@/lib/app/explain-views";
+import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 
@@ -113,19 +113,21 @@ export default function PipelinePage() {
   const [cohortWindow, setCohortWindow] = useState<(typeof WINDOWS)[number]>(60);
   const [cohorts, setCohorts] = useState<CohortRow[]>([]);
   const [periods, setPeriods] = useState<PeriodComparison | null>(null);
+  const [outlook, setOutlook] = useState<Outlook | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
 
   const refresh = useCallback(async (next: PipelineSelection, step: number, days: number, windowDays: number) => {
     const b = board.current;
     if (!b) return;
     const started = performance.now();
-    const [byDimension, f, d, s, c, p] = await Promise.all([
+    const [byDimension, f, d, s, c, p, o] = await Promise.all([
       Promise.all(PIPELINE_DIMENSIONS.map((dim) => b.counts(dim, next))),
       b.funnel(next),
       b.dwell(step, next),
       b.stalled(days, next),
       b.cohorts(windowDays, next),
       b.periods(windowDays, next),
+      b.outlook(days, next),
     ]);
     setCounts(Object.fromEntries(PIPELINE_DIMENSIONS.map((dim, i) => [dim, byDimension[i]])));
     setFunnel(f);
@@ -133,6 +135,7 @@ export default function PipelinePage() {
     setStalled(s);
     setCohorts(c);
     setPeriods(p);
+    setOutlook(o);
     setElapsed(Math.round(performance.now() - started));
   }, []);
 
@@ -260,7 +263,7 @@ export default function PipelinePage() {
               height={200}
               onSelect={(name) => void toggle("stage", name)}
             />
-            <table aria-label="Stage funnel">
+            <table className="short-first" aria-label="Stage funnel">
               <thead>
                 <tr>
                   <th>Stage</th>
@@ -327,7 +330,7 @@ export default function PipelinePage() {
               {stalledTotal.toLocaleString("en-US")} open deals have not moved for {threshold} days or more.
             </p>
             <Chart label="Stalled deals by stage" option={stalledOption(stalled, CHART_THEME)} height={200} />
-            <table aria-label="Stalled deals">
+            <table className="short-first" aria-label="Stalled deals">
               <thead>
                 <tr>
                   <th>Stuck in</th>
@@ -366,7 +369,7 @@ export default function PipelinePage() {
                 </button>
               ))}
             </p>
-            <table aria-label="Cohort ladder">
+            <table className="short-first" aria-label="Cohort ladder">
               <thead>
                 <tr>
                   <th>Entered</th>
@@ -445,6 +448,69 @@ export default function PipelinePage() {
                   A clear difference says the two periods differ, not why. Something else may have changed at the same time,
                   such as the mix of deals or how they were counted. {periods.method}
                 </p>
+              </>
+            )}
+          </section>
+
+          <section aria-labelledby="h-outlook">
+            <h2 id="h-outlook">Outlook for open deals</h2>
+            <p>
+              How many of the open deals might be won. For each stage, the chance of winning comes from the deals that reached
+              it and have since been won or lost, and it is applied to the active open deals now at that stage. Active means
+              the deal moved within the last {threshold} days, the setting chosen under stalled deals. It says how many, not
+              when, and it is a planning aid, not a forecast. Only the segment and source filters apply here.
+            </p>
+            {outlook && (
+              <>
+                <table className="short-first" aria-label="Outlook for open deals">
+                  <thead>
+                    <tr>
+                      <th>Stage</th>
+                      <th>Active open deals</th>
+                      <th>Won, of won or lost so far</th>
+                      <th>Chance of winning</th>
+                      <th>Expected wins</th>
+                      <th>Range</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {outlook.stages.map((s) => (
+                      <tr key={s.stage}>
+                        <td>{s.stage}</td>
+                        <td>{s.active.toLocaleString("en-US")}</td>
+                        <td>
+                          {s.won.toLocaleString("en-US")} of {s.resolved.toLocaleString("en-US")}
+                        </td>
+                        <td>
+                          {formatPercent(s.rate, 1)}, {formatPercent(s.rateLow, 1)} to {formatPercent(s.rateHigh, 1)}
+                        </td>
+                        <td>{Math.round(s.expected).toLocaleString("en-US")}</td>
+                        <td>
+                          {Math.round(s.low).toLocaleString("en-US")} to {Math.round(s.high).toLocaleString("en-US")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th scope="row">All stages</th>
+                      <td>{outlook.totals.active.toLocaleString("en-US")}</td>
+                      <td />
+                      <td />
+                      <td>{Math.round(outlook.totals.expected).toLocaleString("en-US")}</td>
+                      <td>
+                        {Math.round(outlook.totals.low).toLocaleString("en-US")} to {Math.round(outlook.totals.high).toLocaleString("en-US")}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <p>
+                  The range comes from not knowing the win rates exactly. On top of that, the real count varies by chance, by about{" "}
+                  {Math.round(outlook.totals.chanceSpread).toLocaleString("en-US")} either way. {outlook.totals.stalled.toLocaleString("en-US")}{" "}
+                  open deals that have not moved for {outlook.thresholdDays} days or more are left out, because a deal that has been
+                  quiet that long is much less likely to win than the average for its stage.
+                </p>
+                <Explain summary="How the outlook was worked out" items={explainOutlook(outlook)} />
               </>
             )}
           </section>

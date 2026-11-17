@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CohortRow, DwellHistogram, FunnelStage, PeriodComparison, Stalled } from "../charts/pipeline";
+import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { TopPaths } from "../charts/crossfilter";
 import { whatIf } from "../charts/whatif";
 import { formatCount, formatPercent } from "./format";
@@ -7,6 +7,7 @@ import {
   explainCohorts,
   explainDwell,
   explainFunnel,
+  explainOutlook,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -225,5 +226,42 @@ describe("explainWhatIf", () => {
     expect(carried.value).toBe("120 people, 20 more");
     expect(carried.how).toMatch(/not a forecast/);
     clean(list);
+  });
+});
+
+describe("explainOutlook", () => {
+  const outlook: Outlook = {
+    thresholdDays: 30,
+    stages: [
+      { stage: "Lead", active: 1000, stalled: 600, resolved: 40000, won: 6000, rate: 0.15, rateLow: 0.146, rateHigh: 0.154, expected: 150, low: 146, high: 154 },
+      { stage: "Proposal", active: 400, stalled: 200, resolved: 10000, won: 4300, rate: 0.43, rateLow: 0.42, rateHigh: 0.44, expected: 172, low: 168, high: 176 },
+    ],
+    totals: { active: 1400, stalled: 800, expected: 322, low: 314, high: 330, chanceSpread: 11.4 },
+  };
+  const list = explainOutlook(outlook);
+
+  it("explains each stage's rate as won over resolved deals, and the expected wins as active deals times that rate", () => {
+    const p = find(list, "Proposal");
+    expect(p.how).toContain("4,300 of the 10,000 deals");
+    expect(p.how).toContain("43.0 percent");
+    expect(p.how).toContain("400 active deals");
+    expect(p.value).toBe("172 expected wins");
+    clean(list);
+  });
+
+  it("shows the total with its range, and the spread from chance, as two different kinds of uncertainty", () => {
+    const t = find(list, "Expected wins in total");
+    expect(t.value).toBe("322, range 314 to 330");
+    expect(t.how).toMatch(/not knowing the win rates exactly/);
+    expect(find(list, "Spread from chance").value).toBe("about 11 either way");
+    expect(find(list, "Spread from chance").how).toMatch(/even with the rates exactly right/);
+  });
+
+  it("says which deals are left out and why, and that it is a planning aid", () => {
+    const s = find(list, "Stalled deals left out");
+    expect(s.value).toBe("800");
+    expect(s.how).toContain("30 days");
+    expect(s.how).toMatch(/much less likely to win/);
+    expect(find(list, "What it assumes").how).toMatch(/not a forecast/);
   });
 });

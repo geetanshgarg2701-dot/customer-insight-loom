@@ -46,11 +46,12 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
   // Another stage and a longer stalled threshold change what is shown.
   await page.getByRole("group", { name: "Choose a stage" }).getByRole("button", { name: "Lead to Qualified" }).click();
   await expect(page.getByRole("figure", { name: /Days from Lead to Qualified/ })).toBeVisible();
-  const stalledText = async () => (await page.getByText(/open deals have not moved for/).innerText());
+  // The stalled section says it first, and the outlook repeats the idea, so match the sentence that starts with the count.
+  const stalledText = async () => await page.locator("p", { hasText: /^[\d,]+ open deals have not moved for \d+ days or more\.$/ }).innerText();
   const stalledCount = async () => Number(/^([\d,]+) open/.exec(await stalledText())![1].replace(/,/g, ""));
   const at30 = await stalledCount();
   await page.getByRole("group", { name: "Stalled for at least" }).getByRole("button", { name: "60 days" }).click();
-  await expect(page.getByText(/have not moved for 60 days or more/)).toBeVisible();
+  await expect(page.locator("p", { hasText: /^[\d,]+ open deals have not moved for 60 days or more\.$/ })).toBeVisible();
   // The label changes at once and the count a moment later, so wait for the count.
   await expect.poll(stalledCount).toBeLessThan(at30);
 
@@ -86,6 +87,31 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
   // A longer window moves both periods back, so the periods are those that have had 90 days.
   await expect(page.getByText(/Later: entered 2026-05-04 to 2026-08-03/)).toBeVisible();
   await expect.poll(wonShare).toBeGreaterThanOrEqual(won60);
+
+  // Outlook for open deals: a row per stage, expected wins inside their own range, and a stage filter does not move it.
+  const outlookTable = page.getByRole("table", { name: "Outlook for open deals" });
+  await expect(outlookTable.getByRole("row", { name: /^Lead / })).toBeVisible();
+  await expect(outlookTable.getByRole("row", { name: /^Qualified / })).toBeVisible();
+  await expect(outlookTable.getByRole("row", { name: /^Proposal / })).toBeVisible();
+  const totals = async () => {
+    const cells = await outlookTable.getByRole("row", { name: /^All stages/ }).getByRole("cell").allInnerTexts();
+    const num = (t: string) => Number(t.replace(/,/g, ""));
+    const [low, high] = cells[4].split(" to ").map(num);
+    return { active: num(cells[0]), expected: num(cells[3]), low, high };
+  };
+  const before = await totals();
+  expect(before.expected).toBeGreaterThan(0);
+  expect(before.low).toBeLessThanOrEqual(before.expected);
+  expect(before.high).toBeGreaterThanOrEqual(before.expected);
+  await expect(page.getByText(/Active means the deal moved within the last 60 days/)).toBeVisible();
+  await expect(page.getByText(/not a forecast/).first()).toBeVisible();
+  await page.getByRole("group", { name: "Filter by furthest stage" }).getByRole("button", { name: /^Lead, / }).click();
+  await expect(page.getByRole("group", { name: "Filter by furthest stage" }).getByRole("button", { name: /^Lead, / })).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(600);
+  expect(await totals()).toEqual(before);
+  await page.getByRole("group", { name: "Filter by furthest stage" }).getByRole("button", { name: /^Lead, / }).click();
+  await page.getByText("How the outlook was worked out").click();
+  await expect(page.getByText(/different kind of uncertainty from the range above/)).toBeVisible();
 
   // Every section can say how its numbers were worked out, from the real values.
   await page.getByText("How the funnel was worked out").click();

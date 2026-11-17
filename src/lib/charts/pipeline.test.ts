@@ -8,6 +8,7 @@ import {
   defaultPeriods,
   dwellHistogram,
   loadPipeline,
+  openDealOutlook,
   pipelineCounts,
   periodComparison,
   pipelineWhere,
@@ -294,5 +295,92 @@ describe("periodComparison", () => {
     await expect(periodComparison(engine, TABLE, { ...o, later: { from: "x", to: o.later.to } }, {})).rejects.toThrow(RangeError);
     await expect(periodComparison(engine, TABLE, { ...o, windowDays: 0 }, {})).rejects.toThrow(RangeError);
     await expect(periodComparison(engine, TABLE, { ...o, asOf: "soon" }, {})).rejects.toThrow(RangeError);
+  });
+});
+
+describe("openDealOutlook, planted win rates as ground truth", () => {
+  const opts = { thresholdDays: 30, asOf: PIPELINE_AS_OF };
+  const stage = (o: Awaited<ReturnType<typeof openDealOutlook>>, name: string) => o.stages.find((x) => x.stage === name)!;
+
+  it("recovers the planted chance of winning from Proposal: about 50, 40 and 30 percent by segment", async () => {
+    const smb = stage(await openDealOutlook(engine, TABLE, { segment: ["smb"] }, opts), "Proposal");
+    const mid = stage(await openDealOutlook(engine, TABLE, { segment: ["mid"] }, opts), "Proposal");
+    const ent = stage(await openDealOutlook(engine, TABLE, { segment: ["enterprise"] }, opts), "Proposal");
+    expect(smb.rate).toBeGreaterThan(0.44);
+    expect(smb.rate).toBeLessThan(0.56);
+    expect(mid.rate).toBeGreaterThan(0.34);
+    expect(mid.rate).toBeLessThan(0.46);
+    expect(ent.rate).toBeGreaterThan(0.24);
+    expect(ent.rate).toBeLessThan(0.36);
+    expect(smb.rate).toBeGreaterThan(mid.rate);
+    expect(mid.rate).toBeGreaterThan(ent.rate);
+  });
+
+  it("gives an earlier stage a lower chance of winning than a later one", async () => {
+    const o = await openDealOutlook(engine, TABLE, {}, opts);
+    expect(stage(o, "Lead").rate).toBeLessThan(stage(o, "Qualified").rate);
+    expect(stage(o, "Qualified").rate).toBeLessThan(stage(o, "Proposal").rate);
+    expect(o.stages.map((s) => s.stage)).toEqual(["Lead", "Qualified", "Proposal"]);
+  });
+
+  it("brackets each rate in an interval, wider when there are fewer resolved deals", async () => {
+    const all = await openDealOutlook(engine, TABLE, {}, opts);
+    for (const s of all.stages) {
+      expect(s.rateLow).toBeLessThanOrEqual(s.rate);
+      expect(s.rateHigh).toBeGreaterThanOrEqual(s.rate);
+    }
+    const small = await openDealOutlook(engine, TABLE, { segment: ["enterprise"], source: ["referral"] }, opts);
+    const width = (o: typeof all) => stage(o, "Proposal").rateHigh - stage(o, "Proposal").rateLow;
+    expect(small.stages.every((s) => s.resolved < all.stages[0].resolved)).toBe(true);
+    expect(width(small)).toBeGreaterThan(width(all));
+  });
+
+  it("splits open deals into active and stalled, and the two add up to every open deal", async () => {
+    const o = await openDealOutlook(engine, TABLE, {}, opts);
+    const open = (await pipelineCounts(engine, TABLE, "status", {})).find((c) => c.value === "open")!.count;
+    expect(o.stages.reduce((n, s) => n + s.active + s.stalled, 0)).toBe(open);
+    expect(o.totals.active + o.totals.stalled).toBe(open);
+    const looser = await openDealOutlook(engine, TABLE, {}, { ...opts, thresholdDays: 90 });
+    expect(looser.totals.active).toBeGreaterThan(o.totals.active);
+    expect(looser.totals.stalled).toBeLessThan(o.totals.stalled);
+  });
+
+  it("works the expected wins out as active deals times the rate, stage by stage, with a range that brackets it", async () => {
+    const o = await openDealOutlook(engine, TABLE, {}, opts);
+    for (const s of o.stages) {
+      expect(s.expected).toBeCloseTo(s.active * s.rate, 8);
+      expect(s.low).toBeCloseTo(s.active * s.rateLow, 8);
+      expect(s.high).toBeCloseTo(s.active * s.rateHigh, 8);
+    }
+    expect(o.totals.expected).toBeCloseTo(o.stages.reduce((n, s) => n + s.expected, 0), 8);
+    expect(o.totals.low).toBeLessThanOrEqual(o.totals.expected);
+    expect(o.totals.high).toBeGreaterThanOrEqual(o.totals.expected);
+  });
+
+  it("reports the spread from chance alone, which is separate from not knowing the rate exactly", async () => {
+    const o = await openDealOutlook(engine, TABLE, {}, opts);
+    const variance = o.stages.reduce((n, s) => n + s.active * s.rate * (1 - s.rate), 0);
+    expect(o.totals.chanceSpread).toBeCloseTo(1.96 * Math.sqrt(variance), 8);
+    expect(o.totals.chanceSpread).toBeGreaterThan(0);
+  });
+
+  it("ignores a stage or status filter, which would skew the rates it learns from", async () => {
+    const all = await openDealOutlook(engine, TABLE, {}, opts);
+    const filtered = await openDealOutlook(engine, TABLE, { stage: ["Lead"], status: ["lost"] }, opts);
+    expect(filtered).toEqual(all);
+  });
+
+  it("respects a segment filter, and a hostile value matches nothing without an error", async () => {
+    const ent = await openDealOutlook(engine, TABLE, { segment: ["enterprise"] }, opts);
+    const all = await openDealOutlook(engine, TABLE, {}, opts);
+    expect(ent.totals.active).toBeLessThan(all.totals.active);
+    const none = await openDealOutlook(engine, TABLE, { segment: ["x' OR '1'='1"] }, opts);
+    expect(none.totals).toMatchObject({ active: 0, stalled: 0, expected: 0, low: 0, high: 0, chanceSpread: 0 });
+    expect(none.stages.every((s) => s.rate === 0 && s.resolved === 0)).toBe(true);
+  });
+
+  it("refuses a bad threshold or cutoff", async () => {
+    await expect(openDealOutlook(engine, TABLE, {}, { ...opts, thresholdDays: -1 })).rejects.toThrow(RangeError);
+    await expect(openDealOutlook(engine, TABLE, {}, { ...opts, asOf: "soon" })).rejects.toThrow(RangeError);
   });
 });

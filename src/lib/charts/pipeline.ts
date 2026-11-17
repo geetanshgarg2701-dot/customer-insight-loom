@@ -2,7 +2,7 @@ import { toPlainRow } from "../duckdb/normalize";
 import { PIPELINE_STAGES, type PipelineRow } from "../demo/pipeline";
 import type { SqlEngine } from "../intake/types";
 import { insertRows } from "../ledger/ledger";
-import { newcombeDifference, type Interval } from "../stats/readout";
+import { newcombeDifference, wilsonInterval, type Interval } from "../stats/readout";
 import { buildWhere } from "./crossfilter";
 
 /**
@@ -377,5 +377,118 @@ export async function periodComparison(
       `Share of the deals that entered in each period that reached the stage within ${options.windowDays} days of entering. ` +
       `period. The difference is the later share minus the earlier share, with a 95 percent Newcombe hybrid score interval. ` +
       `A period counts as comparable only when its newest deal has had the whole window.`,
+  };
+}
+
+export type OutlookStage = {
+  stage: string;
+  /** Open deals at this stage that have moved within the threshold. */
+  active: number;
+  /** Open deals at this stage that have been quiet for at least the threshold. Left out of the expected wins. */
+  stalled: number;
+  /** Deals that reached this stage and have since been won or lost. */
+  resolved: number;
+  won: number;
+  /** Won over resolved. The chance that a deal that reaches this stage is eventually won. */
+  rate: number;
+  rateLow: number;
+  rateHigh: number;
+  /** Active deals times the rate. */
+  expected: number;
+  /** Active deals times the low and high ends of the interval on the rate. */
+  low: number;
+  high: number;
+};
+
+export type Outlook = {
+  thresholdDays: number;
+  stages: OutlookStage[];
+  totals: {
+    active: number;
+    stalled: number;
+    expected: number;
+    low: number;
+    high: number;
+    /** 95 percent spread from chance alone, with the rates exactly right. Separate from low and high. */
+    chanceSpread: number;
+  };
+};
+
+/**
+ * How many of the open deals might be won. For each stage, the chance of winning is learned from the deals that reached
+ * it and have since been won or lost, with a Wilson interval, and it is applied to the open deals now at that stage.
+ * Open deals quiet for at least `thresholdDays` are left out and counted separately, because a deal that has gone quiet
+ * is much less likely to win than the average for its stage. The range reflects not knowing the rate exactly. The chance
+ * spread is separate: even with the rate right, each deal either wins or does not. Only the segment and source filters
+ * apply, because a stage or status filter would change which deals the rates are learned from. There is no timing, so it
+ * says how many, not when.
+ */
+export async function openDealOutlook(
+  engine: SqlEngine,
+  table: string,
+  selection: PipelineSelection,
+  options: { thresholdDays: number; asOf: string },
+): Promise<Outlook> {
+  checkTable(table);
+  if (!Number.isFinite(options.thresholdDays) || options.thresholdDays < 0) {
+    throw new RangeError("The stalled threshold must be 0 days or more.");
+  }
+  const asOfMs = Date.parse(options.asOf);
+  if (!Number.isFinite(asOfMs)) throw new RangeError("The cutoff is not a time.");
+  const asOf = new Date(asOfMs).toISOString().slice(0, 19).replace("T", " ");
+  const where = pipelineWhere({ segment: selection.segment, source: selection.source });
+  const t = options.thresholdDays;
+  const names = [PIPELINE_STAGES[0], PIPELINE_STAGES[1], PIPELINE_STAGES[2]];
+  const reached = ["e1", "e2", "e3"];
+
+  const columns = names.flatMap((name, i) => [
+    `count(*) FILTER (WHERE ${reached[i]} IS NOT NULL AND status IN ('won', 'lost')) AS r${i}`,
+    `count(*) FILTER (WHERE ${reached[i]} IS NOT NULL AND status = 'won') AS w${i}`,
+    `count(*) FILTER (WHERE status = 'open' AND stage = '${name}' AND idle < ${t}) AS a${i}`,
+    `count(*) FILTER (WHERE status = 'open' AND stage = '${name}' AND idle >= ${t}) AS s${i}`,
+  ]);
+  const [row] = (
+    await engine.query(
+      `SELECT ${columns.join(", ")} FROM (` +
+        `SELECT stage, status, e1, e2, e3, date_diff('second', COALESCE(e4, e3, e2, e1), CAST(? AS TIMESTAMP)) / ${DAY_SECONDS}.0 AS idle ` +
+        `FROM ${table} ${where.sql})`,
+      [asOf, ...where.params],
+    )
+  ).map(toPlainRow);
+
+  const stages: OutlookStage[] = names.map((stage, i) => {
+    const resolved = Number(row[`r${i}`]);
+    const won = Number(row[`w${i}`]);
+    const active = Number(row[`a${i}`]);
+    const stalled = Number(row[`s${i}`]);
+    const rate = resolved === 0 ? 0 : won / resolved;
+    const ci = resolved === 0 ? { low: 0, high: 0 } : wilsonInterval(won, resolved, 0.05);
+    return {
+      stage,
+      active,
+      stalled,
+      resolved,
+      won,
+      rate,
+      rateLow: ci.low,
+      rateHigh: ci.high,
+      expected: active * rate,
+      low: active * ci.low,
+      high: active * ci.high,
+    };
+  });
+  const sum = (pick: (s: OutlookStage) => number) => stages.reduce((n, s) => n + pick(s), 0);
+  const variance = sum((s) => s.active * s.rate * (1 - s.rate));
+  return {
+    thresholdDays: t,
+    stages,
+    totals: {
+      active: sum((s) => s.active),
+      stalled: sum((s) => s.stalled),
+      expected: sum((s) => s.expected),
+      low: sum((s) => s.low),
+      high: sum((s) => s.high),
+      chanceSpread: 1.96 * Math.sqrt(variance),
+    },
   };
 }

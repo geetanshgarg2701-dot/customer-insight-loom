@@ -17,6 +17,7 @@ import {
   defaultPeriods,
   dwellHistogram,
   loadPipeline,
+  openDealOutlook,
   periodComparison,
   pipelineCounts,
   stageFunnel,
@@ -25,6 +26,7 @@ import {
   type Count as PipelineCount,
   type DwellHistogram,
   type FunnelStage,
+  type Outlook,
   type PeriodComparison,
   type PipelineDimension,
   type PipelineSelection,
@@ -191,6 +193,7 @@ export type PipelineBoard = {
   stalled(thresholdDays: number, selection: PipelineSelection): Promise<Stalled[]>;
   cohorts(windowDays: number, selection: PipelineSelection): Promise<CohortRow[]>;
   periods(windowDays: number, selection: PipelineSelection): Promise<PeriodComparison>;
+  outlook(thresholdDays: number, selection: PipelineSelection): Promise<Outlook>;
   close(): Promise<void>;
 };
 
@@ -207,6 +210,7 @@ export async function createBrowserPipelineBoard(rows = 100_000, seed = 21): Pro
     dwell: (stageIndex, selection) => dwellHistogram(engine, table, stageIndex, selection),
     stalled: (thresholdDays, selection) => stalledByStage(engine, table, { thresholdDays, asOf: PIPELINE_AS_OF }, selection),
     cohorts: (windowDays, selection) => cohortLadder(engine, table, { windowDays, asOf: PIPELINE_AS_OF }, selection),
+    outlook: (thresholdDays, selection) => openDealOutlook(engine, table, selection, { thresholdDays, asOf: PIPELINE_AS_OF }),
     periods: (windowDays, selection) =>
       periodComparison(engine, table, { windowDays, asOf: PIPELINE_AS_OF, ...defaultPeriods(PIPELINE_AS_OF, windowDays) }, selection),
     close: async () => {

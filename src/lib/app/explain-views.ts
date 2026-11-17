@@ -1,5 +1,5 @@
 import type { TopPaths } from "../charts/crossfilter";
-import type { CohortRow, DwellHistogram, FunnelStage, PeriodComparison, Stalled } from "../charts/pipeline";
+import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
 import { formatCount, formatPercent, formatSignedPoints } from "./format";
 import type { Explanation } from "./explain";
@@ -182,4 +182,51 @@ export function explainWhatIf(s: WhatIf, stages: readonly StageCount[]): Explana
     how: `${chain.length > 0 ? chain.join(" ") + " " : "There are no later steps, so the change applies at the end. "}${s.note}`,
   });
   return out;
+}
+
+export function explainOutlook(o: Outlook): Explanation[] {
+  const rows: Explanation[] = o.stages.map((s) => ({
+    label: s.stage,
+    value: `${n(s.expected)} expected wins`,
+    how:
+      s.resolved === 0
+        ? `No deal that reached ${s.stage} has been won or lost yet, so there is no rate to apply.`
+        : `${formatCount(s.won)} of the ${formatCount(s.resolved)} deals that reached ${s.stage} and have since been won or lost ` +
+          `were won, which is ${formatPercent(s.rate, 1)}. ${formatCount(s.active)} active deals are at ${s.stage} now, so ` +
+          `${formatCount(s.active)} times ${formatPercent(s.rate, 1)} is about ${n(s.expected)}. The 95 percent range for the rate, ` +
+          `${formatPercent(s.rateLow, 1)} to ${formatPercent(s.rateHigh, 1)}, gives ${n(s.low)} to ${n(s.high)}.`,
+  }));
+  rows.push(
+    {
+      label: "Expected wins in total",
+      value: `${n(o.totals.expected)}, range ${n(o.totals.low)} to ${n(o.totals.high)}`,
+      how:
+        `The sum of the stages above, from ${formatCount(o.totals.active)} active deals. The range comes from not knowing ` +
+        `the win rates exactly, using the interval on each rate.`,
+    },
+    {
+      label: "Spread from chance",
+      value: `about ${Math.round(o.totals.chanceSpread)} either way`,
+      how:
+        `Each deal either wins or does not, so the real count varies by chance even with the rates exactly right. About 95 ` +
+        `times in 100 it would fall within about ${Math.round(o.totals.chanceSpread)} of the expected number. This is a ` +
+        `different kind of uncertainty from the range above.`,
+    },
+    {
+      label: "Stalled deals left out",
+      value: formatCount(o.totals.stalled),
+      how:
+        `${formatCount(o.totals.stalled)} open deals have not moved for ${o.thresholdDays} days or more. They are left out ` +
+        `because a deal that has been quiet this long is much less likely to win than the average for its stage. See the ` +
+        `stalled deals section.`,
+    },
+    {
+      label: "What it assumes",
+      value: "a planning aid",
+      how:
+        `It assumes that deals now behave like deals did before, and that the active deals are typical of their stage. It ` +
+        `is a planning aid, not a forecast, and it says how many deals may be won, not when.`,
+    },
+  );
+  return rows;
 }
