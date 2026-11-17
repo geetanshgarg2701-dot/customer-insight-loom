@@ -52,7 +52,9 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 |---|---|---|
 | Supabase schema with row level security | BUILT | Seven migrations on the test project only, tests v4 to v6 and a privilege check. |
 | Pilot accounts, a client for Supabase | NOT STARTED | The schema exists and the app never calls it. |
-| Webhook ingestion and identity | NOT STARTED | |
+| Identity matching, plan section 5.5 | PARTIAL | `src/lib/identity`: exact match on the normalized email, merged and unmatched lists, possible plus tag pairs, masked display. A library with tests, no screen yet. |
+| Time rules, plan sections 5.7 and 5.8 | PARTIAL | `src/lib/time`: elapsed time windows, days cut in the workspace zone, the March 8 and November 1 days, local times that do not exist or happen twice. A library with tests, no screen yet. |
+| Webhook ingestion | NOT STARTED | A browser only app has no server to receive one. This needs a decision. |
 | Keep alive | NOT STARTED | |
 | Static copy for a host with no server | BUILT | Built and tested locally. Not deployed. See `2026-11-17-static-mirror.md`. |
 | Deployed demo link | NOT STARTED | Not decided. |
@@ -71,18 +73,18 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 454 unit tests, 15 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 478 unit tests, 15 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
 Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budgets, and the item estimates are SPECULATION. No hours were tracked while building, so nothing below is measured. Use it to compare scope, not to promise a date.
 
-**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gives about 222 hours left, which puts done at 129 of 351, or about 37 percent. The two methods agree within a point, so the figure is about 37 percent by work, against about 51 percent by item count.
+**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gave about 222 hours left. On 2026-11-17 identity matching and the time rules were built, about 10 hours, so about 212 are left and about 139 are done, which is 139 of 351, or about 40 percent. Against about 51 percent by item count.
 
 | Not started item | Hours |
 |---|---|
 | Design system and the chart coordinator spike | 14 |
-| Webhook ingestion, identity matching, remaining time rules | 22 |
+| Webhook ingestion, and screens for identity and time rules | 12 |
 | Journey views, M16 | 36 |
 | Pipeline views, M17 | 42 |
 | Evidence chain, M6 | 14 |
@@ -93,8 +95,8 @@ Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budg
 | Name redaction | 8 |
 | Click to explain, privacy and terms, landing and 404 | 10 |
 | Accessibility checks and phone width tests | 10 |
-| **Total** | **222** |
+| **Total** | **212** |
 
-At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 78 of the 222 hours and hold the success metric the testers are asked about.
+At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 78 of the 212 hours and hold the success metric the testers are asked about.
 
 **What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 170, which is about 11 to 14 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.

@@ -10,7 +10,7 @@
 import type { SqlEngine, SqlParam } from "../intake/types";
 import { insertRows, type Arm, type Ledger } from "../ledger/ledger";
 import { experimentReadout, type ExperimentReadout } from "../stats/experiment";
-import { bucketOf, customerHash, looksLikeEmail, normalizeEmail } from "./hash";
+import { FORMULA_START, bucketOf, customerHash, looksLikeEmail, normalizeEmail, unprotect } from "./hash";
 
 const HASH_BATCH = 1000;
 
@@ -81,8 +81,6 @@ export async function assignAudience(input: {
   return { assigned: records.length, treatment, control: records.length - treatment, duplicates, invalid, rows };
 }
 
-const FORMULA_START = /^[=+\-@\t\r]/;
-
 export function csvCell(value: string): string {
   // A leading quote stops spreadsheets from running a cell as a formula.
   const safe = FORMULA_START.test(value) ? `'${value}` : value;
@@ -93,11 +91,6 @@ export function csvCell(value: string): string {
 export function assignmentCsv(rows: readonly AssignedRow[], entryId: string): string {
   const out = ["email,group,entry_id", ...rows.map((r) => [r.email, r.arm, entryId].map(csvCell).join(","))];
   return out.join("\r\n") + "\r\n";
-}
-
-/** Undoes only the protection csvCell adds. */
-function unprotect(value: string): string {
-  return value.length > 1 && value[0] === "'" && FORMULA_START.test(value.slice(1)) ? value.slice(1) : value;
 }
 
 function parseGroup(raw: string | null): Arm | "invalid" {

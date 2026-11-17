@@ -7,9 +7,21 @@
  * would sit in every control group at once.
  */
 
-/** Trim and lower case. Plan section 5 calls for exact normalized email matching. */
+/**
+ * Plan section 5.5: trim spaces, apply Unicode normalization, lower case, and nothing else. Dots and plus tags are
+ * left alone, because removing them is a guess. Normalization comes first so a full width or non breaking space
+ * form lands on the same address as the plain one.
+ */
 export function normalizeEmail(raw: string): string {
-  return raw.trim().toLowerCase();
+  return raw.normalize("NFKC").trim().toLowerCase();
+}
+
+/** A cell that starts with one of these can be run as a formula by a spreadsheet. */
+export const FORMULA_START = /^[=+\-@\t\r]/;
+
+/** Undoes only the protection csvCell adds, a leading quote on a cell that starts like a formula. */
+export function unprotect(value: string): string {
+  return value.length > 1 && value[0] === "'" && FORMULA_START.test(value.slice(1)) ? value.slice(1) : value;
 }
 
 /** A deliberately loose shape check: one at sign, no spaces. */
