@@ -29,3 +29,11 @@ export function loadEcharts(): Promise<typeof import("echarts/core")> {
   }
   return loaded;
 }
+
+/**
+ * A person who asks their system to reduce motion gets charts that draw at once, with no bars growing or flows sliding.
+ * The charts animate by default, so this only ever turns animation off.
+ */
+export function withMotion(option: ChartOption, reduceMotion: boolean): ChartOption {
+  return reduceMotion ? { ...option, animation: false } : option;
+}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { guessColumn } from "@/lib/app/columns";
 import { formatCount, formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
 import { explainReadout } from "@/lib/app/explain";
+import { Explain } from "../../explain";
 import { describeVerdict } from "@/lib/app/verdict";
 import { downloadText } from "@/lib/app/download";
 import { verifyBrowserResults } from "@/lib/duckdb/client";
@@ -333,19 +334,7 @@ export function ResultsSection({
                   </tr>
                 </tbody>
               </table>
-              <details>
-                <summary>How these numbers were worked out</summary>
-                <dl>
-                  {explainReadout(r.readout, r.counts).map((e) => (
-                    <div key={e.label}>
-                      <dt>
-                        {e.label}: {e.value}
-                      </dt>
-                      <dd>{e.how}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </details>
+              <Explain items={explainReadout(r.readout, r.counts)} />
               <p>{verdict.label}</p>
               <p>{verdict.text}</p>
               {r.delivery && <p>Delivery: {r.delivery.note}</p>}

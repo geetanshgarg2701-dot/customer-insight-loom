@@ -32,7 +32,7 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
   await expect(page.locator("canvas")).toHaveCount(3);
 
   // Enterprise deals: fewer reach Won, and they wait longer in Proposal. These are the planted facts.
-  const medianOf = async () => Number(/Median ([\d.]+) days/.exec(await page.getByText(/deals moved from/).innerText())![1]);
+  const medianOf = async () => Number(/Median ([\d.]+) days/.exec(await page.locator("p", { hasText: /deals moved from .* Median/ }).innerText())![1]);
   const smallMedian = await medianOf();
   const segment = page.getByRole("group", { name: "Filter by segment" });
   await segment.getByRole("button", { name: /^enterprise, / }).click();
@@ -86,6 +86,19 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
   // A longer window moves both periods back, so the periods are those that have had 90 days.
   await expect(page.getByText(/Later: entered 2026-05-04 to 2026-08-03/)).toBeVisible();
   await expect.poll(wonShare).toBeGreaterThanOrEqual(won60);
+
+  // Every section can say how its numbers were worked out, from the real values.
+  await page.getByText("How the funnel was worked out").click();
+  await expect(page.getByText(/went on to reach .*\. [\d,]+ divided by [\d,]+ is/).first()).toBeVisible();
+  await page.getByText("How time in stage was worked out").click();
+  await expect(page.getByText(/half of these deals took less time than this/)).toBeVisible();
+  await page.getByText("How stalled deals were worked out").click();
+  await expect(page.getByText(/not won and not lost/)).toBeVisible();
+  await page.getByText("How the cohort ladder was worked out").click();
+  await expect(page.getByText(/Still maturing: \d+ months?/)).toBeVisible();
+  await page.getByText("How the period comparison was worked out").click();
+  // One explanation per stage says it, so the first is enough.
+  await expect(page.getByText(/Newcombe hybrid score method, runs from/).first()).toBeVisible();
 
   // The measured time is on the page. The plan's target is 1 second, a guess that this run checks.
   const ms = Number(/Updated in (\d+) ms/.exec(await page.getByText(/Updated in \d+ ms/).innerText())![1]);

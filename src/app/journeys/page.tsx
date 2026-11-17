@@ -6,6 +6,8 @@ import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
+import { explainPaths, explainWhatIf } from "@/lib/app/explain-views";
+import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
 import { CHART_THEME, type ChartTheme } from "./theme";
@@ -301,6 +303,7 @@ export default function JourneysPage() {
                 </tfoot>
               </table>
             )}
+            {paths && <Explain summary="How top paths were worked out" items={explainPaths(paths)} />}
           </section>
 
           <section aria-labelledby="h-whatif">
@@ -329,6 +332,7 @@ export default function JourneysPage() {
                   {formatPercent(scenario.extraShare, 1)}.
                 </p>
                 <p>{scenario.note}</p>
+                <Explain summary="How the what if was worked out" items={explainWhatIf(scenario, stages)} />
               </>
             )}
           </section>

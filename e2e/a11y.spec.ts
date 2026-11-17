@@ -148,3 +148,32 @@ test("every chart has the same information as text, so nothing depends on seeing
   // The canvas itself is named by its figure, so a screen reader announces what it is.
   expect(await page.getByRole("figure").count()).toBe(4);
 });
+
+test("charts draw at once when the system asks to reduce motion, and follow the setting live", async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/journeys");
+  await page.getByRole("button", { name: "Load synthetic journeys" }).click();
+  await expect(page.getByText(/Showing 100,000 of 100,000 customers/)).toBeVisible({ timeout: 180_000 });
+  const figures = page.getByRole("figure");
+  await expect(figures).toHaveCount(4);
+  for (const figure of await figures.all()) await expect(figure).toHaveAttribute("data-motion", "off");
+  // Changing the system setting takes effect without a reload.
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  for (const figure of await figures.all()) await expect(figure).toHaveAttribute("data-motion", "on");
+});
+
+test("with every explanation open, the pipeline and journeys screens still have no axe violations", async ({ page }) => {
+  test.setTimeout(240_000);
+  for (const [path, button, ready] of [
+    ["/journeys", "Load synthetic journeys", /Showing 100,000 of 100,000 customers/],
+    ["/pipeline", "Load synthetic pipeline", /Showing 100,000 of 100,000 deals/],
+  ] as const) {
+    await page.goto(path);
+    await page.getByRole("button", { name: button }).click();
+    await expect(page.getByText(ready)).toBeVisible({ timeout: 180_000 });
+    for (const summary of await page.locator("summary").all()) await summary.click();
+    await page.waitForTimeout(500);
+    await scan(page, `${path} with every explanation open`);
+  }
+});

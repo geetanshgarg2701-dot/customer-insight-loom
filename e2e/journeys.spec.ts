@@ -44,9 +44,15 @@ test("linked charts filter each other on 100,000 synthetic journeys, and the upd
   await page.getByRole("group", { name: "Step to change" }).getByRole("button", { name: "Product to Cart" }).click();
   await page.getByRole("group", { name: "Change in percentage points" }).getByRole("button", { name: "+10 points" }).click();
   await expect(page.getByText(/more people would reach Purchase/)).toBeVisible();
-  await expect(page.getByText(/not a forecast/)).toBeVisible();
+  // The what if paragraph and its explanation both say it, so check the paragraph.
+  await expect(page.locator("p", { hasText: /^This assumes the people gained behave like everyone/ })).toBeVisible();
   await page.getByRole("group", { name: "Change in percentage points" }).getByRole("button", { name: "-10 points" }).click();
   await expect(page.getByText(/fewer people would reach Purchase/)).toBeVisible();
+
+  await page.getByText("How top paths were worked out").click();
+  await expect(page.getByText(/customers took exactly this route, detours included/).first()).toBeVisible();
+  await page.getByText("How the what if was worked out").click();
+  await expect(page.getByText(/Carried to Purchase: [\d,]+ people, [\d,]+ (more|fewer)/)).toBeVisible();
 
   // Choosing the segment "new" with the keyboard route narrows every other chart and the flow.
   const flow = page.getByRole("table", { name: "Flow between steps" });

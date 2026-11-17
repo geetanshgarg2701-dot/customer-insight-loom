@@ -1,0 +1,229 @@
+import { describe, expect, it } from "vitest";
+import type { CohortRow, DwellHistogram, FunnelStage, PeriodComparison, Stalled } from "../charts/pipeline";
+import type { TopPaths } from "../charts/crossfilter";
+import { whatIf } from "../charts/whatif";
+import { formatCount, formatPercent } from "./format";
+import {
+  explainCohorts,
+  explainDwell,
+  explainFunnel,
+  explainPaths,
+  explainPeriods,
+  explainStalled,
+  explainWhatIf,
+} from "./explain-views";
+
+const find = <T extends { label: string }>(list: T[], label: string): T => list.find((e) => e.label === label)!;
+const clean = (list: { label: string; value: string; how: string }[]) => {
+  for (const e of list) expect(`${e.label} ${e.value} ${e.how}`).not.toMatch(/[—()]/);
+};
+
+describe("explainFunnel", () => {
+  const funnel: FunnelStage[] = [
+    { stage: "Lead", count: 1000, conversion: 1 },
+    { stage: "Qualified", count: 500, conversion: 0.5 },
+    { stage: "Proposal", count: 300, conversion: 0.6 },
+    { stage: "Won", count: 90, conversion: 0.3 },
+  ];
+  const list = explainFunnel(funnel);
+
+  it("explains each stage as a count and the share of the stage before it", () => {
+    const proposal = find(list, "Proposal");
+    expect(proposal.value).toBe(`${formatCount(300)} deals, ${formatPercent(0.6, 1)} of the stage before`);
+    expect(proposal.how).toContain("300 of the 500 deals that reached Qualified");
+    expect(proposal.how).toContain("60.0 percent");
+  });
+
+  it("says the first stage is everyone who matches the filters", () => {
+    expect(find(list, "Lead").how).toMatch(/everyone who matches the filters/);
+  });
+
+  it("is clean text and handles an empty stage", () => {
+    clean(list);
+    const empty = explainFunnel([
+      { stage: "Lead", count: 0, conversion: 1 },
+      { stage: "Qualified", count: 0, conversion: 0 },
+    ]);
+    expect(find(empty, "Qualified").how).toMatch(/no deals reached/);
+  });
+});
+
+describe("explainDwell", () => {
+  const h: DwellHistogram = {
+    from: "Proposal",
+    to: "Won",
+    moved: 1517,
+    binDays: 3,
+    bins: [{ fromDay: 0, count: 100 }],
+    medianDays: 26.6,
+    p90Days: 62.7,
+  };
+  const list = explainDwell(h);
+
+  it("explains the count, the median and the 90th percentile in plain words", () => {
+    expect(find(list, "Deals that moved").value).toBe("1,517");
+    expect(find(list, "Median").value).toBe("26.6 days");
+    expect(find(list, "Median").how).toMatch(/half of these deals took less/);
+    expect(find(list, "90th percentile").value).toBe("62.7 days");
+    expect(find(list, "90th percentile").how).toMatch(/nine in ten/);
+  });
+
+  it("warns that deals still waiting are left out, so slow stages look faster than they are", () => {
+    expect(find(list, "Deals that moved").how).toMatch(/still waiting are not in it/);
+    clean(list);
+  });
+});
+
+describe("explainStalled", () => {
+  const stalled: Stalled[] = [
+    { stage: "Lead", count: 1590, medianIdleDays: 52.8 },
+    { stage: "Proposal", count: 876, medianIdleDays: 52.4 },
+  ];
+  const list = explainStalled(stalled, { thresholdDays: 30, asOf: "2026-11-01T00:00:00Z" });
+
+  it("totals the stalled deals and explains the rule, with the cutoff", () => {
+    const total = find(list, "Stalled deals");
+    expect(total.value).toBe("2,466");
+    expect(total.how).toContain("30 days");
+    expect(total.how).toContain("2026-11-01");
+    expect(total.how).toMatch(/not won and not lost/);
+  });
+
+  it("explains idle time as elapsed time since the last stage entry, per stage", () => {
+    const lead = find(list, "Stuck in Lead");
+    expect(lead.value).toBe("1,590 deals, median 52.8 days idle");
+    expect(lead.how).toMatch(/elapsed time since the deal last entered a stage/);
+    clean(list);
+  });
+
+  it("says plainly when nothing is stalled", () => {
+    const none = explainStalled([], { thresholdDays: 60, asOf: "2026-11-01T00:00:00Z" });
+    expect(find(none, "Stalled deals").value).toBe("0");
+  });
+});
+
+describe("explainCohorts", () => {
+  const row = (cohort: string, mature: boolean): CohortRow => ({
+    cohort,
+    deals: 9481,
+    reachedQualified: 5320,
+    reachedProposal: 3148,
+    reachedWon: 1270,
+    qualifiedShare: 5320 / 9481,
+    proposalShare: 3148 / 9481,
+    wonShare: 1270 / 9481,
+    mature,
+    latestEntry: "2026-03-31T23:00:00.000Z",
+  });
+  const list = explainCohorts([row("2026-03", true), row("2026-10", false)], 60);
+
+  it("walks through the first comparable month with its real counts", () => {
+    const first = find(list, "Example: 2026-03");
+    expect(first.how).toContain("5,320 of 9,481 deals");
+    expect(first.how).toContain(formatPercent(5320 / 9481, 1));
+    expect(first.how).toContain("within 60 days");
+  });
+
+  it("explains maturity and names the months still maturing", () => {
+    const m = find(list, "Still maturing");
+    expect(m.value).toBe("1 month");
+    expect(m.how).toContain("2026-10");
+    expect(m.how).toMatch(/not had the whole window/);
+    clean(list);
+  });
+
+  it("handles no comparable month", () => {
+    const only = explainCohorts([row("2026-10", false)], 60);
+    expect(only.some((e) => e.label.startsWith("Example"))).toBe(false);
+  });
+});
+
+describe("explainPeriods", () => {
+  const c: PeriodComparison = {
+    windowDays: 60,
+    earlier: { from: "2026-03-04T00:00:00.000Z", to: "2026-06-03T00:00:00.000Z", deals: 27489, comparable: true, latestEntry: null },
+    later: { from: "2026-06-03T00:00:00.000Z", to: "2026-09-02T00:00:00.000Z", deals: 27547, comparable: true, latestEntry: null },
+    comparable: true,
+    alpha: 0.05,
+    method: "",
+    rows: [
+      {
+        stage: "Qualified",
+        earlier: { reached: 15450, share: 15450 / 27489 },
+        later: { reached: 17740, share: 17740 / 27547 },
+        difference: 17740 / 27547 - 15450 / 27489,
+        interval: { low: 0.073, high: 0.09 },
+        significant: true,
+      },
+    ],
+  };
+  const list = explainPeriods(c);
+
+  it("shows both shares as a count over the deals in the period, and the difference", () => {
+    const q = find(list, "Qualified");
+    expect(q.how).toContain("15,450 of 27,489 deals");
+    expect(q.how).toContain("17,740 of 27,547 deals");
+    expect(q.value).toMatch(/^\+\d\.\d points$/);
+    expect(q.how).toMatch(/Newcombe hybrid score/);
+    expect(q.how).toMatch(/excludes zero/);
+    clean(list);
+  });
+
+  it("says when the interval includes zero, and when a period is not comparable", () => {
+    const flat = explainPeriods({ ...c, rows: [{ ...c.rows[0], significant: false, interval: { low: -0.01, high: 0.02 } }] });
+    expect(find(flat, "Qualified").how).toMatch(/includes zero/);
+    const young = explainPeriods({ ...c, comparable: false, later: { ...c.later, comparable: false } });
+    expect(find(young, "Comparable").value).toBe("no");
+  });
+});
+
+describe("explainPaths", () => {
+  const r: TopPaths = {
+    total: 100000,
+    minShare: 0.02,
+    paths: [{ path: "Visit > Product", count: 24930, share: 0.2493, endsAt: "Product", endsInPurchase: false }],
+    other: { count: 4110, share: 0.0411, paths: 3 },
+  };
+  const list = explainPaths(r);
+
+  it("explains a path share as customers over all customers, and the merged group", () => {
+    expect(find(list, "Visit > Product").how).toContain("24,930 of 100,000 customers");
+    const other = find(list, "Other paths");
+    expect(other.value).toBe("4,110 customers in 3 routes");
+    expect(other.how).toContain("2 percent");
+    expect(other.how).toMatch(/so the totals still add up/);
+    clean(list);
+  });
+
+  it("leaves out the merged group when nothing was merged", () => {
+    const none = explainPaths({ ...r, other: { count: 0, share: 0, paths: 0 } });
+    expect(none.some((e) => e.label === "Other paths")).toBe(false);
+  });
+});
+
+describe("explainWhatIf", () => {
+  const stages = [
+    { stage: "Visit", count: 1000 },
+    { stage: "Product", count: 500 },
+    { stage: "Cart", count: 250 },
+    { stage: "Purchase", count: 100 },
+  ];
+  const s = whatIf(stages, { fromStep: 1, points: 10 });
+  const list = explainWhatIf(s, stages);
+
+  it("shows the current rate as a count over a count, and the new rate", () => {
+    const rate = find(list, "Product to Cart");
+    expect(rate.how).toContain("250 of 500");
+    expect(rate.how).toContain("50.0 percent");
+    expect(rate.how).toContain("60.0 percent");
+  });
+
+  it("carries the gain through the later steps with the real figures", () => {
+    const carried = find(list, "Carried to Purchase");
+    expect(carried.how).toContain("300");
+    expect(carried.how).toContain("40.0 percent");
+    expect(carried.value).toBe("120 people, 20 more");
+    expect(carried.how).toMatch(/not a forecast/);
+    clean(list);
+  });
+});

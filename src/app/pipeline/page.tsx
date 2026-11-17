@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PIPELINE_DIMENSIONS, type Count, type PipelineDimension, type PipelineSelection } from "@/lib/charts/pipeline";
 import type { CohortRow, DwellHistogram, FunnelStage, PeriodComparison, Stalled } from "@/lib/charts/pipeline";
 import type { ChartOption } from "@/lib/charts/echarts";
-import { PIPELINE_STAGES } from "@/lib/demo/pipeline";
+import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
+import { explainCohorts, explainDwell, explainFunnel, explainPeriods, explainStalled } from "@/lib/app/explain-views";
+import { Explain } from "../explain";
 import { Nav } from "../nav";
 
 const TITLES: Record<PipelineDimension, string> = {
@@ -276,6 +278,7 @@ export default function PipelinePage() {
                 ))}
               </tbody>
             </table>
+            <Explain summary="How the funnel was worked out" items={explainFunnel(funnel)} />
           </section>
 
           <section aria-labelledby="h-dwell">
@@ -302,6 +305,7 @@ export default function PipelinePage() {
                   {dwell.moved.toLocaleString("en-US")} deals moved from {dwell.from} to {dwell.to}. Median {days(dwell.medianDays)}.
                   Nine in ten took {days(dwell.p90Days)} or less.
                 </p>
+                <Explain summary="How time in stage was worked out" items={explainDwell(dwell)} />
               </>
             )}
           </section>
@@ -341,6 +345,10 @@ export default function PipelinePage() {
                 ))}
               </tbody>
             </table>
+            <Explain
+              summary="How stalled deals were worked out"
+              items={explainStalled(stalled, { thresholdDays: threshold, asOf: PIPELINE_AS_OF })}
+            />
           </section>
 
           <section aria-labelledby="h-cohorts">
@@ -382,6 +390,7 @@ export default function PipelinePage() {
                 ))}
               </tbody>
             </table>
+            <Explain summary="How the cohort ladder was worked out" items={explainCohorts(cohorts, cohortWindow)} />
           </section>
 
           <section aria-labelledby="h-periods">
@@ -431,6 +440,7 @@ export default function PipelinePage() {
                     ))}
                   </tbody>
                 </table>
+                <Explain summary="How the period comparison was worked out" items={explainPeriods(periods)} />
                 <p>
                   A clear difference says the two periods differ, not why. Something else may have changed at the same time,
                   such as the mix of deals or how they were counted. {periods.method}

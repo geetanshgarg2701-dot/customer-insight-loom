@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { explainPower } from "@/lib/app/explain";
+import { Explain } from "../../explain";
 import { formatCount, formatPercent, formatPoints } from "@/lib/app/format";
 import type { Ledger, LedgerEntry } from "@/lib/ledger/ledger";
 import { MAX_WINDOW_HOURS, conversionWindowHours } from "@/lib/ledger/window";
@@ -189,24 +190,14 @@ export function DesignSection({
             </tbody>
           </table>
           {fresh && (
-            <details>
-              <summary>How these numbers were worked out</summary>
-              <dl>
-                {explainPower(power, {
-                  baselineRate: Number(baseline) / 100,
-                  minDetectableLift: Number(lift) / 100,
-                  treatmentShare: Number(share) / 100,
-                  audienceSize: Number(audience),
-                }).map((e) => (
-                  <div key={e.label}>
-                    <dt>
-                      {e.label}: {e.value}
-                    </dt>
-                    <dd>{e.how}</dd>
-                  </div>
-                ))}
-              </dl>
-            </details>
+            <Explain
+              items={explainPower(power, {
+                baselineRate: Number(baseline) / 100,
+                minDetectableLift: Number(lift) / 100,
+                treatmentShare: Number(share) / 100,
+                audienceSize: Number(audience),
+              })}
+            />
           )}
           {power.pass && typeof power.smallestDetectableLift === "number" && (
             <p>
