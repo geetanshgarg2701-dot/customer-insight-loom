@@ -14,6 +14,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Sample ratio check | BUILT | `srm.ts` |
 | Benjamini Hochberg function | PARTIAL | `bh.ts` exists. No screen applies a correction. Holm is not built. |
 | A/A, coverage and planted lift checks, shown on the methods page | BUILT | `honesty.ts`, `src/app/methods` |
+| Property tests of the statistics, text and time code | BUILT | 30 properties on random inputs plus simulation: interval coverage 95.5 and 96.2 percent, power 81.8 percent against the promised 80, false positives 4.6 to 5.1 percent at 30,000 runs, Benjamini Hochberg 5.3 percent under the null, local times across seven zones. No wrong answer found. One performance defect found and fixed: cutting 100,000 events into days went from 6.3 s to 0.4 s. See `2026-11-17-property-test-results.md`. |
 | Fixed horizon, readout locked until the window closes | BUILT | `window.ts`, enforced in the app and in the database |
 | Result versions with a reason | BUILT | `ledger_result_versions`, in the app and in the database |
 | Incremental revenue | PARTIAL | A helper exists, no screen uses it, and it assumes equal order value in both arms. |
@@ -76,7 +77,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 628 unit tests, 51 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 660 unit tests, 51 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
