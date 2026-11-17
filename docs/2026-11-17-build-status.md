@@ -72,3 +72,29 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 ## Tests today
 
 On this date: 454 unit tests, 15 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+
+## Work remaining, in hours
+
+Written 2026-11-17. Every figure here is INFERRED from the plan's own phase budgets, and the item estimates are SPECULATION. No hours were tracked while building, so nothing below is measured. Use it to compare scope, not to promise a date.
+
+**Method.** The plan budgets 336 build hours across its phases. Crediting each phase for what exists gives about 129 hours done, or about 38 percent. Estimating the not started items one by one gives about 222 hours left, which puts done at 129 of 351, or about 37 percent. The two methods agree within a point, so the figure is about 37 percent by work, against about 51 percent by item count.
+
+| Not started item | Hours |
+|---|---|
+| Design system and the chart coordinator spike | 14 |
+| Webhook ingestion, identity matching, remaining time rules | 22 |
+| Journey views, M16 | 36 |
+| Pipeline views, M17 | 42 |
+| Evidence chain, M6 | 14 |
+| AI features with evals, including the in browser model, M8, M13, M15 | 30 |
+| Deck export, M9 | 10 |
+| Compliance check, delete all, usage meter, keep alive | 14 |
+| Pilot accounts, a Supabase client | 12 |
+| Name redaction | 8 |
+| Click to explain, privacy and terms, landing and 404 | 10 |
+| Accessibility checks and phone width tests | 10 |
+| **Total** | **222** |
+
+At 12 to 15 hours a week that is about 15 to 19 weeks, so mid March to early April if work starts now and nothing slips. The plan's own schedule reaches its checkpoint at the same point, which suggests the plan was sized close to the real work. The two big risks are the journey and pipeline views, which are 78 of the 222 hours and hold the success metric the testers are asked about.
+
+**What would shorten it.** Cutting the AI features, the deck export and pilot accounts saves about 52 hours, leaving about 170, which is about 11 to 14 weeks. The ledger, statistics, intake, redaction, demo and static copy would stay, and they are the parts that already work.
