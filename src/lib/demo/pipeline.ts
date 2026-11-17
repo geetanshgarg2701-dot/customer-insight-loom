@@ -4,7 +4,9 @@ import { mulberry32 } from "../stats/honesty";
  * Synthetic sales pipeline for the pipeline views. Labels and times only, so nothing here can identify anyone. The
  * generator doubles as the test fixture, plan section 5.14, because every answer is known.
  *
- * Planted facts: enterprise deals sit in Proposal about three times longer than small ones and win less often.
+ * Planted facts: enterprise deals sit in Proposal about three times longer than small ones and win less often. Deals
+ * that entered on or after PIPELINE_CHANGE_AT, a new qualification process, move from Lead to Qualified 8 points more
+ * often, so a comparison of two periods has a real change to find.
  * Times are UTC text without a zone, the form the database reads. Deals that have not reached a stage by the cutoff
  * have no time for it. A deal that stops moving is marked lost some weeks later, unless that time is after the cutoff,
  * in which case it is still open. Open deals are the only ones that can be stalled.
@@ -16,6 +18,10 @@ export const PIPELINE_SOURCES = ["inbound", "outbound", "referral"] as const;
 
 /** The cutoff for "now" in the demo, so every number is reproducible. */
 export const PIPELINE_AS_OF = "2026-11-01T00:00:00Z";
+
+/** From this date the demo's qualification process is better. */
+export const PIPELINE_CHANGE_AT = "2026-06-01T00:00:00Z";
+const QUALIFY_BOOST = 0.08;
 
 export type PipelineRow = {
   segment: (typeof PIPELINE_SEGMENTS)[number];
@@ -66,18 +72,21 @@ function utcText(ms: number): string {
 export function syntheticPipeline(count: number, seed: number): PipelineRow[] {
   const rng = mulberry32(seed);
   const asOf = Date.parse(PIPELINE_AS_OF);
+  const changeAt = Date.parse(PIPELINE_CHANGE_AT);
   const normal = () => Math.sqrt(-2 * Math.log(rng() || 1e-12)) * Math.cos(2 * Math.PI * rng());
   const rows: PipelineRow[] = [];
   for (let i = 0; i < count; i++) {
     const segment = pick(PICK_SEGMENT, rng());
     const source = pick(PICK_SOURCE, rng());
     let at = Math.floor((asOf - rng() * 330 * DAY_MS) / 1000) * 1000;
+    const improved = at >= changeAt;
     const entered: (string | null)[] = PIPELINE_STAGES.map(() => null);
     entered[0] = utcText(at);
     let reached = 1;
     let quit = false;
     for (let s = 0; s < 3; s++) {
-      if (rng() >= CONTINUE[segment][s]) {
+      const chance = Math.min(1, CONTINUE[segment][s] + (s === 0 && improved ? QUALIFY_BOOST : 0));
+      if (rng() >= chance) {
         quit = true;
         break;
       }

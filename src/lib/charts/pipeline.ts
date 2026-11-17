@@ -2,6 +2,7 @@ import { toPlainRow } from "../duckdb/normalize";
 import { PIPELINE_STAGES, type PipelineRow } from "../demo/pipeline";
 import type { SqlEngine } from "../intake/types";
 import { insertRows } from "../ledger/ledger";
+import { newcombeDifference, type Interval } from "../stats/readout";
 import { buildWhere } from "./crossfilter";
 
 /**
@@ -37,6 +38,11 @@ export async function loadPipeline(engine: SqlEngine, table: string, rows: reado
     ["segment", "source", ...STAGE_COLUMNS, "stage", "lost_at", "status"],
     rows.map((r) => [r.segment, r.source, ...r.entered, r.stage, r.lostAt, r.status]),
   );
+}
+
+/** A timestamp from the database arrives as milliseconds since 1970 in UTC. Anything else is treated as missing. */
+function timeOf(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export type Count = { value: string; count: number };
@@ -226,7 +232,150 @@ export async function cohortLadder(
       proposalShare: share(r.p),
       wonShare: share(r.w),
       mature: Boolean(r.mature),
-      latestEntry: r.latest === null || r.latest === undefined ? null : String(r.latest),
+      latestEntry: timeOf(r.latest) === null ? null : new Date(timeOf(r.latest)!).toISOString(),
     };
   });
+}
+
+const DAY_MS = 86_400_000;
+/** 13 weeks, so a period always holds whole weeks and the two periods have the same length. */
+const PERIOD_DAYS = 91;
+
+export type Period = { from: string; to: string };
+
+/**
+ * The two periods to compare by default: the latest 13 weeks of deals that have all had the whole window by the
+ * cutoff, and the 13 weeks before them. The newest deals are left out on purpose, because a deal that has not had the
+ * whole window yet would make the later period look worse than it is.
+ */
+export function defaultPeriods(
+  asOf: string,
+  windowDays: number,
+): { cutoff: string; earlier: Period; later: Period } {
+  const asOfMs = Date.parse(asOf);
+  if (!Number.isFinite(asOfMs)) throw new RangeError("The cutoff is not a time.");
+  if (!Number.isFinite(windowDays) || windowDays <= 0) throw new RangeError("The window must be above 0 days.");
+  const cutoff = asOfMs - windowDays * DAY_MS;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  return {
+    cutoff: iso(cutoff),
+    later: { from: iso(cutoff - PERIOD_DAYS * DAY_MS), to: iso(cutoff) },
+    earlier: { from: iso(cutoff - 2 * PERIOD_DAYS * DAY_MS), to: iso(cutoff - PERIOD_DAYS * DAY_MS) },
+  };
+}
+
+export type PeriodStats = Period & {
+  deals: number;
+  /** True when the newest deal in the period has had the whole window by the cutoff. */
+  comparable: boolean;
+  latestEntry: string | null;
+};
+
+export type PeriodRow = {
+  stage: string;
+  earlier: { reached: number; share: number };
+  later: { reached: number; share: number };
+  /** Later share minus earlier share, as a proportion. */
+  difference: number;
+  interval: Interval;
+  /** True when the interval excludes zero. */
+  significant: boolean;
+};
+
+export type PeriodComparison = {
+  windowDays: number;
+  earlier: PeriodStats;
+  later: PeriodStats;
+  /** True only when both periods are comparable. If not, the rows are shown but should not be read as a trend. */
+  comparable: boolean;
+  rows: PeriodRow[];
+  alpha: number;
+  method: string;
+};
+
+/**
+ * Do deals that entered in the later period reach each stage more or less often than those in the earlier one? Each
+ * share is the deals that reached the stage within the window of entering, as a share of the deals that entered, with
+ * elapsed time and the closing instant inside. The difference gets an interval from the same Newcombe method as the
+ * readout, because the two periods hold different deals. A clear difference is not proof of why it changed.
+ */
+export async function periodComparison(
+  engine: SqlEngine,
+  table: string,
+  options: { windowDays: number; asOf: string; earlier: Period; later: Period },
+  selection: PipelineSelection,
+): Promise<PeriodComparison> {
+  checkTable(table);
+  if (!Number.isFinite(options.windowDays) || options.windowDays <= 0) {
+    throw new RangeError("The window must be above 0 days.");
+  }
+  const asOfMs = Date.parse(options.asOf);
+  if (!Number.isFinite(asOfMs)) throw new RangeError("The cutoff is not a time.");
+  const checked = (period: Period): { from: number; to: number } => {
+    const from = Date.parse(period.from);
+    const to = Date.parse(period.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) throw new RangeError("A period needs a start and an end time.");
+    if (!(from < to)) throw new RangeError("A period must start before it ends.");
+    return { from, to };
+  };
+  const bounds = { earlier: checked(options.earlier), later: checked(options.later) };
+  const windowSeconds = Math.round(options.windowDays * DAY_SECONDS);
+  const matureBefore = asOfMs - windowSeconds * 1000;
+  const where = pipelineWhere(selection);
+  const joiner = where.sql ? `${where.sql} AND` : "WHERE";
+  const sqlTime = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+  const within = (c: string) => `count(*) FILTER (WHERE ${c} IS NOT NULL AND date_diff('second', e1, ${c}) <= ${windowSeconds})`;
+
+  const measure = async (period: Period, b: { from: number; to: number }) => {
+    const [row] = (
+      await engine.query(
+        `SELECT count(*) AS deals, ${within("e2")} AS q, ${within("e3")} AS p, ${within("e4")} AS w, max(e1) AS latest ` +
+          `FROM ${table} ${joiner} e1 >= CAST(? AS TIMESTAMP) AND e1 < CAST(? AS TIMESTAMP)`,
+        [...where.params, sqlTime(b.from), sqlTime(b.to)],
+      )
+    ).map(toPlainRow);
+    const latestMs = timeOf(row.latest);
+    const latest = latestMs === null ? null : new Date(latestMs).toISOString();
+    const stats: PeriodStats = {
+      from: period.from,
+      to: period.to,
+      deals: Number(row.deals),
+      comparable: latestMs !== null && latestMs <= matureBefore,
+      latestEntry: latest,
+    };
+    return { stats, reached: [Number(row.q), Number(row.p), Number(row.w)] };
+  };
+
+  const earlier = await measure(options.earlier, bounds.earlier);
+  const later = await measure(options.later, bounds.later);
+  const alpha = 0.05;
+  const stages = [PIPELINE_STAGES[1], PIPELINE_STAGES[2], PIPELINE_STAGES[3]];
+  const rows: PeriodRow[] = stages.map((stage, i) => {
+    const e = earlier.reached[i];
+    const l = later.reached[i];
+    const eShare = earlier.stats.deals === 0 ? 0 : e / earlier.stats.deals;
+    const lShare = later.stats.deals === 0 ? 0 : l / later.stats.deals;
+    const empty = earlier.stats.deals === 0 || later.stats.deals === 0;
+    const interval = empty ? { low: 0, high: 0 } : newcombeDifference(l, later.stats.deals, e, earlier.stats.deals, alpha);
+    return {
+      stage,
+      earlier: { reached: e, share: eShare },
+      later: { reached: l, share: lShare },
+      difference: empty ? 0 : lShare - eShare,
+      interval,
+      significant: !empty && (interval.low > 0 || interval.high < 0),
+    };
+  });
+  return {
+    windowDays: options.windowDays,
+    earlier: earlier.stats,
+    later: later.stats,
+    comparable: earlier.stats.comparable && later.stats.comparable,
+    rows,
+    alpha,
+    method:
+      `Share of the deals that entered in each period that reached the stage within ${options.windowDays} days of entering. ` +
+      `period. The difference is the later share minus the earlier share, with a 95 percent Newcombe hybrid score interval. ` +
+      `A period counts as comparable only when its newest deal has had the whole window.`,
+  };
 }

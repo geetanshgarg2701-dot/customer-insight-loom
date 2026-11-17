@@ -9,6 +9,18 @@ import { assignAudience, assignmentCsv, verifyResults } from "./assign";
 import { bucketOf, customerHash, hmacHex, normalizeEmail } from "./hash";
 
 const SECRET = "ab".repeat(32);
+
+/**
+ * A ledger with fixed ids and a fixed secret. Who lands in which group depends on both, so without this a check on
+ * the size of a group or the sign of a lift can fail on a run that is merely unlucky. With it every run is identical.
+ */
+function pinned() {
+  let counter = 0;
+  return {
+    newId: () => `00000000-0000-4000-8000-${String(++counter).padStart(12, "0")}`,
+    randomBytes: (n: number) => new Uint8Array(n).fill(9),
+  };
+}
 const ENTRY = "11111111-1111-4111-8111-111111111111";
 
 describe("hashing", () => {
@@ -50,7 +62,7 @@ describe("assignment", () => {
     engine = await createNodeEngine();
     await dropLedgerTables(engine);
     await engine.exec("DROP TABLE IF EXISTS experiment_results");
-    ledger = await createLedger(engine, {});
+    ledger = await createLedger(engine, pinned());
     entryId = (await ledger.createDraft({ title: "Test", hypothesis: "H" }, "u")).id;
   });
 
@@ -157,7 +169,7 @@ describe("results upload, verified against the stored assignment", () => {
     engine = await createNodeEngine();
     await dropLedgerTables(engine);
     await engine.exec("DROP TABLE IF EXISTS experiment_results");
-    ledger = await createLedger(engine, {});
+    ledger = await createLedger(engine, pinned());
     entryId = (await ledger.createDraft({ title: "Test", hypothesis: "H" }, "u")).id;
     const list = Array.from({ length: 4000 }, (_, i) => `p${i}@example.com`);
     assigned = (await assignAudience({ ledger, entryId, emails: list, treatmentShare: 0.5 })).rows;
@@ -309,7 +321,7 @@ describe("end to end through the CSV intake", () => {
     await dropLedgerTables(engine);
     await engine.exec("DROP TABLE IF EXISTS experiment_results");
     try {
-      const ledger = await createLedger(engine, {});
+      const ledger = await createLedger(engine, pinned());
       const entryId = (await ledger.createDraft({ title: "CSV", hypothesis: "H" }, "u")).id;
       const intake = createIntake(engine);
       const audience = lines("email,first_name,score", "a@example.com,Ann,1", "b@example.com,Bo,2", "c@example.com,Cy,3");

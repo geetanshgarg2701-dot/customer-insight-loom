@@ -5,9 +5,11 @@ import { createNodeEngine } from "../intake/testing/node-engine";
 import {
   PIPELINE_DIMENSIONS,
   cohortLadder,
+  defaultPeriods,
   dwellHistogram,
   loadPipeline,
   pipelineCounts,
+  periodComparison,
   pipelineWhere,
   stageFunnel,
   stalledByStage,
@@ -178,7 +180,7 @@ describe("cohortLadder, plan section on the cohort ladder", () => {
       const monthEnd = Date.UTC(y, m, 1);
       // A mature cohort's newest possible entry, the end of its month, plus the window, is not after the cutoff.
       expect(monthEnd - 1 + 60 * 86_400_000).toBeLessThanOrEqual(asOf + 31 * 86_400_000);
-      expect(c.latestEntry).not.toBeNull();
+      expect(c.latestEntry).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     }
   });
 
@@ -202,5 +204,95 @@ describe("cohortLadder, plan section on the cohort ladder", () => {
     expect(ent.reduce((n, c) => n + c.deals, 0)).toBeLessThan(all.reduce((n, c) => n + c.deals, 0));
     await expect(cohortLadder(engine, TABLE, { windowDays: 0, asOf: PIPELINE_AS_OF }, {})).rejects.toThrow(RangeError);
     await expect(cohortLadder(engine, TABLE, { windowDays: 60, asOf: "soon" }, {})).rejects.toThrow(RangeError);
+  });
+});
+
+describe("defaultPeriods", () => {
+  it("takes the latest 13 weeks that have had the whole window, and the 13 weeks before them", () => {
+    const p = defaultPeriods(PIPELINE_AS_OF, 60);
+    // The cutoff is 60 days before 1 November 2026, which is 2 September.
+    expect(p.cutoff).toBe("2026-09-02T00:00:00.000Z");
+    expect(p.later).toEqual({ from: "2026-06-03T00:00:00.000Z", to: "2026-09-02T00:00:00.000Z" });
+    expect(p.earlier).toEqual({ from: "2026-03-04T00:00:00.000Z", to: "2026-06-03T00:00:00.000Z" });
+  });
+
+  it("moves earlier for a longer window, and rejects bad input", () => {
+    expect(defaultPeriods(PIPELINE_AS_OF, 90).cutoff < defaultPeriods(PIPELINE_AS_OF, 30).cutoff).toBe(true);
+    expect(() => defaultPeriods("soon", 60)).toThrow(RangeError);
+    expect(() => defaultPeriods(PIPELINE_AS_OF, 0)).toThrow(RangeError);
+  });
+});
+
+describe("periodComparison", () => {
+  const options = (windowDays = 60) => ({ windowDays, asOf: PIPELINE_AS_OF, ...defaultPeriods(PIPELINE_AS_OF, windowDays) });
+
+  it("compares two periods that have both had the whole window, and counts every deal in each", async () => {
+    const c = await periodComparison(engine, TABLE, options(), {});
+    expect(c.comparable).toBe(true);
+    for (const period of [c.earlier, c.later]) {
+      expect(period.deals).toBeGreaterThan(10_000);
+      expect(period.comparable).toBe(true);
+    }
+    const o = options();
+    const direct = await engine.query("SELECT count(*) AS n FROM pipeline WHERE e1 >= CAST(? AS TIMESTAMP) AND e1 < CAST(? AS TIMESTAMP)", [
+      o.later.from.slice(0, 19).replace("T", " "),
+      o.later.to.slice(0, 19).replace("T", " "),
+    ]);
+    expect(c.later.deals).toBe(Number(direct[0].n));
+  });
+
+  it("finds the planted change in the qualified rate, with an interval that excludes zero", async () => {
+    const c = await periodComparison(engine, TABLE, options(), {});
+    const q = c.rows.find((r) => r.stage === "Qualified")!;
+    expect(q.later.share).toBeGreaterThan(q.earlier.share);
+    expect(q.difference).toBeGreaterThan(0.04);
+    expect(q.difference).toBeLessThan(0.12);
+    expect(q.interval.low).toBeGreaterThan(0);
+    expect(q.significant).toBe(true);
+    expect(q.difference).toBeCloseTo(q.later.share - q.earlier.share, 12);
+  });
+
+  it("orders the stages, and a later stage is never reached by more deals than an earlier one in either period", async () => {
+    const c = await periodComparison(engine, TABLE, options(), {});
+    expect(c.rows.map((r) => r.stage)).toEqual(["Qualified", "Proposal", "Won"]);
+    for (const key of ["earlier", "later"] as const) {
+      expect(c.rows[1][key].reached).toBeLessThanOrEqual(c.rows[0][key].reached);
+      expect(c.rows[2][key].reached).toBeLessThanOrEqual(c.rows[1][key].reached);
+    }
+  });
+
+  it("calls a period against itself no difference at all", async () => {
+    const o = options();
+    const same = await periodComparison(engine, TABLE, { ...o, earlier: o.later }, {});
+    for (const r of same.rows) {
+      expect(r.difference).toBe(0);
+      expect(r.interval.low).toBeLessThanOrEqual(0);
+      expect(r.interval.high).toBeGreaterThanOrEqual(0);
+      expect(r.significant).toBe(false);
+    }
+  });
+
+  it("says a period is not comparable when its newest deal has not had the whole window", async () => {
+    const o = options();
+    const young = await periodComparison(engine, TABLE, { ...o, later: { from: "2026-09-01T00:00:00.000Z", to: "2026-11-01T00:00:00.000Z" } }, {});
+    expect(young.later.comparable).toBe(false);
+    expect(young.comparable).toBe(false);
+  });
+
+  it("respects the filters", async () => {
+    const all = await periodComparison(engine, TABLE, options(), {});
+    const ent = await periodComparison(engine, TABLE, options(), { segment: ["enterprise"] });
+    expect(ent.later.deals).toBeLessThan(all.later.deals);
+    const none = await periodComparison(engine, TABLE, options(), { segment: ["x' OR '1'='1"] });
+    expect(none.later.deals).toBe(0);
+    expect(none.rows.every((r) => r.difference === 0 && r.significant === false)).toBe(true);
+  });
+
+  it("refuses periods that are backwards, empty or not times, and a bad window", async () => {
+    const o = options();
+    await expect(periodComparison(engine, TABLE, { ...o, later: { from: o.later.to, to: o.later.from } }, {})).rejects.toThrow(RangeError);
+    await expect(periodComparison(engine, TABLE, { ...o, later: { from: "x", to: o.later.to } }, {})).rejects.toThrow(RangeError);
+    await expect(periodComparison(engine, TABLE, { ...o, windowDays: 0 }, {})).rejects.toThrow(RangeError);
+    await expect(periodComparison(engine, TABLE, { ...o, asOf: "soon" }, {})).rejects.toThrow(RangeError);
   });
 });

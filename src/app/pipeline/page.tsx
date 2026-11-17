@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PIPELINE_DIMENSIONS, type Count, type PipelineDimension, type PipelineSelection } from "@/lib/charts/pipeline";
-import type { CohortRow, DwellHistogram, FunnelStage, Stalled } from "@/lib/charts/pipeline";
+import type { CohortRow, DwellHistogram, FunnelStage, PeriodComparison, Stalled } from "@/lib/charts/pipeline";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { PIPELINE_STAGES } from "@/lib/demo/pipeline";
-import { formatPercent } from "@/lib/app/format";
+import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
@@ -94,6 +94,7 @@ function stalledOption(stalled: Stalled[], theme: ChartTheme): ChartOption {
 }
 
 const days = (n: number) => `${n.toFixed(1)} days`;
+const dateOf = (iso: string) => iso.slice(0, 10);
 
 export default function PipelinePage() {
   const board = useRef<PipelineBoard | null>(null);
@@ -109,24 +110,27 @@ export default function PipelinePage() {
   const [stalled, setStalled] = useState<Stalled[]>([]);
   const [cohortWindow, setCohortWindow] = useState<(typeof WINDOWS)[number]>(60);
   const [cohorts, setCohorts] = useState<CohortRow[]>([]);
+  const [periods, setPeriods] = useState<PeriodComparison | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
 
   const refresh = useCallback(async (next: PipelineSelection, step: number, days: number, windowDays: number) => {
     const b = board.current;
     if (!b) return;
     const started = performance.now();
-    const [byDimension, f, d, s, c] = await Promise.all([
+    const [byDimension, f, d, s, c, p] = await Promise.all([
       Promise.all(PIPELINE_DIMENSIONS.map((dim) => b.counts(dim, next))),
       b.funnel(next),
       b.dwell(step, next),
       b.stalled(days, next),
       b.cohorts(windowDays, next),
+      b.periods(windowDays, next),
     ]);
     setCounts(Object.fromEntries(PIPELINE_DIMENSIONS.map((dim, i) => [dim, byDimension[i]])));
     setFunnel(f);
     setDwell(d);
     setStalled(s);
     setCohorts(c);
+    setPeriods(p);
     setElapsed(Math.round(performance.now() - started));
   }, []);
 
@@ -378,6 +382,61 @@ export default function PipelinePage() {
                 ))}
               </tbody>
             </table>
+          </section>
+
+          <section aria-labelledby="h-periods">
+            <h2 id="h-periods">Period comparison</h2>
+            <p>
+              Do deals that entered recently reach each stage more or less often than those before? It compares the latest
+              13 weeks of deals that have had the whole window with the 13 weeks before, using the window chosen above and
+              counting elapsed time from entry. The newest deals are left out on purpose, because a deal that has not had
+              the whole window yet would make the later period look worse than it is.
+            </p>
+            {periods && (
+              <>
+                <p>
+                  Earlier: entered {dateOf(periods.earlier.from)} to {dateOf(periods.earlier.to)}, {periods.earlier.deals.toLocaleString("en-US")} deals.
+                  Later: entered {dateOf(periods.later.from)} to {dateOf(periods.later.to)}, {periods.later.deals.toLocaleString("en-US")} deals.
+                  Within {periods.windowDays} days of entering.
+                </p>
+                {!periods.comparable && (
+                  <p role="alert">
+                    One of these periods has deals that have not had the whole window yet, so the difference below should
+                    not be read as a trend.
+                  </p>
+                )}
+                <table aria-label="Period comparison">
+                  <thead>
+                    <tr>
+                      <th>Reached</th>
+                      <th>Earlier</th>
+                      <th>Later</th>
+                      <th>Difference</th>
+                      <th>95 percent interval</th>
+                      <th>Clear difference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periods.rows.map((r) => (
+                      <tr key={r.stage}>
+                        <td>{r.stage}</td>
+                        <td>{formatPercent(r.earlier.share, 1)}</td>
+                        <td>{formatPercent(r.later.share, 1)}</td>
+                        <td>{formatSignedPoints(r.difference, 1)}</td>
+                        <td>
+                          {formatSignedPoints(r.interval.low, 1)} to {formatSignedPoints(r.interval.high, 1)}
+                        </td>
+                        <td>{r.significant ? "yes" : "no, inconclusive"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p>
+                  A clear difference says the two periods differ, not why. Something else may have changed at the same time,
+                  such as the mix of deals or how they were counted. {periods.method}
+                </p>
+              </>
+            )}
           </section>
         </>
       )}

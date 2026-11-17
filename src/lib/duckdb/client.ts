@@ -14,8 +14,10 @@ import {
 } from "../charts/crossfilter";
 import {
   cohortLadder,
+  defaultPeriods,
   dwellHistogram,
   loadPipeline,
+  periodComparison,
   pipelineCounts,
   stageFunnel,
   stalledByStage,
@@ -23,6 +25,7 @@ import {
   type Count as PipelineCount,
   type DwellHistogram,
   type FunnelStage,
+  type PeriodComparison,
   type PipelineDimension,
   type PipelineSelection,
   type Stalled,
@@ -187,6 +190,7 @@ export type PipelineBoard = {
   dwell(stageIndex: number, selection: PipelineSelection): Promise<DwellHistogram>;
   stalled(thresholdDays: number, selection: PipelineSelection): Promise<Stalled[]>;
   cohorts(windowDays: number, selection: PipelineSelection): Promise<CohortRow[]>;
+  periods(windowDays: number, selection: PipelineSelection): Promise<PeriodComparison>;
   close(): Promise<void>;
 };
 
@@ -203,6 +207,8 @@ export async function createBrowserPipelineBoard(rows = 100_000, seed = 21): Pro
     dwell: (stageIndex, selection) => dwellHistogram(engine, table, stageIndex, selection),
     stalled: (thresholdDays, selection) => stalledByStage(engine, table, { thresholdDays, asOf: PIPELINE_AS_OF }, selection),
     cohorts: (windowDays, selection) => cohortLadder(engine, table, { windowDays, asOf: PIPELINE_AS_OF }, selection),
+    periods: (windowDays, selection) =>
+      periodComparison(engine, table, { windowDays, asOf: PIPELINE_AS_OF, ...defaultPeriods(PIPELINE_AS_OF, windowDays) }, selection),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

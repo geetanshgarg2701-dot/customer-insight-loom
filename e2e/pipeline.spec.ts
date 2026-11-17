@@ -70,7 +70,21 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
     return parseFloat(cells[4]);
   };
   const won60 = await wonShare();
+
+  // Period comparison at 60 days: the two 13 week periods, both fully matured, and the planted change is clear.
+  const compare = page.getByRole("table", { name: "Period comparison" });
+  await expect(page.getByText(/Earlier: entered 2026-03-04 to 2026-06-03/)).toBeVisible();
+  await expect(page.getByText(/Later: entered 2026-06-03 to 2026-09-02/)).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "not had the whole window" })).toHaveCount(0);
+  const qualified = compare.getByRole("row", { name: /^Qualified/ });
+  await expect(qualified).toContainText("yes");
+  await expect(qualified).toContainText("+");
+  await expect(compare.getByRole("row", { name: /^Won/ })).toBeVisible();
+  await expect(page.getByText(/says the two periods differ, not why/)).toBeVisible();
+
   await page.getByRole("group", { name: "Cohort window" }).getByRole("button", { name: "Within 90 days" }).click();
+  // A longer window moves both periods back, so the periods are those that have had 90 days.
+  await expect(page.getByText(/Later: entered 2026-05-04 to 2026-08-03/)).toBeVisible();
   await expect.poll(wonShare).toBeGreaterThanOrEqual(won60);
 
   // The measured time is on the page. The plan's target is 1 second, a guess that this run checks.

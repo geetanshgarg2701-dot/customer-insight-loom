@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PIPELINE_AS_OF, PIPELINE_STAGES, syntheticPipeline } from "./pipeline";
+import { PIPELINE_AS_OF, PIPELINE_CHANGE_AT, PIPELINE_STAGES, syntheticPipeline } from "./pipeline";
 
 const DAY = 86_400_000;
 
@@ -66,6 +66,16 @@ describe("syntheticPipeline", () => {
     // Most deals that went nowhere are marked lost, and some are still open.
     expect(lost).toBeGreaterThan(rows.filter((r) => r.status === "open").length);
     expect(rows.filter((r) => r.status === "open").length).toBeGreaterThan(0);
+  });
+
+  it("plants a known change: deals that entered after the new qualification process move on more often", () => {
+    const utc = (t: string) => Date.parse(t.replace(" ", "T") + "Z");
+    const change = Date.parse(PIPELINE_CHANGE_AT);
+    const share = (later: boolean) => {
+      const group = rows.filter((r) => (utc(r.entered[0]!) >= change) === later && utc(r.entered[0]!) < Date.parse(PIPELINE_AS_OF) - 90 * DAY);
+      return group.filter((r) => r.entered[1] !== null).length / group.length;
+    };
+    expect(share(true)).toBeGreaterThan(share(false) + 0.04);
   });
 
   it("uses only labels, never an email or a name", () => {

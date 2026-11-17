@@ -23,7 +23,13 @@ beforeEach(async () => {
   engine = await createNodeEngine();
   await dropLedgerTables(engine);
   await engine.exec("DROP TABLE IF EXISTS experiment_results");
-  ledger = await createLedger(engine, {});
+  // Fixed ids and a fixed secret make every run identical. Without them, who lands in which group changes from run to
+  // run, so a check that a 95 percent interval contains the planted lift failed about 1 run in 20, as it should.
+  let counter = 0;
+  ledger = await createLedger(engine, {
+    newId: () => `00000000-0000-4000-8000-${String(++counter).padStart(12, "0")}`,
+    randomBytes: (n) => new Uint8Array(n).fill(7),
+  });
 });
 
 afterEach(async () => {
