@@ -134,7 +134,7 @@ export async function verifyResults(input: {
   engine: SqlEngine;
   ledger: Ledger;
   entryId: string;
-  rows: readonly { email: string | null; group: string | null; converted: string | null }[];
+  rows: readonly { email: string | null; group: string | null; converted: string | null; received?: string | null }[];
   treatmentShare: number;
   alpha?: number;
 }): Promise<{ verification: Verification; readout: ExperimentReadout }> {
@@ -143,12 +143,14 @@ export async function verifyResults(input: {
   const stored = new Map((await ledger.listAssignments(entryId)).map((a) => [a.customerEmailHash, a.arm]));
 
   let invalid = 0;
-  const parsed: { hash: string; group: Arm; converted: boolean | null }[] = [];
+  const parsed: { hash: string; group: Arm; converted: boolean | null; received: boolean | null }[] = [];
   const touched = new Set<string>();
   for (let i = 0; i < input.rows.length; i += HASH_BATCH) {
     const batch = input.rows.slice(i, i + HASH_BATCH).map((r) => {
       const email = normalizeEmail(unprotect(r.email ?? ""));
-      return { email, group: parseGroup(r.group), converted: parseConverted(r.converted) };
+      const received = parseConverted(r.received ?? null);
+      // A received value that cannot be read counts as not reported. It does not invalidate the row.
+      return { email, group: parseGroup(r.group), converted: parseConverted(r.converted), received: received === "invalid" ? null : received };
     });
     const hashes = await Promise.all(
       batch.map((b) => (looksLikeEmail(b.email) ? customerHash(secret, b.email) : Promise.resolve(null))),
@@ -160,7 +162,7 @@ export async function verifyResults(input: {
         invalid++;
         return;
       }
-      parsed.push({ hash, group: b.group, converted: b.converted });
+      parsed.push({ hash, group: b.group, converted: b.converted, received: b.received });
     });
   }
 
@@ -179,14 +181,14 @@ export async function verifyResults(input: {
     const arm = stored.get(hash);
     if (arm === undefined) unknown++;
     else if (arm !== list[0].group) groupMismatch++;
-    else matched.push([arm, list[0].converted]);
+    else matched.push([arm, list[0].converted, list[0].received]);
   }
   let missing = 0;
   for (const hash of stored.keys()) if (!touched.has(hash)) missing++;
 
   // The table holds group and outcome only. No identity reaches it.
-  await engine.exec(`CREATE OR REPLACE TABLE ${RESULTS_TABLE} (arm VARCHAR NOT NULL, converted BOOLEAN)`);
-  await insertRows(engine, RESULTS_TABLE, ["arm", "converted"], matched);
+  await engine.exec(`CREATE OR REPLACE TABLE ${RESULTS_TABLE} (arm VARCHAR NOT NULL, converted BOOLEAN, received BOOLEAN)`);
+  await insertRows(engine, RESULTS_TABLE, ["arm", "converted", "received"], matched);
   const readout = await experimentReadout(engine, RESULTS_TABLE, {
     treatmentShare: input.treatmentShare,
     alpha: input.alpha,

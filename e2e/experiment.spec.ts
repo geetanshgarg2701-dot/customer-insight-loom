@@ -85,11 +85,13 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   // Results: the user's send tool returns the file with a converted column.
   const lines = assignmentFile.split("\r\n").filter(Boolean);
   const results = [
-    `${lines[0]},converted`,
+    `${lines[0]},converted,received`,
     ...lines.slice(1).map((line, i) => {
       const treated = line.split(",")[1] === "treatment";
       const converted = treated ? i % 100 < 45 : i % 100 < 30;
-      return `${line},${converted ? 1 : 0}`;
+      // Everyone in treatment got the email. About one in ten in control was emailed by mistake.
+      const received = treated || i % 10 === 0 ? "yes" : "no";
+      return `${line},${converted ? 1 : 0},${received}`;
     }),
   ].join("\n");
   const readout = page.getByRole("region", { name: "Results" });
@@ -101,11 +103,14 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await expect(readout.getByLabel("Email column")).toHaveValue("0", { timeout: 30_000 });
   await expect(readout.getByLabel("Group column")).toHaveValue("1");
   await expect(readout.getByLabel("Converted column")).toHaveValue("3");
+  await expect(readout.getByLabel(/Received column/)).toHaveValue("4");
   await readout.getByRole("button", { name: "Verify and read out" }).click();
   await expect(readout.getByText("Readout: readable")).toBeVisible({ timeout: 60_000 });
   await expect(readout.getByRole("table", { name: "Verification" })).toContainText(String(N));
   await expect(readout.getByText(/Newcombe/)).toBeVisible();
   await expect(readout.getByText(/Significant: yes/)).toBeVisible();
+  await expect(readout.getByText(/of the control group reported receiving the email/)).toBeVisible();
+  await expect(readout.getByText(/assigned to the send/).first()).toBeVisible();
   await readout.getByRole("button", { name: "Record result in ledger" }).click();
   await expect(page.getByText("Status: readable")).toBeVisible();
   // The first result is version 1, and a second readout would need a reason and become version 2.

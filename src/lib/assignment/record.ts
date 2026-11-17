@@ -24,6 +24,14 @@ export function resultRecord(readout: Readable, verification: Verification, comp
     srm_p_value: readout.srm.pValue,
     pending: readout.counts.treatment.pending + readout.counts.control.pending,
     verification,
+    // Aggregates only. Present when the upload had a received column.
+    delivery: readout.delivery
+      ? {
+          treatment_share: readout.delivery.treatmentShare,
+          control_share: readout.delivery.controlShare,
+          scaled_lift: readout.delivery.scaledLift,
+        }
+      : null,
     computed_at: computedAt,
     engine_version: r.engineVersion,
     method: r.method,

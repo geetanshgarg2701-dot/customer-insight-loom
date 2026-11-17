@@ -218,6 +218,36 @@ describe("results upload, verified against the stored assignment", () => {
     expect(r.readout.counts.treatment.pending + r.readout.counts.control.pending).toBe(1);
   });
 
+  it("reads an optional received column and reports delivery next to the readout", async () => {
+    // Treatment all received it. Every 10th control person was emailed by mistake.
+    const rows = honestRows().map((r, i) => ({
+      ...r,
+      received: r.group === "treatment" ? "yes" : i % 10 === 0 ? "yes" : "no",
+    }));
+    const r = await verifyResults({ engine, ledger, entryId, rows, treatmentShare: 0.5 });
+    expect(r.readout.status).toBe("readable");
+    if (r.readout.status !== "readable") return;
+    const d = r.readout.delivery!;
+    expect(d.treatmentShare).toBe(1);
+    expect(d.controlShare).toBeGreaterThan(0.08);
+    expect(d.controlShare).toBeLessThan(0.12);
+    expect(d.scaledLift).toBeGreaterThan(r.readout.readout.lift);
+  });
+
+  it("has no delivery figures when the upload has no received column", async () => {
+    const r = await verifyResults({ engine, ledger, entryId, rows: honestRows(), treatmentShare: 0.5 });
+    expect(r.readout.status).toBe("readable");
+    if (r.readout.status === "readable") expect(r.readout.delivery).toBeNull();
+  });
+
+  it("counts a blank or bad received value as not reported, not as not received", async () => {
+    const rows = honestRows().map((r) => ({ ...r, received: r.group === "treatment" ? "" : "maybe" }));
+    const r = await verifyResults({ engine, ledger, entryId, rows, treatmentShare: 0.5 });
+    expect(r.readout.status).toBe("readable");
+    if (r.readout.status === "readable") expect(r.readout.delivery).toBeNull();
+    expect(r.verification.invalid).toBe(0);
+  });
+
   it("accepts the protected form of an email from its own download", async () => {
     const other = (await ledger.createDraft({ title: "Formula", hypothesis: "H" }, "u")).id;
     const a = await assignAudience({
@@ -268,7 +298,8 @@ describe("results upload, verified against the stored assignment", () => {
     const columns = (await engine.all("SELECT column_name FROM information_schema.columns WHERE table_name = 'experiment_results'")).map(
       (r) => String(r.column_name),
     );
-    expect(columns.sort()).toEqual(["arm", "converted"]);
+    // Group, outcome and whether the email was received. No identity, no hash.
+    expect(columns.sort()).toEqual(["arm", "converted", "received"]);
   });
 });
 

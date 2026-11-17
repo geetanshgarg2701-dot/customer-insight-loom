@@ -29,7 +29,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Audit trail | BUILT | `ledger_audit`, written by triggers in the database |
 | Ledger export and import as a file | PARTIAL | A JSON file with a validator. A CSV export is not built. |
 | Assignment by keyed hash, rebuild, results upload and check | BUILT | `src/lib/assignment` |
-| Received or delivered column in the results upload | NOT STARTED | The readout warns instead. |
+| Received column in the results upload, delivery shares and a rough scaled lift | BUILT | `src/lib/stats/delivery.ts`. Optional. The readout itself is never changed. The scaled lift is a rough division by the delivery gap, with no interval. |
 | Synthetic demo data | BUILT | `src/lib/demo` |
 | Evidence chain | NOT STARTED | |
 | Click to explain on every number | NOT STARTED | |
@@ -71,4 +71,4 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 444 unit tests, 15 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 454 unit tests, 15 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.

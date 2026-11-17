@@ -1,5 +1,6 @@
 import { toPlainRow } from "../duckdb/normalize";
 import type { SqlEngine } from "../intake/types";
+import { deliverySummary, type Delivery } from "./delivery";
 import { readout, type Readout } from "./readout";
 import { sampleRatioCheck, type SrmResult } from "./srm";
 
@@ -55,8 +56,44 @@ export async function armCounts(engine: SqlEngine, table: string): Promise<ArmCo
   return counts;
 }
 
+/**
+ * Reads the optional boolean `received` column, if the table has one. A NULL means the row did not say, so it
+ * counts as not reported, never as not received.
+ */
+async function deliveryCounts(
+  engine: SqlEngine,
+  table: string,
+): Promise<{ treatment: { reported: number; received: number }; control: { reported: number; received: number } } | null> {
+  const has = await engine.query(
+    "SELECT count(*) AS n FROM information_schema.columns WHERE table_name = ? AND column_name = 'received'",
+    [table],
+  );
+  if (Number(toPlainRow(has[0]).n) === 0) return null;
+  const rows = (
+    await engine.all(
+      `SELECT arm, count(*) FILTER (WHERE received IS NOT NULL) AS reported, ` +
+        `count(*) FILTER (WHERE received) AS received_yes FROM ${table} GROUP BY arm`,
+    )
+  ).map(toPlainRow);
+  const out = { treatment: { reported: 0, received: 0 }, control: { reported: 0, received: 0 } };
+  for (const row of rows) {
+    if (row.arm === "treatment" || row.arm === "control") {
+      out[row.arm] = { reported: Number(row.reported), received: Number(row.received_yes) };
+    }
+  }
+  return out;
+}
+
 export type ExperimentReadout =
-  | { status: "readable"; counts: ArmCounts; srm: SrmResult; readout: Readout; message: string }
+  | {
+      status: "readable";
+      counts: ArmCounts;
+      srm: SrmResult;
+      readout: Readout;
+      /** From the optional received column, or null when the upload had none. */
+      delivery: Delivery | null;
+      message: string;
+    }
   | { status: "blocked_srm"; counts: ArmCounts; srm: SrmResult; message: string }
   | { status: "waiting"; counts: ArmCounts; srm: SrmResult; message: string };
 
@@ -96,15 +133,18 @@ export async function experimentReadout(
       message: `Waiting: no conversion window has closed yet in at least one arm.${pendingNote}`,
     };
   }
+  const result = readout({
+    treatment: { n: counts.treatment.n, conversions: counts.treatment.conversions },
+    control: { n: counts.control.n, conversions: counts.control.conversions },
+    alpha: design.alpha,
+  });
+  const delivered = await deliveryCounts(engine, table);
   return {
     status: "readable",
     counts,
     srm,
-    readout: readout({
-      treatment: { n: counts.treatment.n, conversions: counts.treatment.conversions },
-      control: { n: counts.control.n, conversions: counts.control.conversions },
-      alpha: design.alpha,
-    }),
+    readout: result,
+    delivery: delivered ? deliverySummary({ ...delivered, lift: result.lift }) : null,
     message: `Readable.${pendingNote}`,
   };
 }

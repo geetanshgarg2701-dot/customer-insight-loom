@@ -41,7 +41,7 @@ export function ResultsSection({
   onChange: () => Promise<void>;
 }) {
   const csv = useCsvColumns();
-  const [chosen, setChosen] = useState<Partial<Record<"email" | "group" | "converted", number>>>({});
+  const [chosen, setChosen] = useState<Partial<Record<"email" | "group" | "converted" | "received", number>>>({});
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,9 +85,13 @@ export function ResultsSection({
     email: chosen.email ?? (names ? guessColumn(names, /e-?mail/i) : -1),
     group: chosen.group ?? (names ? guessColumn(names, /group|arm/i) : -1),
     converted: chosen.converted ?? (names ? guessColumn(names, /convert/i) : -1),
+    // Optional. A column that says whether each person received the email, to show delivery next to the readout.
+    received: chosen.received ?? (names ? guessColumn(names, /receiv|deliver/i) : -1),
   };
 
-  const ready = cols.email >= 0 && cols.group >= 0 && cols.converted >= 0 && new Set(Object.values(cols)).size === 3;
+  const required = [cols.email, cols.group, cols.converted];
+  const picked = cols.received >= 0 ? [...required, cols.received] : required;
+  const ready = required.every((c) => c >= 0) && new Set(picked).size === picked.length;
 
   async function onVerify() {
     if (share === null) return;
@@ -95,10 +99,10 @@ export function ResultsSection({
     setError(null);
     setOutcome(null);
     try {
-      const { rows, skipped } = await csv.read([cols.email, cols.group, cols.converted]);
+      const { rows, skipped } = await csv.read(cols.received >= 0 ? [...required, cols.received] : required);
       const result = await verifyBrowserResults({
         entryId: entry.id,
-        rows: rows.map(([email, group, converted]) => ({ email, group, converted })),
+        rows: rows.map(([email, group, converted, received]) => ({ email, group, converted, received })),
         treatmentShare: share,
       });
       setOutcome({ ...result, ragged: { few: skipped.tooFewFields, many: skipped.tooManyFields } });
@@ -254,6 +258,26 @@ export function ResultsSection({
               {select("Group column", "group")}
               {select("Converted column", "converted")}
               <p>
+                <label>
+                  Received column, optional{" "}
+                  <select
+                    value={cols.received}
+                    onChange={(e) => setChosen({ ...chosen, received: Number(e.target.value) })}
+                  >
+                    <option value={-1}>No received column</option>
+                    {csv.headers.map((h) => (
+                      <option key={h.index} value={h.index}>
+                        {h.name || `Column ${h.index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </p>
+              <p>
+                A received column says whether each person got the email, yes or no. A blank value means not known.
+                It is used only to show how far delivery matches the assignment.
+              </p>
+              <p>
                 A blank converted value means that person&apos;s conversion window is still open. They are excluded and
                 counted.
               </p>
@@ -310,6 +334,7 @@ export function ResultsSection({
               </table>
               <p>{verdict.label}</p>
               <p>{verdict.text}</p>
+              {r.delivery && <p>Delivery: {r.delivery.note}</p>}
               <p>Method: {r.readout.method}</p>
               <p>
                 People were assigned by a hash fixed before launch, so the difference can be read as the effect of
