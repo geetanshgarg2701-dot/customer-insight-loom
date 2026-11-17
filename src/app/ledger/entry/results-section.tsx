@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { guessColumn } from "@/lib/app/columns";
 import { formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
+import { describeVerdict } from "@/lib/app/verdict";
 import { downloadText } from "@/lib/app/download";
 import { verifyBrowserResults } from "@/lib/duckdb/client";
 import type { Verification } from "@/lib/assignment/assign";
@@ -199,6 +200,7 @@ export function ResultsSection({
   );
 
   const r = outcome?.readout;
+  const verdict = r && r.status === "readable" ? describeVerdict(r.readout) : null;
   const v = outcome?.verification;
 
   return (
@@ -285,7 +287,7 @@ export function ResultsSection({
           </p>
           <p>Readout: {STATUS_TEXT[r.status]}</p>
           <p>{r.message}</p>
-          {r.status === "readable" && (
+          {r.status === "readable" && verdict && (
             <>
               <table aria-label="Readout">
                 <tbody>
@@ -306,12 +308,15 @@ export function ResultsSection({
                   </tr>
                 </tbody>
               </table>
-              <p>Significant: {r.readout.significant ? "yes" : "no"}</p>
+              <p>{verdict.label}</p>
+              <p>{verdict.text}</p>
               <p>Method: {r.readout.method}</p>
               <p>
-                People were assigned by a hash fixed before launch, so the difference can be read as an effect of
-                the send, within the interval shown. It is {formatPoints(r.readout.lift)} on a base of{" "}
-                {formatPercent(r.readout.controlRate)}.
+                People were assigned by a hash fixed before launch, so the difference can be read as the effect of
+                being assigned to the send, within the interval shown. It is {formatPoints(r.readout.lift)} on a
+                base of {formatPercent(r.readout.controlRate)}. This is not the effect of receiving the email. If some
+                of the control group was emailed anyway, or some of the treatment group was never delivered, the
+                measured lift is smaller than the effect on people who received it, and this screen cannot see that.
               </p>
               {entry.result === null ? (
                 <p>

@@ -168,6 +168,12 @@ export function DesignSection({
                   {power.availableTreatment} treatment, {power.availableControl} control
                 </td>
               </tr>
+              {typeof power.smallestDetectableLift === "number" && (
+                <tr>
+                  <th scope="row">Smallest lift this audience can detect</th>
+                  <td>{formatPoints(power.smallestDetectableLift)}</td>
+                </tr>
+              )}
               <tr>
                 <th scope="row">Design</th>
                 <td>
@@ -181,6 +187,13 @@ export function DesignSection({
               </tr>
             </tbody>
           </table>
+          {power.pass && typeof power.smallestDetectableLift === "number" && (
+            <p>
+              Passing means this audience can detect a lift of {formatPoints(Number(lift) / 100)} or more. A real lift
+              smaller than {formatPoints(power.smallestDetectableLift)} would usually be missed, and the result would
+              read as inconclusive.
+            </p>
+          )}
           <p>Method: {power.method}</p>
           {!power.pass && (
             <p>

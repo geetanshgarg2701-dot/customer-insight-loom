@@ -43,6 +43,7 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await design.getByLabel("People available").fill(String(N));
   await design.getByRole("button", { name: "Run power check" }).click();
   await expect(design.getByText("Power check passed")).toBeVisible();
+  await expect(design.getByText("Smallest lift this audience can detect")).toBeVisible();
   await design.getByRole("button", { name: "Register entry" }).click();
   await expect(page.getByText("Status: registered")).toBeVisible();
 

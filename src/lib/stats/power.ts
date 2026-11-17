@@ -21,11 +21,53 @@ export type PowerResult = {
   availableTreatment: number;
   availableControl: number;
   pass: boolean;
+  /**
+   * The smallest absolute lift this audience can detect at the same alpha, power and split, as a proportion.
+   * Null when no lift below 100 percent could be detected. A pass for a large lift can hide a weak audience,
+   * so this is shown next to the pass message. Missing on results saved before it existed.
+   */
+  smallestDetectableLift: number | null;
   alpha: number;
   power: number;
   method: string;
   engineVersion: string;
 };
+
+function requiredPerArm(p: number, d: number, s: number, alpha: number, power: number) {
+  const pT = p + d;
+  const pC = p;
+  const pBar = s * pT + (1 - s) * pC;
+  const zA = normalQuantile(1 - alpha / 2);
+  const zB = normalQuantile(power);
+  const nullPart = zA * Math.sqrt(pBar * (1 - pBar) * (1 / s + 1 / (1 - s)));
+  const altPart = zB * Math.sqrt((pT * (1 - pT)) / s + (pC * (1 - pC)) / (1 - s));
+  const total = (nullPart + altPart) ** 2 / (d * d);
+  return { requiredTreatment: Math.ceil(total * s), requiredControl: Math.ceil(total * (1 - s)) };
+}
+
+/** Bisection on the lift. The people needed fall as the lift grows, so the passing lifts start at one point. */
+function smallestLift(
+  p: number,
+  s: number,
+  alpha: number,
+  power: number,
+  availableTreatment: number,
+  availableControl: number,
+): number | null {
+  const fits = (d: number) => {
+    const r = requiredPerArm(p, d, s, alpha, power);
+    return availableTreatment >= r.requiredTreatment && availableControl >= r.requiredControl;
+  };
+  let low = 1e-6;
+  let high = 1 - p - 1e-6;
+  if (!(high > low) || !fits(high)) return null;
+  for (let i = 0; i < 80; i++) {
+    const mid = (low + high) / 2;
+    if (fits(mid)) high = mid;
+    else low = mid;
+  }
+  return high;
+}
 
 /**
  * Sample size for a two sided two proportion z test with unequal allocation,
@@ -49,17 +91,7 @@ export function powerCheck(input: PowerInput): PowerResult {
   if (!(alpha > 0 && alpha < 1)) throw new RangeError("alpha must be strictly between 0 and 1.");
   if (!(power > 0 && power < 1)) throw new RangeError("power must be strictly between 0 and 1.");
 
-  const pT = p + d;
-  const pC = p;
-  const pBar = s * pT + (1 - s) * pC;
-  const zA = normalQuantile(1 - alpha / 2);
-  const zB = normalQuantile(power);
-  const nullPart = zA * Math.sqrt(pBar * (1 - pBar) * (1 / s + 1 / (1 - s)));
-  const altPart = zB * Math.sqrt((pT * (1 - pT)) / s + (pC * (1 - pC)) / (1 - s));
-  const total = (nullPart + altPart) ** 2 / (d * d);
-
-  const requiredTreatment = Math.ceil(total * s);
-  const requiredControl = Math.ceil(total * (1 - s));
+  const { requiredTreatment, requiredControl } = requiredPerArm(p, d, s, alpha, power);
   const availableTreatment = Math.floor(audienceSize * s);
   const availableControl = audienceSize - availableTreatment;
 
@@ -70,6 +102,7 @@ export function powerCheck(input: PowerInput): PowerResult {
     availableTreatment,
     availableControl,
     pass: availableTreatment >= requiredTreatment && availableControl >= requiredControl,
+    smallestDetectableLift: smallestLift(p, s, alpha, power, availableTreatment, availableControl),
     alpha,
     power,
     method:

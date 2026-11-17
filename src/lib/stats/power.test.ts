@@ -64,3 +64,37 @@ describe("powerCheck", () => {
     for (const input of bad) expect(() => powerCheck(input)).toThrow(RangeError);
   });
 });
+
+describe("smallestDetectableLift", () => {
+  const smallest = (audienceSize: number, treatmentShare = 0.5) =>
+    powerCheck({ baselineRate: 0.1, minDetectableLift: 0.08, treatmentShare, audienceSize }).smallestDetectableLift;
+
+  it("matches the review figures for a 10 percent baseline and an even split", () => {
+    // 300 per arm, 500 per arm and 1,000 per arm, alpha 0.05, power 0.80.
+    expect(smallest(600)!).toBeCloseTo(0.079, 3);
+    expect(smallest(1000)!).toBeCloseTo(0.0595, 3);
+    expect(smallest(2000)!).toBeCloseTo(0.0407, 3);
+  });
+
+  it("is the edge of passing: that lift passes with this audience, a slightly smaller one fails", () => {
+    const d = smallest(600)!;
+    const atEdge = powerCheck({ baselineRate: 0.1, minDetectableLift: d, treatmentShare: 0.5, audienceSize: 600 });
+    const below = powerCheck({ baselineRate: 0.1, minDetectableLift: d - 0.0005, treatmentShare: 0.5, audienceSize: 600 });
+    expect(atEdge.pass).toBe(true);
+    expect(below.pass).toBe(false);
+  });
+
+  it("shrinks as the audience grows", () => {
+    expect(smallest(4000)!).toBeLessThan(smallest(1000)!);
+    expect(smallest(1000)!).toBeLessThan(smallest(300)!);
+  });
+
+  it("is larger for an uneven split with the same audience", () => {
+    expect(smallest(1000, 0.9)!).toBeGreaterThan(smallest(1000, 0.5)!);
+  });
+
+  it("is null when no lift could be detected with this audience", () => {
+    expect(smallest(0)).toBeNull();
+    expect(smallest(4)).toBeNull();
+  });
+});
