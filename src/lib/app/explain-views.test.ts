@@ -1,3 +1,4 @@
+import { anchoredFlow } from "../charts/anchored";
 import { describe, expect, it } from "vitest";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { TopPaths } from "../charts/crossfilter";
@@ -8,6 +9,7 @@ import {
   explainDwell,
   explainFunnel,
   explainOutlook,
+  explainAnchored,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -264,4 +266,36 @@ describe("explainOutlook", () => {
     expect(s.how).toMatch(/much less likely to win/);
     expect(find(list, "What it assumes").how).toMatch(/not a forecast/);
   });
+});
+
+describe("explainAnchored", () => {
+  const flow = anchoredFlow(
+    [
+      { path: ["Visit", "Product", "Cart", "Purchase"], count: 50 },
+      { path: ["Visit", "Product", "Cart", "Support", "Purchase"], count: 10 },
+      { path: ["Visit", "Product", "Cart"], count: 15 },
+      { path: ["Visit", "Product"], count: 40 },
+    ],
+    { anchor: "Cart", before: 1, after: 1, topN: 1 },
+  );
+  const list = explainAnchored(flow);
+
+  it("says how many did the anchor, out of how many, and that each is counted once", () => {
+    const e = find(list, "Customers");
+    expect(e.value).toBe("75 of 115");
+    expect(e.how).toContain("Cart");
+    expect(e.how).toContain("first time");
+  });
+
+  it("explains each step after, the grouped events and the people whose path ended", () => {
+    const next = find(list, "Step +1");
+    expect(next.value).toBe("60 of 75 customers went on");
+    expect(next.how).toContain("Purchase 50");
+    expect(next.how).toContain("1 other kind of event, 10 customers");
+    const ended = find(list, "Ended after anchor");
+    expect(ended.value).toBe("15 customers");
+    expect(ended.how).toContain("has not acted yet");
+  });
+
+  it("keeps the words plain", () => clean(list));
 });

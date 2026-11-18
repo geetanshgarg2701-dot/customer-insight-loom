@@ -145,8 +145,9 @@ test("every chart has the same information as text, so nothing depends on seeing
     for (const text of await buttons.allInnerTexts()) expect(text).toMatch(/, [\d,]+$/);
   }
   expect(await page.getByRole("table", { name: "Flow between steps" }).getByRole("row").count()).toBeGreaterThan(3);
+  expect(await page.getByRole("table", { name: "Around one event" }).getByRole("row").count()).toBeGreaterThan(3);
   // The canvas itself is named by its figure, so a screen reader announces what it is.
-  expect(await page.getByRole("figure").count()).toBe(4);
+  expect(await page.getByRole("figure").count()).toBe(5);
 });
 
 test("charts draw at once when the system asks to reduce motion, and follow the setting live", async ({ page }) => {
@@ -156,7 +157,7 @@ test("charts draw at once when the system asks to reduce motion, and follow the 
   await page.getByRole("button", { name: "Load synthetic journeys" }).click();
   await expect(page.getByText(/Showing 100,000 of 100,000 customers/)).toBeVisible({ timeout: 180_000 });
   const figures = page.getByRole("figure");
-  await expect(figures).toHaveCount(4);
+  await expect(figures).toHaveCount(5);
   for (const figure of await figures.all()) await expect(figure).toHaveAttribute("data-motion", "off");
   // Changing the system setting takes effect without a reload.
   await page.emulateMedia({ reducedMotion: "no-preference" });

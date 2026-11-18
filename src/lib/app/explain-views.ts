@@ -1,3 +1,4 @@
+import type { AnchoredFlow } from "../charts/anchored";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
@@ -229,4 +230,41 @@ export function explainOutlook(o: Outlook): Explanation[] {
     },
   );
   return rows;
+}
+
+export function explainAnchored(f: AnchoredFlow): Explanation[] {
+  const out: Explanation[] = [
+    {
+      label: "Customers",
+      value: `${formatCount(f.customers)} of ${formatCount(f.outOf)}`,
+      how:
+        `${formatCount(f.customers)} of the ${formatCount(f.outOf)} customers shown did ${f.anchor}. Each is counted once, from the first ` +
+        `time they did it, even if they did it again later. Customers who never did it are left out of this view.`,
+    },
+  ];
+  for (const c of f.columns) {
+    if (c.offset === 0) continue;
+    const named = c.events.map((e) => `${e.name} ${formatCount(e.count)}`).join(", ");
+    const k = c.other.kinds;
+    const grouped =
+      k > 0
+        ? ` ${k} other ${k === 1 ? "kind" : "kinds"} of ${k === 1 ? "event" : "events"}, ${formatCount(c.other.count)} customers, ${k === 1 ? "is" : "are"} grouped as Other events, so nothing is dropped.`
+        : "";
+    const side = c.offset > 0 ? "had a next event" : "had an earlier event";
+    out.push({
+      label: `Step ${c.offset > 0 ? "+" : ""}${c.offset}`,
+      value: `${formatCount(c.present)} of ${formatCount(f.customers)} customers ${c.offset > 0 ? "went on" : "had one"}`,
+      how:
+        `${formatCount(c.present)} of ${formatCount(f.customers)} customers who did ${f.anchor} ${side} at this step. ` +
+        `Most common: ${named || "none"}.${grouped}`,
+    });
+  }
+  for (const n of f.nodes.filter((x) => x.kind === "ended")) {
+    out.push({
+      label: n.name,
+      value: `${formatCount(n.count)} customers`,
+      how: `${formatCount(n.count)} customers did nothing more after this step, so their path ends here. They are shown as a group of their own so each step's total still adds up. In real data, ended can also mean the customer has not acted yet, so read it with the conversion window in mind.`,
+    });
+  }
+  return out;
 }

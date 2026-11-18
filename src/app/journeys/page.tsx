@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection, type TopPaths } from "@/lib/charts/crossfilter";
+import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
-import { explainPaths, explainWhatIf } from "@/lib/app/explain-views";
+import { explainAnchored, explainPaths, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
@@ -21,6 +22,8 @@ const TITLES: Record<JourneyDimension, string> = {
 const ROWS = 100_000;
 const RARITY = [0.01, 0.02, 0.05] as const;
 const CHANGES = [-10, 5, 10, 20] as const;
+const STEPS = [0, 1, 2, 3] as const;
+const TOP_N = [3, 5, Infinity] as const;
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -86,6 +89,33 @@ function sankeyOption(edges: SankeyEdge[], theme: ChartTheme): ChartOption {
   };
 }
 
+function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
+  return {
+    aria: { enabled: true },
+    color: theme.palette,
+    textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
+    tooltip: { trigger: "item" },
+    series: [
+      {
+        type: "sankey",
+        left: 8,
+        right: 150,
+        top: 8,
+        bottom: 8,
+        draggable: false,
+        data: flow.nodes.map((n) => ({
+          name: n.name,
+          depth: n.depth,
+          itemStyle: n.kind === "ended" || n.kind === "began" ? { color: theme.line } : undefined,
+        })),
+        links: flow.edges.map((e) => ({ source: e.source, target: e.target, value: e.value })),
+        label: { color: theme.text, textBorderWidth: 0, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
+        lineStyle: { color: "gradient", opacity: 0.4 },
+      },
+    ],
+  };
+}
+
 export default function JourneysPage() {
   const board = useRef<JourneyBoard | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -97,6 +127,11 @@ export default function JourneysPage() {
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [rarity, setRarity] = useState<(typeof RARITY)[number]>(0.02);
   const [paths, setPaths] = useState<TopPaths | null>(null);
+  const [allPaths, setAllPaths] = useState<PathCount[]>([]);
+  const [anchor, setAnchor] = useState("Cart");
+  const [before, setBefore] = useState<(typeof STEPS)[number]>(1);
+  const [after, setAfter] = useState<(typeof STEPS)[number]>(2);
+  const [topN, setTopN] = useState<(typeof TOP_N)[number]>(3);
   const [whatStep, setWhatStep] = useState(1);
   const [whatPoints, setWhatPoints] = useState<(typeof CHANGES)[number]>(10);
 
@@ -104,16 +139,21 @@ export default function JourneysPage() {
     const b = board.current;
     if (!b) return;
     const started = performance.now();
-    const [byDimension, flow, topped] = await Promise.all([
+    const [byDimension, flow, topped, distinct] = await Promise.all([
       Promise.all(JOURNEY_DIMENSIONS.map((d) => b.counts(d, next))),
       b.flow(next),
       b.paths(minShare, next),
+      b.pathCounts(next),
     ]);
+    setAllPaths(distinct);
     setCounts(Object.fromEntries(JOURNEY_DIMENSIONS.map((d, i) => [d, byDimension[i]])));
     setEdges(flow);
     setPaths(topped);
     setElapsed(Math.round(performance.now() - started));
   }, []);
+
+  const choices = useMemo(() => anchorChoices(allPaths), [allPaths]);
+  const around = useMemo(() => anchoredFlow(allPaths, { anchor, before, after, topN }), [allPaths, anchor, before, after, topN]);
 
   async function onLoad() {
     setBusy(true);
@@ -252,6 +292,100 @@ export default function JourneysPage() {
                 ))}
               </tbody>
             </table>
+          </section>
+
+          <section aria-labelledby="h-around">
+            <h2 id="h-around">Around one event</h2>
+            <p>
+              Pick an event to see what customers did just before and just after it. Each customer who did it is
+              counted once, from the first time. The most common events at each step are named and the rest are
+              grouped, so every step still adds up.
+            </p>
+            <p>
+              <label>
+                Event{" "}
+                <select value={anchor} onChange={(e) => setAnchor(e.target.value)}>
+                  {choices.map((c) => (
+                    <option key={c.event} value={c.event}>
+                      {c.event}, {c.customers.toLocaleString("en-US")} customers
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </p>
+            <p role="group" aria-label="Steps before">
+              Steps before:{" "}
+              {STEPS.map((n) => (
+                <button key={n} type="button" aria-pressed={before === n} onClick={() => setBefore(n)}>
+                  {n}
+                </button>
+              ))}
+            </p>
+            <p role="group" aria-label="Steps after">
+              Steps after:{" "}
+              {STEPS.map((n) => (
+                <button key={n} type="button" aria-pressed={after === n} onClick={() => setAfter(n)}>
+                  {n}
+                </button>
+              ))}
+            </p>
+            <p role="group" aria-label="Events named per step">
+              Events named per step:{" "}
+              {TOP_N.map((n) => (
+                <button key={String(n)} type="button" aria-pressed={topN === n} onClick={() => setTopN(n)}>
+                  {Number.isFinite(n) ? n : "All"}
+                </button>
+              ))}
+            </p>
+            {around.customers === 0 ? (
+              <p>No customer in the current selection did {anchor}.</p>
+            ) : (
+              <div>
+                <p>
+                  {around.customers.toLocaleString("en-US")} of {around.outOf.toLocaleString("en-US")} customers did{" "}
+                  {anchor}.
+                </p>
+                <Chart label={`What customers did before and after ${anchor}`} option={anchoredOption(around, CHART_THEME)} height={340} />
+                <table aria-label="Around one event">
+                  <thead>
+                    <tr>
+                      <th scope="col">Step</th>
+                      <th scope="col">Event</th>
+                      <th scope="col">Customers</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {around.columns.flatMap((c) => [
+                      ...c.events.map((e) => (
+                        <tr key={`${c.offset}|${e.name}`}>
+                          <td>{c.offset === 0 ? "Anchor" : c.offset > 0 ? `+${c.offset}` : String(c.offset)}</td>
+                          <td>{e.name}</td>
+                          <td>{e.count.toLocaleString("en-US")}</td>
+                        </tr>
+                      )),
+                      ...(c.other.kinds > 0
+                        ? [
+                            <tr key={`${c.offset}|other`}>
+                              <td>{c.offset > 0 ? `+${c.offset}` : String(c.offset)}</td>
+                              <td>Other events, {c.other.kinds} kinds</td>
+                              <td>{c.other.count.toLocaleString("en-US")}</td>
+                            </tr>,
+                          ]
+                        : []),
+                    ])}
+                    {around.nodes
+                      .filter((n) => n.kind === "ended")
+                      .map((n) => (
+                        <tr key={n.name}>
+                          <td colSpan={2}>{n.name}, path ends</td>
+                          <td>{n.count.toLocaleString("en-US")}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                <Explain summary="How this view was worked out" items={explainAnchored(around)} />
+              </div>
+            )}
           </section>
 
           <section aria-labelledby="h-paths">
