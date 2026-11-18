@@ -2,7 +2,7 @@
 
 Written Tuesday November 17, 2026, from the review of November 16. It covers findings R1-2, R1-3, R4-1, R4-2, R4-3 and R4-4.
 
-Parts A, C and D of the plan are kept on one machine and are not committed to this repository. They hold personal details, and this repository is public. That settles R4-2. So this file does not quote them. It says what each correction is, what the built code already does, and what still needs a decision.
+Parts A, C and D of the plan are kept on one machine and are not committed to this repository. They hold personal details. This repository is private today, and the parts stay off it in case it is ever made public. That settles R4-2. So this file does not quote them. It says what each correction is, what the built code already does, and what still needs a decision.
 
 Labels: BUILT means the code or schema already settles it. DECIDE means a person must choose. EDIT means only the plan text is wrong.
 

@@ -12,10 +12,11 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Readout, Newcombe interval, pooled z p value, inconclusive wording | BUILT | `readout.ts`, `src/lib/app/verdict.ts` |
 | Warning that significant results from small tests run high | BUILT | `verdict.ts` |
 | Sample ratio check | BUILT | `srm.ts` |
-| Benjamini Hochberg function | PARTIAL | `bh.ts` exists. No screen applies a correction. Holm is not built. |
+| Benjamini Hochberg function | PARTIAL | `bh.ts` exists. No screen applies a correction. Holm is not built. Tested on 2026-11-18 with real and null effects mixed in `bh-mixed.test.ts`: the false discovery rate matched the null share times q within 3 standard errors, and a hand checked example shows it flags 2 of 5 where a plain p below 0.05 flags 4. |
 | Correction label on confirmatory results | PARTIAL | Confirmatory results are now labeled `not_applied` with one comparison, until the family correction is built. Results saved earlier keep the label `benjamini_hochberg` and the screen says no correction ran. |
 | A/A, coverage and planted lift checks, shown on the methods page | BUILT | `honesty.ts`, `src/app/methods` |
 | Property tests of the statistics, text and time code | BUILT | 30 properties on random inputs plus simulation: interval coverage 95.5 and 96.2 percent, power 81.8 percent against the promised 80, false positives 4.6 to 5.1 percent at 30,000 runs, Benjamini Hochberg 5.3 percent under the null, local times across seven zones. No wrong answer found. One performance defect found and fixed: cutting 100,000 events into days went from 6.3 s to 0.4 s. See `2026-11-17-property-test-results.md`. |
+| Agreement of the interval call and the p value | BUILT | Measured on 2026-11-18 over 48 settings of 10,000 runs. They disagree mostly when conversions are few: 135 of 10,000 at 500 per arm and a 2 percent rate at the detection edge. Almost every disagreement is the p value significant when the interval is not. See `2026-11-18-interval-and-p-value-agreement.md`. |
 | Fixed horizon, readout locked until the window closes | BUILT | `window.ts`, enforced in the app and in the database |
 | Result versions with a reason | BUILT | `ledger_result_versions`, in the app and in the database |
 | Incremental revenue | PARTIAL | A helper exists, no screen uses it, and it assumes equal order value in both arms. |
@@ -53,7 +54,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 | Item | Status | Evidence and gap |
 |---|---|---|
-| Supabase schema with row level security | BUILT | Seven migrations on the test project only, tests v4 to v6 and a privilege check. |
+| Supabase schema with row level security | BUILT | Eight migration files, on the test project only, tests v4 to v7 and a privilege check. |
 | Correction label migration, `not_applied` | BUILT | Applied to the test project only. The test project recorded it under timestamp 20261118080638 while the local file is 20261118120000. SQL test v7 passed 9 of 9. |
 | Pilot accounts, a client for Supabase | NOT STARTED | The schema exists and the app never calls it. |
 | Identity matching, plan section 5.5 | PARTIAL | `src/lib/identity`: exact match on the normalized email, merged and unmatched lists, possible plus tag pairs, masked display. Now has a screen, `/check`, that matches two uploaded files and shows masked lists. |
@@ -79,7 +80,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 687 unit tests, 58 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On 2026-11-18: 715 unit tests, 59 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
