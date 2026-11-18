@@ -138,3 +138,13 @@ describe("ledgerCsv", () => {
     expect(cells[h.split(",").indexOf("lift")]).toBe("");
   });
 });
+
+describe("ledgerCsv, correction columns", () => {
+  it("writes not_applied and the count, so a reader of the file can see that no correction ran", () => {
+    const [header, row] = parse(ledgerCsv([entry({ correctionMethod: "not_applied", comparisonsCount: 1 })], new Map([[base.id, 1]])));
+    const cols = header.split(",");
+    const cells = row.split(",");
+    expect(cells[cols.indexOf("correction_method")]).toBe("not_applied");
+    expect(cells[cols.indexOf("comparisons_count")]).toBe("1");
+  });
+});

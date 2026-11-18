@@ -254,3 +254,36 @@ describe("fingerprint", () => {
     expect(fp).toEqual({ entryCount: 3, entryIdsHash: hex });
   });
 });
+
+describe("the not_applied label in an export", () => {
+  async function ledgerWithOneResult(label: "not_applied" | "benjamini_hochberg") {
+    const now = clock();
+    const l = await createLedger(await freshEngine(), { now });
+    const e = await l.createDraft({ title: "C", hypothesis: "H", design: { conversionWindowHours: WINDOW_HOURS } }, "u");
+    await l.register(e.id, "u");
+    await l.launch(e.id, "u");
+    now.jump(WINDOW_HOURS + 1);
+    await l.recordResult(e.id, { result: { lift: 0.02 }, comparisonsCount: 1, correctionMethod: label }, "u");
+    return l;
+  }
+
+  it("writes the label and the count, and imports them back unchanged", async () => {
+    const source = await ledgerWithOneResult("not_applied");
+    const file = JSON.parse(JSON.stringify(await source.exportFile()));
+    expect(file.entries[0]).toMatchObject({ correction_method: "not_applied", comparisons_count: 1 });
+    expect(file.results[0]).toMatchObject({ correction_method: "not_applied", comparisons_count: 1 });
+    const target = await importLedger(await freshEngine(), file, {});
+    const [entry] = await target.listEntries();
+    expect(entry).toMatchObject({ correctionMethod: "not_applied", comparisonsCount: 1 });
+    const [version] = await target.listResults(entry.id);
+    expect(version).toMatchObject({ correctionMethod: "not_applied", comparisonsCount: 1 });
+  });
+
+  it("still imports a file saved before this change, which has the old label with one comparison", async () => {
+    const source = await ledgerWithOneResult("benjamini_hochberg");
+    const file = JSON.parse(JSON.stringify(await source.exportFile()));
+    const target = await importLedger(await freshEngine(), file, {});
+    const [entry] = await target.listEntries();
+    expect(entry).toMatchObject({ correctionMethod: "benjamini_hochberg", comparisonsCount: 1 });
+  });
+});

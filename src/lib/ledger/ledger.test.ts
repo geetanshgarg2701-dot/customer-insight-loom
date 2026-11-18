@@ -226,3 +226,26 @@ describe("workspace secret", () => {
     expect(await ledger.workspaceSecret()).toBe(s);
   });
 });
+
+describe("the not_applied correction label", () => {
+  it("is accepted with one comparison, stored on the entry and on its result version, and read back", async () => {
+    const clock2 = { t: Date.parse("2026-11-16T09:00:00.000Z") };
+    const l = await createLedger(await createNodeEngine({ isolated: true }), { now: () => new Date((clock2.t += 1000)) });
+    const e = await l.createDraft({ title: "T", hypothesis: "H", design: { conversionWindowHours: 168 } }, "u");
+    await l.register(e.id, "u");
+    await l.launch(e.id, "u");
+    clock2.t += 169 * 3_600_000;
+    const readable = await l.recordResult(e.id, { result: { lift: 0.02 }, comparisonsCount: 1, correctionMethod: "not_applied" }, "u");
+    expect(readable).toMatchObject({ comparisonsCount: 1, correctionMethod: "not_applied" });
+    const [v] = await l.listResults(e.id);
+    expect(v).toMatchObject({ comparisonsCount: 1, correctionMethod: "not_applied" });
+  });
+
+  it("is still not a way to smuggle in an unknown label", async () => {
+    const e = await ledger.createDraft(DRAFT, "u");
+    await ledger.launch(e.id, "u");
+    await expect(
+      ledger.recordResult(e.id, { result: {}, comparisonsCount: 1, correctionMethod: "none" as never }, "u"),
+    ).rejects.toThrow(RangeError);
+  });
+});

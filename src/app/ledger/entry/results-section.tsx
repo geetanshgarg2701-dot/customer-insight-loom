@@ -7,6 +7,7 @@ import { explainReadout } from "@/lib/app/explain";
 import { Explain } from "../../explain";
 import { describeVerdict } from "@/lib/app/verdict";
 import { downloadText } from "@/lib/app/download";
+import { correctionFor, correctionLine, correctionShort } from "@/lib/ledger/correction";
 import { verifyBrowserResults } from "@/lib/duckdb/client";
 import type { Verification } from "@/lib/assignment/assign";
 import { resultRecord } from "@/lib/assignment/record";
@@ -21,6 +22,13 @@ type Outcome = { verification: Verification; readout: ExperimentReadout; ragged:
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
+
+/**
+ * A readout compares the treatment group with the control group on the one metric registered before launch, so this
+ * screen makes one comparison. If a view that compares several groups is ever added here, this is where the count
+ * grows, and correctionFor will refuse until a real correction is run across them.
+ */
+const COMPARISONS_ON_THIS_SCREEN = 1;
 
 const STATUS_TEXT = {
   readable: "readable",
@@ -126,8 +134,8 @@ export function ResultsSection({
         {
           // Aggregates only. No email, no hash and no row level data.
           result: resultRecord(outcome.readout, outcome.verification, ledger.now().toISOString()),
-          comparisonsCount: 1,
-          correctionMethod: entry.entryType === "confirmatory" ? "benjamini_hochberg" : "exploratory_label",
+          comparisonsCount: COMPARISONS_ON_THIS_SCREEN,
+          correctionMethod: correctionFor(entry.entryType, COMPARISONS_ON_THIS_SCREEN),
           // The first result needs no reason. Any later one is a new version and must say why.
           reason: entry.result === null ? undefined : reason,
         },
@@ -339,6 +347,7 @@ export function ResultsSection({
               <p>{verdict.text}</p>
               {r.delivery && <p>Delivery: {r.delivery.note}</p>}
               <p>Method: {r.readout.method}</p>
+              <p>{correctionLine(correctionFor(entry.entryType, COMPARISONS_ON_THIS_SCREEN), COMPARISONS_ON_THIS_SCREEN)}</p>
               <p>
                 People were assigned by a hash fixed before launch, so the difference can be read as the effect of
                 being assigned to the send, within the interval shown. It is {formatPoints(r.readout.lift)} on a
@@ -391,6 +400,7 @@ export function ResultsSection({
                 <th>Recorded at</th>
                 <th>Reason</th>
                 <th>Lift</th>
+                <th>Correction</th>
               </tr>
             </thead>
             <tbody>
@@ -402,6 +412,7 @@ export function ResultsSection({
                     <td>{v.recordedAt}</td>
                     <td>{v.reason}</td>
                     <td>{typeof lift === "number" ? formatSignedPoints(lift) : "not available"}</td>
+                    <td>{correctionShort(v.correctionMethod, v.comparisonsCount)}</td>
                   </tr>
                 );
               })}

@@ -57,6 +57,12 @@ describe("explainReadout", () => {
     expect(p.how).toMatch(/not used for the significant call/);
   });
 
+  it("does not say a multiple comparison correction is applied, because none runs", () => {
+    const p = find(list, "p value");
+    expect(p.how).not.toMatch(/used to order comparisons for multiple comparison correction/);
+    expect(p.how).toMatch(/no multiple comparison correction runs/);
+  });
+
   it("explains the significance call from the interval", () => {
     const s = find(list, "Significant");
     expect(s.value).toBe(result.significant ? "yes" : "no");

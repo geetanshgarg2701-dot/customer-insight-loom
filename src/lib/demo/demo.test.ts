@@ -120,7 +120,7 @@ describe("seedDemoLedger, plan 6.1 guided first run", () => {
     for (const e of entries) expect(e.synthetic).toBe(true);
 
     const [confirmatory, exploratory, running] = entries;
-    expect(confirmatory).toMatchObject({ status: "readable", entryType: "confirmatory", correctionMethod: "benjamini_hochberg" });
+    expect(confirmatory).toMatchObject({ status: "readable", entryType: "confirmatory", correctionMethod: "not_applied", comparisonsCount: 1 });
     expect(exploratory).toMatchObject({ entryType: "exploratory", correctionMethod: "exploratory_label" });
     expect(running).toMatchObject({ status: "running", entryType: "confirmatory", result: null });
     expect(await ledger.listAssignments(running.id)).not.toHaveLength(0);
@@ -269,6 +269,22 @@ describe("the demo shows the planted result whatever random secret the ledger ha
       const group = rows.filter((r) => r.group === arm);
       const converted = group.filter((r) => r.converted === "1").length;
       expect(converted).toBe(Math.round(group.length * rate));
+    }
+  });
+});
+
+describe("every label the demo stores is true", () => {
+  it("never records benjamini_hochberg with fewer than two comparisons, because bh.ts runs nowhere", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    for (const e of await ledger.listEntries()) {
+      if (e.result === null) continue;
+      expect(
+        e.correctionMethod === "benjamini_hochberg" && (e.comparisonsCount ?? 0) < 2,
+        `${e.title} claims a correction that never ran`,
+      ).toBe(false);
+      for (const v of await ledger.listResults(e.id)) {
+        expect(v.correctionMethod === "benjamini_hochberg" && v.comparisonsCount < 2, `${e.title} version ${v.version}`).toBe(false);
+      }
     }
   });
 });

@@ -12,7 +12,12 @@ export const LEDGER_SCHEMA_VERSION = 1;
 
 export const STATUSES = ["draft", "registered", "running", "readable", "closed"] as const;
 export const FRAMEWORK_TAGS = ["PAS", "FAB", "AIDA"] as const;
-export const CORRECTION_METHODS = ["benjamini_hochberg", "exploratory_label"] as const;
+/**
+ * not_applied means one comparison, so there was nothing to correct. benjamini_hochberg is for a result where
+ * benjaminiHochberg really was run across several comparisons. It was once written for every confirmatory result,
+ * and results saved that way keep it, so it must stay a valid value on import.
+ */
+export const CORRECTION_METHODS = ["benjamini_hochberg", "exploratory_label", "not_applied"] as const;
 export const ARMS = ["treatment", "control"] as const;
 /** Tables a citation may point at in demo mode. More join as their tables arrive. */
 export const CITABLE_TABLES = ["ledger_entries"] as const;

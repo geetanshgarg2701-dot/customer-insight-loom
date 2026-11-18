@@ -13,6 +13,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Warning that significant results from small tests run high | BUILT | `verdict.ts` |
 | Sample ratio check | BUILT | `srm.ts` |
 | Benjamini Hochberg function | PARTIAL | `bh.ts` exists. No screen applies a correction. Holm is not built. |
+| Correction label on confirmatory results | PARTIAL | Confirmatory results are now labeled `not_applied` with one comparison, until the family correction is built. Results saved earlier keep the label `benjamini_hochberg` and the screen says no correction ran. |
 | A/A, coverage and planted lift checks, shown on the methods page | BUILT | `honesty.ts`, `src/app/methods` |
 | Property tests of the statistics, text and time code | BUILT | 30 properties on random inputs plus simulation: interval coverage 95.5 and 96.2 percent, power 81.8 percent against the promised 80, false positives 4.6 to 5.1 percent at 30,000 runs, Benjamini Hochberg 5.3 percent under the null, local times across seven zones. No wrong answer found. One performance defect found and fixed: cutting 100,000 events into days went from 6.3 s to 0.4 s. See `2026-11-17-property-test-results.md`. |
 | Fixed horizon, readout locked until the window closes | BUILT | `window.ts`, enforced in the app and in the database |
@@ -53,6 +54,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Item | Status | Evidence and gap |
 |---|---|---|
 | Supabase schema with row level security | BUILT | Seven migrations on the test project only, tests v4 to v6 and a privilege check. |
+| Correction label migration, `not_applied` | BUILT | Applied to the test project only. The test project recorded it under timestamp 20261118080638 while the local file is 20261118120000. SQL test v7 passed 9 of 9. |
 | Pilot accounts, a client for Supabase | NOT STARTED | The schema exists and the app never calls it. |
 | Identity matching, plan section 5.5 | PARTIAL | `src/lib/identity`: exact match on the normalized email, merged and unmatched lists, possible plus tag pairs, masked display. Now has a screen, `/check`, that matches two uploaded files and shows masked lists. |
 | Time rules, plan sections 5.7 and 5.8 | PARTIAL | `src/lib/time`: elapsed time windows, days cut in the workspace zone, the March 8 and November 1 days, local times that do not exist or happen twice. The `/check` screen reads a time column in the chosen zone and lists, by row, times that never happened or happened twice. It is not yet connected to the readout, so a flagged row is reported and not excluded. |

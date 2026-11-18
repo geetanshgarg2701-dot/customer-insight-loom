@@ -67,8 +67,18 @@ test("loads the synthetic demo and reads out the running entry from a demo resul
   // No synthetic address is ever shown on the page.
   expect(await page.locator("body").innerText()).not.toContain("example.invalid");
 
+  // Before recording, the screen says plainly that one comparison needs no correction.
+  await expect(
+    results.getByText("Comparisons made: 1. No multiple comparison correction applies, because one comparison has nothing to correct."),
+  ).toBeVisible();
+
   await results.getByRole("button", { name: "Record result in ledger" }).click();
   await expect(page.getByText("Status: readable")).toBeVisible();
+
+  // The recorded result says the same, and never claims a procedure that did not run.
+  const versions = page.getByRole("table", { name: "Result versions" });
+  await expect(versions).toContainText("Not applied, 1 comparison");
+  await expect(versions).not.toContainText("Benjamini");
 
   expect(foreign).toEqual([]);
   expect(posts).toEqual([]);
@@ -82,4 +92,26 @@ test("refuses to load the demo into a ledger that has entries", async ({ page })
   await expect(page.getByRole("table", { name: "Ledger entries" })).toContainText("Mine", { timeout: 30_000 });
   // The button is offered only while the ledger is empty.
   await expect(page.getByRole("button", { name: "Load demo data" })).toHaveCount(0);
+});
+
+test("the ledger export says no correction was applied, for every demo result", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/ledger");
+  await page.getByRole("button", { name: "Load demo data" }).click();
+  await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export as CSV" }).click(),
+  ]);
+  const lines = fs.readFileSync((await download.path())!, "utf8").split("\r\n").filter(Boolean);
+  const cols = lines[0].split(",");
+  const method = cols.indexOf("correction_method");
+  const count = cols.indexOf("comparisons_count");
+  expect(method).toBeGreaterThan(-1);
+  const methods = lines.slice(1).map((l) => l.split(",")[method]);
+  expect(methods).toContain("not_applied");
+  expect(methods).not.toContain("benjamini_hochberg");
+  for (const l of lines.slice(1)) {
+    if (l.split(",")[method] === "not_applied") expect(l.split(",")[count]).toBe("1");
+  }
 });

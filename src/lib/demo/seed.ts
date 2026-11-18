@@ -12,6 +12,7 @@
 import { assignAudience, verifyResults } from "../assignment/assign";
 import { resultRecord } from "../assignment/record";
 import type { SqlEngine } from "../intake/types";
+import { correctionFor } from "../ledger/correction";
 import { SYNTHETIC_ACTOR, createLedger, type Ledger } from "../ledger/ledger";
 import { powerCheck } from "../stats/power";
 import { DEMO_POOL_SIZE, demoEmail, demoResultRows } from "./synthetic";
@@ -115,7 +116,7 @@ async function readAndRecord(engine: SqlEngine, ledger: Ledger, entryId: string,
     {
       result: resultRecord(verified.readout, verified.verification, ledger.now().toISOString()),
       comparisonsCount: 1,
-      correctionMethod: confirmatory ? "benjamini_hochberg" : "exploratory_label",
+      correctionMethod: correctionFor(confirmatory ? "confirmatory" : "exploratory", 1),
     },
     SYNTHETIC_ACTOR,
   );

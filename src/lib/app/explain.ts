@@ -64,8 +64,9 @@ export function explainReadout(r: Readout, counts: { treatment: Arm; control: Ar
       label: "p value",
       value: r.pValue.toPrecision(3),
       how:
-        `From the pooled two proportion z test, two sided. It is used to order comparisons for multiple comparison ` +
-        `correction and is not used for the significant call, so for very small counts it can disagree with the interval.`,
+        `From the pooled two proportion z test, two sided. It is not used for the significant call, so for very small ` +
+        `counts it can disagree with the interval. It is kept so comparisons can be ordered if a multiple comparison ` +
+        `correction is ever applied, but no multiple comparison correction runs on this screen, because it makes one comparison.`,
     },
     {
       label: "Significant",
