@@ -35,7 +35,7 @@ Geetansh
 - Replace the "because" sentence with something true about that person. If you have nothing true to say, do not send that one.
 - Do not attach screenshots or claim the tool does more than it does today. As of this date it is a schema, a redaction module and a plan.
 - The 30 minutes is my guess, not from the plan. Change it if you want a longer session.
-- Sample data only. No tester uploads real customer data in these sessions.
+- Sample data only. No tester uploads real customer data in these sessions. Updated 2026-11-18: this still holds for the 30 minute sessions. The owner approved a separate real data experiment, run by the tester on their own data under written consent, described in `2026-11-18-pilot-kit.md`.
 - Quotes from a tester appear in the case study only with their written consent, and only after redaction.
 - If fewer than 3 testers are recruited by Feb 28, the case study says so.
 
