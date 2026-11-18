@@ -54,8 +54,8 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 |---|---|---|
 | Supabase schema with row level security | BUILT | Seven migrations on the test project only, tests v4 to v6 and a privilege check. |
 | Pilot accounts, a client for Supabase | NOT STARTED | The schema exists and the app never calls it. |
-| Identity matching, plan section 5.5 | PARTIAL | `src/lib/identity`: exact match on the normalized email, merged and unmatched lists, possible plus tag pairs, masked display. A library with tests, no screen yet. |
-| Time rules, plan sections 5.7 and 5.8 | PARTIAL | `src/lib/time`: elapsed time windows, days cut in the workspace zone, the March 8 and November 1 days, local times that do not exist or happen twice. A library with tests, no screen yet. |
+| Identity matching, plan section 5.5 | PARTIAL | `src/lib/identity`: exact match on the normalized email, merged and unmatched lists, possible plus tag pairs, masked display. Now has a screen, `/check`, that matches two uploaded files and shows masked lists. |
+| Time rules, plan sections 5.7 and 5.8 | PARTIAL | `src/lib/time`: elapsed time windows, days cut in the workspace zone, the March 8 and November 1 days, local times that do not exist or happen twice. The `/check` screen reads a time column in the chosen zone and lists, by row, times that never happened or happened twice. It is not yet connected to the readout, so a flagged row is reported and not excluded. |
 | Webhook ingestion | NOT STARTED | A browser only app has no server to receive one. This needs a decision. |
 | Keep alive | NOT STARTED | |
 | Static copy for a host with no server | BUILT | One command, `npm run build:static`, tested with and without a prefix. Not deployed. See `2026-11-17-static-mirror.md` and the release checklist. |
@@ -77,7 +77,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 660 unit tests, 51 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 668 unit tests, 56 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 

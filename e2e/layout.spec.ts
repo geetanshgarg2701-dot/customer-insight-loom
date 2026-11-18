@@ -14,7 +14,7 @@ async function expectFits(page: Page, where: string) {
 test.describe("phone width", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
-  for (const path of ["/", "/intake", "/ledger", "/journeys", "/pipeline", "/methods", "/privacy", "/terms", "/no-such-page"]) {
+  for (const path of ["/", "/intake", "/ledger", "/journeys", "/pipeline", "/check", "/methods", "/privacy", "/terms", "/no-such-page"]) {
     test(`${path} uses the editorial style and fits a phone`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole("main")).toBeVisible();
