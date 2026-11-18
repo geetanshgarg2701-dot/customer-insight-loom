@@ -11,6 +11,7 @@ It runs entirely in your browser. Your files are read on your own computer, held
 - **Ledger.** Record a hypothesis, check that the audience is large enough, assign a holdout by a keyed hash, and read out the result. The design locks at registration, results stay locked until the conversion window closes, and later readouts are numbered versions.
 - **Data intake.** Load a CSV in the browser with DuckDB, map its columns, and preview 20 rows. Columns that look like personal data are blocked.
 - **Journeys and pipeline.** Linked charts, a flow with drop off, top paths, a what if, a stage funnel, time in stage, stalled deals, a cohort ladder and a period comparison. These run on synthetic data.
+- **Data check.** Match two files on email and check a time column against clock changes, in the browser. Addresses are shown masked, and times that never happened or happened twice are listed by row, not guessed.
 - **Methods.** The checks that ran on generated data to test the statistics, with the counts.
 - **Explanations.** The main numbers can say how they were worked out, built from the real values.
 

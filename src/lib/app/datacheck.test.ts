@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { FORMULA_START } from "../assignment/hash";
+import { mulberry32 } from "../stats/honesty";
+import { csvLine } from "./csv";
 import { checkTimes, columnOf, parseCsv } from "./datacheck";
 
 describe("parseCsv", () => {
@@ -61,5 +64,23 @@ describe("checkTimes", () => {
   it("reads a UTC file the same in any zone, so only zoneless times depend on the setting", () => {
     const rows = ["2026-03-08T12:00:00Z", "2026-11-01T06:30:00Z"];
     expect(checkTimes(rows, "UTC")).toEqual(checkTimes(rows, CHICAGO));
+  });
+});
+
+describe("the reader and the writer agree, on random cells", () => {
+  const rng = mulberry32(20261118);
+  const ALPHABET = ['"', ",", "\r", "\n", "=", "+", "-", "@", "\t", " ", "'", "a", "Z", "0", "é", "漢"];
+  const cell = () => Array.from({ length: Math.floor(rng() * 9) }, () => ALPHABET[Math.floor(rng() * ALPHABET.length)]).join("");
+
+  it("reads back every row the app writes, cell for cell, allowing only the one protective quote", () => {
+    for (let n = 0; n < 300; n++) {
+      const width = 1 + Math.floor(rng() * 4);
+      const rows = Array.from({ length: 1 + Math.floor(rng() * 4) }, () => Array.from({ length: width }, cell));
+      const read = parseCsv(rows.map(csvLine).join(""));
+      const expected = rows.map((r) => r.map((c) => (FORMULA_START.test(c) ? `'${c}` : c)));
+      // A row of one empty cell is written as a bare line break and reads as an empty row, the usual CSV ambiguity.
+      const keep = (r: string[]) => !(r.length === 1 && r[0] === "");
+      expect(read.filter(keep)).toEqual(expected.filter(keep));
+    }
   });
 });
