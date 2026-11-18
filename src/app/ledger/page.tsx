@@ -199,6 +199,10 @@ export default function LedgerPage() {
               Adds three synthetic entries, each labeled synthetic: one confirmatory with a result, one
               exploratory, and one still running that you can read out yourself.
             </p>
+            <p>
+              The demo outcomes are set so every visitor sees the planted result: a 4 point lift reads as significant and a
+              zero lift reads as not significant. Real tests vary from run to run, and the methods page shows how much.
+            </p>
           </>
         )}
         {entries !== null && entries.length > 0 && (

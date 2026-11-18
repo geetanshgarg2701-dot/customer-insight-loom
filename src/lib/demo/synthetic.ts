@@ -35,7 +35,7 @@ export type DemoResultRow = { email: string; group: Arm; converted: string };
 
 /**
  * A results file for the demo people assigned to an entry. Treatment converts
- * at baseline plus the true lift, control at the baseline. pendingShare leaves
+ * at baseline plus the true lift, control at the baseline, as exact counts per group. pendingShare leaves
  * that share of windows open, written as a blank converted value.
  */
 export async function demoResultRows(input: {
@@ -57,19 +57,35 @@ export async function demoResultRows(input: {
   const secret = await ledger.workspaceSecret();
   const stored = new Map((await ledger.listAssignments(entryId)).map((a) => [a.customerEmailHash, a.arm]));
   const rng = mulberry32(seed);
-  const rows: DemoResultRow[] = [];
+  // Two draws per person in a fixed order, so the file is the same every time for the same assignment.
+  const people: { email: string; group: Arm; open: boolean; draw: number }[] = [];
   for (let start = 0; start < DEMO_POOL_SIZE && stored.size > 0; start += HASH_BATCH) {
     const emails = Array.from({ length: Math.min(HASH_BATCH, DEMO_POOL_SIZE - start) }, (_, j) => demoEmail(start + j));
     const hashes = await Promise.all(emails.map((e) => customerHash(secret, e)));
     emails.forEach((email, j) => {
-      const arm = stored.get(hashes[j]);
-      if (!arm) return;
-      // Two draws per person in a fixed order, so the file is the same every time.
+      const group = stored.get(hashes[j]);
+      if (!group) return;
       const open = rng() < pendingShare;
-      const converted = rng() < (arm === "treatment" ? treated : baselineRate);
-      rows.push({ email, group: arm, converted: open ? "" : converted ? "1" : "0" });
+      people.push({ email, group, open, draw: rng() });
     });
   }
+
+  // Who lands in which group depends on the ledger's random secret, so independent draws would give a different
+  // result on every load: the zero lift entry would read significant about 1 time in 20 and the 4 point entry would
+  // read not significant about 1 time in 5. Instead, in each group the people with the lowest draws convert, in exactly
+  // the number the planted rate calls for. Every load then shows the planted result, with the interval a test of that
+  // size really has. The honesty checks on the methods page show real sampling noise. This is a demo, labeled synthetic.
+  const converts = new Set<(typeof people)[number]>();
+  for (const [group, rate] of [["treatment", treated], ["control", baselineRate]] as const) {
+    const closed = people.filter((p) => p.group === group && !p.open);
+    const ranked = [...closed].sort((a, b) => a.draw - b.draw);
+    for (const p of ranked.slice(0, Math.round(closed.length * rate))) converts.add(p);
+  }
+  const rows: DemoResultRow[] = people.map((p) => ({
+    email: p.email,
+    group: p.group,
+    converted: p.open ? "" : converts.has(p) ? "1" : "0",
+  }));
   return { rows, matched: rows.length };
 }
 

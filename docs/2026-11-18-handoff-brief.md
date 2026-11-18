@@ -24,7 +24,7 @@ The full table of built, partial and not started items, with evidence, is `2026-
 ```
 npm install
 npm run dev          # http://localhost:3000
-npm test             # 685 unit tests
+npm test             # 687 unit tests
 npm run test:e2e     # 58 browser tests, Playwright with Edge: set PW_CHANNEL=msedge
 npm run build:static -- evidence-ledger && npm run check:site
 ```

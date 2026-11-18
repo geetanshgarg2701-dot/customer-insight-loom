@@ -233,3 +233,42 @@ describe("resultRecord", () => {
     expect(JSON.stringify(record)).not.toContain("@");
   });
 });
+
+describe("the demo shows the planted result whatever random secret the ledger has", () => {
+  // The ledger picks a random secret, so who lands in which group differs every time. If each person's outcome were
+  // an independent draw, the zero lift entry would read "Significant: yes" about 1 load in 20 and the 4 point lift
+  // entry would read "Significant: no" about 1 load in 5. A visitor, or a tester in a session, must see the same thing.
+  const secrets = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  it("reads the confirmatory entry as significant and the zero lift entry as not, for every secret", { timeout: 120_000 }, async () => {
+    for (const fill of secrets) {
+      await dropLedgerTables(engine);
+      await engine.exec("DROP TABLE IF EXISTS experiment_results");
+      let counter = 0;
+      const fresh = await createLedger(engine, {
+        newId: () => `00000000-0000-4000-8000-${String(++counter).padStart(12, "0")}`,
+        randomBytes: (n) => new Uint8Array(n).fill(fill),
+      });
+      await seedDemoLedger({ engine, ledger: fresh });
+      const [confirmatory, exploratory] = await fresh.listEntries();
+      const c = confirmatory.result as { significant: boolean; lift: number };
+      const x = exploratory.result as { significant: boolean; lift: number };
+      expect(c.significant, `secret ${fill}: confirmatory`).toBe(true);
+      expect(x.significant, `secret ${fill}: zero lift`).toBe(false);
+      expect(c.lift, `secret ${fill}`).toBeCloseTo(0.04, 2);
+      expect(Math.abs(x.lift), `secret ${fill}`).toBeLessThan(0.005);
+    }
+  });
+
+  it("makes each group's conversions match its planted rate, up to rounding", async () => {
+    const entryId = (await ledger.createDraft({ title: "Mine", hypothesis: "H" }, "u")).id;
+    const emails = Array.from({ length: 4000 }, (_, i) => demoEmail(i));
+    await assignAudience({ ledger, entryId, emails, treatmentShare: 0.5 });
+    const { rows } = await demoResultRows({ ledger, entryId, baselineRate: 0.1, trueLift: 0.05, seed: 3 });
+    for (const [arm, rate] of [["treatment", 0.15], ["control", 0.1]] as const) {
+      const group = rows.filter((r) => r.group === arm);
+      const converted = group.filter((r) => r.converted === "1").length;
+      expect(converted).toBe(Math.round(group.length * rate));
+    }
+  });
+});

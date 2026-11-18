@@ -77,7 +77,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On this date: 685 unit tests, 58 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On this date: 687 unit tests, 58 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
