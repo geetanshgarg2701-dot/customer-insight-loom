@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// Runs only through playwright.static.config.ts, against the static export under /evidence-ledger.
+const PREFIX = process.env.MIRROR_PREFIX ?? "evidence-ledger";
+
+// Runs only through playwright.static.config.ts, against the static export under /evidence-ledger, or under MIRROR_PREFIX.
 test("the static mirror loads DuckDB from its own prefix and runs the demo with no other host", async ({
   page,
   context,
@@ -21,17 +23,17 @@ test("the static mirror loads DuckDB from its own prefix and runs the demo with 
   });
 
   await page.goto("ledger/");
-  await expect(page.getByRole("link", { name: "Methods" })).toHaveAttribute("href", "/evidence-ledger/methods/");
+  await expect(page.getByRole("link", { name: "Methods" })).toHaveAttribute("href", `/${PREFIX}/methods/`);
   await page.getByRole("button", { name: "Load demo data" }).click();
   await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("table", { name: "Ledger entries" }).getByRole("row")).toHaveCount(4);
 
   // Moving between pages by clicking works without the prefetch files.
   await page.getByRole("link", { name: "Methods" }).click();
-  await expect(page).toHaveURL(/\/evidence-ledger\/methods\/$/);
+  await expect(page).toHaveURL(new RegExp(`/${PREFIX}/methods/$`));
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Data intake" }).click();
-  await expect(page).toHaveURL(/\/evidence-ledger\/intake\/$/);
+  await expect(page).toHaveURL(new RegExp(`/${PREFIX}/intake/$`));
   await expect(page.getByLabel("CSV file")).toBeVisible();
 
   expect(missing).toEqual([]);

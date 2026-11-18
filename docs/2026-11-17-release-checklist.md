@@ -48,7 +48,7 @@ UNVERIFIED: that GitHub Pages serves `.wasm` files with the right content type, 
 
 These are your steps, not mine.
 
-1. Create the public repository for the built site.
+1. Create the public repository for the built site. Name it `evidence-ledger-app`, because the private source repository already uses `evidence-ledger` on the same account, and the site address comes from the public repository's name. Build with `npm run build:static -- evidence-ledger-app` and test that exact prefix with `MIRROR_PREFIX=evidence-ledger-app npm run test:static`. Decided 2026-11-18.
 2. `npm run build:static -- <repo name>`, or without a name for a site of its own.
    Then run `npm run check:site`. It scans `out/` for real email addresses, developer paths, key-like strings and source maps, and exits with an error if it finds any. It passed on 2026-11-18.
 3. Put the contents of `out/` in the repository, including the file `.nojekyll`, and turn on Pages for it.
