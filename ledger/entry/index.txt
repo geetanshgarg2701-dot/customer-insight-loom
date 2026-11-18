@@ -1,0 +1,27 @@
+1:"$Sreact.fragment"
+2:"/customer-insight-loom/_next/static/chunks/08mika-44sn50.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+5:I[22016,["$2"],""]
+a:"$Sreact.suspense"
+b:"/customer-insight-loom/_next/static/chunks/35cz_z2jsllmz.js"
+c:"/customer-insight-loom/_next/static/chunks/3u7afctjxnn82.js"
+d:"/customer-insight-loom/_next/static/chunks/3_2p_pbwbuprx.js"
+e:I[362,["$2","$b","$c","$d"],"EntryView"]
+f:I[97367,["$2"],"OutletBoundary"]
+11:"ViewportBoundary"
+12:I[97367,["$2"],"$11"]
+14:"MetadataBoundary"
+15:I[97367,["$2"],"$14"]
+17:I[68027,["$2"],"default",1]
+:HL["/customer-insight-loom/_next/static/chunks/3inmaa2ydqmaq.css","style"]
+7:X
+9:[["children",{"s":"__PAGE__","h":512,"d":{"r":["$","$1","c",{"children":[["$","$a",null,{"fallback":["$","p",null,{"children":"Loading"}],"children":["$","$Le",null,{}]}],[["$","script","script-0",{"src":"/customer-insight-loom/_next/static/chunks/35cz_z2jsllmz.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/customer-insight-loom/_next/static/chunks/3u7afctjxnn82.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/customer-insight-loom/_next/static/chunks/3_2p_pbwbuprx.js","async":true,"nonce":"$undefined"}]],["$","$Lf",null,{"children":["$","$a",null,{"name":"Next.MetadataOutlet","children":"$@10"}]}]]}],"p":false,"v":null}}]]
+8:[["children",{"s":"entry","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$7"},"c":"$Q9"}]]
+6:[["children",{"s":"ledger","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$7"},"c":"$Q8"}]]
+0:{"P":null,"c":["","ledger","entry",""],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/customer-insight-loom/_next/static/chunks/3inmaa2ydqmaq.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/customer-insight-loom/_next/static/chunks/08mika-44sn50.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"en","className":"h-full antialiased","children":["$","body",null,{"className":"min-h-full flex flex-col","children":[["$","div",null,{"className":"flex-1","children":["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","main",null,{"children":[["$","nav",null,{"aria-label":"Main","children":[["$","$L5",null,{"href":"/","children":"Home"}]," ",["$","$L5",null,{"href":"/intake","children":"Data intake"}]," ",["$","$L5",null,{"href":"/ledger","children":"Ledger"}]," ",["$","$L5",null,{"href":"/journeys","children":"Journeys"}]," ",["$","$L5",null,{"href":"/pipeline","children":"Pipeline"}]," ",["$","$L5",null,{"href":"/check","children":"Data check"}]," ",["$","$L5",null,{"href":"/methods","children":"Methods"}]]}],["$","h1",null,{"children":"Page not found"}],["$","p",null,{"children":"There is nothing at this address. It may have been moved, or the link may have a typo."}],["$","p",null,{"children":["$","$L5",null,{"href":"/","children":"Go to the home page"}]}]]}],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}],["$","footer",null,{"aria-label":"Site","children":[["$","$L5",null,{"href":"/privacy","children":"Privacy"}]," ",["$","$L5",null,{"href":"/terms","children":"Terms"}],["$","span",null,{"children":" Early version. Free, and offered as it is."}]]}]]}]}]]}],"p":false,"v":null},"c":"$Q6"},"h":{"r":["$","$1","h",{"children":[null,["$","$L12",null,{"children":"$L13"}],["$","$L15",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$a",null,{"name":"Next.Metadata","children":"$L16"}]}],null]}],null]}],"p":false,"v":null}},"m":"$undefined","G":["$17",[["$","link","0",{"rel":"stylesheet","href":"/customer-insight-loom/_next/static/chunks/3inmaa2ydqmaq.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"Dv7e7MDVaY4PbOtB9dZcq"}
+7:C
+13:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+18:I[27201,["$2"],"IconMark"]
+10:null
+16:[["$","title","0",{"children":"Customer Insight Loom"}],["$","meta","1",{"name":"description","content":"A free ledger for email experiments. Record the bet before you send, hold back a control group, and read the result once, with the uncertainty shown."}],["$","link","2",{"rel":"icon","href":"/customer-insight-loom/icon.svg?icon.39pz6p907c3if.svg","sizes":"any","type":"image/svg+xml"}],["$","$L18","3",{}]]
