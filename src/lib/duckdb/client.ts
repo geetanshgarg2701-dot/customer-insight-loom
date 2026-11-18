@@ -2,6 +2,7 @@ import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import type { verifyResults } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
 import { pathCounts, type PathCount } from "../charts/anchored";
+import { compareGroups, type CompareDimension, type Comparison } from "../charts/compare";
 import {
   countsBy,
   loadJourneys,
@@ -165,6 +166,7 @@ export type JourneyBoard = {
   flow(selection: Selection): Promise<SankeyEdge[]>;
   paths(minShare: number, selection: Selection): Promise<TopPaths>;
   pathCounts(selection: Selection): Promise<PathCount[]>;
+  compare(dimension: CompareDimension, a: string, b: string, selection: Selection): Promise<Comparison>;
   close(): Promise<void>;
 };
 
@@ -179,6 +181,7 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     flow: (selection) => sankeyEdges(engine, table, selection),
     paths: (minShare, selection) => topPaths(engine, table, selection, { minShare }),
     pathCounts: (selection) => pathCounts(engine, table, selection),
+    compare: (dimension, a, b, selection) => compareGroups(engine, table, { dimension, a, b, selection }),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

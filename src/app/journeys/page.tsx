@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection, type TopPaths } from "@/lib/charts/crossfilter";
 import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
+import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
+import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
-import { formatPercent } from "@/lib/app/format";
+import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
-import { explainAnchored, explainPaths, explainWhatIf } from "@/lib/app/explain-views";
+import { explainAnchored, explainComparison, explainPaths, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
-import { CHART_THEME, type ChartTheme } from "./theme";
+import { CHART_THEME, GROUP_COLOR, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
   channel: "Channel",
@@ -89,6 +91,63 @@ function sankeyOption(edges: SankeyEdge[], theme: ChartTheme): ChartOption {
   };
 }
 
+/**
+ * Two panels in one chart, on the same scale from 0 to 100 percent, so the bars can be compared by eye. Each bar is
+ * labeled with its value. A group under the minimum size is drawn muted.
+ */
+function comparisonOption(c: Comparison, theme: ChartTheme): ChartOption {
+  const groups = [c.a, c.b];
+  const steps = c.a.rates.map((r) => r.step);
+  return {
+    aria: { enabled: true },
+    textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
+    tooltip: { trigger: "item" },
+    title: groups.map((g, i) => ({
+      text: `${g.value}, ${g.entered.toLocaleString("en-US")} people`,
+      left: i === 0 ? "7%" : "57%",
+      top: 0,
+      textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize, fontWeight: "normal" },
+    })),
+    grid: [
+      { left: "7%", width: "38%", top: 34, bottom: 56 },
+      { left: "57%", width: "38%", top: 34, bottom: 56 },
+    ],
+    xAxis: groups.map((_, i) => ({
+      type: "category" as const,
+      gridIndex: i,
+      data: steps,
+      axisLine: { lineStyle: { color: theme.line } },
+      axisLabel: { color: theme.text, interval: 0, width: 80, overflow: "break" as const },
+    })),
+    yAxis: groups.map((_, i) => ({
+      type: "value" as const,
+      gridIndex: i,
+      min: 0,
+      max: 1,
+      axisLabel: { color: theme.text, formatter: (v: number) => `${Math.round(v * 100)}` },
+      splitLine: { lineStyle: { color: theme.line } },
+    })),
+    series: groups.map((g, i) => ({
+      type: "bar" as const,
+      xAxisIndex: i,
+      yAxisIndex: i,
+      name: g.value,
+      barWidth: "46%",
+      label: {
+        show: true,
+        position: "top" as const,
+        color: theme.text,
+        fontFamily: theme.fontFamily,
+        formatter: (p) => (typeof p.value === "number" ? `${(p.value * 100).toFixed(1)}` : ""),
+      },
+      data: g.rates.map((r) => ({
+        value: r.rate,
+        itemStyle: { color: GROUP_COLOR[g.value] ?? theme.palette[0], opacity: g.tooSmall ? 0.35 : 1 },
+      })),
+    })),
+  };
+}
+
 function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
   return {
     aria: { enabled: true },
@@ -132,6 +191,10 @@ export default function JourneysPage() {
   const [before, setBefore] = useState<(typeof STEPS)[number]>(1);
   const [after, setAfter] = useState<(typeof STEPS)[number]>(2);
   const [topN, setTopN] = useState<(typeof TOP_N)[number]>(3);
+  const [cmpDim, setCmpDim] = useState<CompareDimension>("segment");
+  const [cmpA, setCmpA] = useState("new");
+  const [cmpB, setCmpB] = useState("returning");
+  const [comparison, setComparison] = useState<Comparison | null>(null);
   const [whatStep, setWhatStep] = useState(1);
   const [whatPoints, setWhatPoints] = useState<(typeof CHANGES)[number]>(10);
 
@@ -152,6 +215,23 @@ export default function JourneysPage() {
     setElapsed(Math.round(performance.now() - started));
   }, []);
 
+  const refreshComparison = useCallback(async (dim: CompareDimension, a: string, b: string, sel: Selection) => {
+    const board_ = board.current;
+    if (!board_) return;
+    setComparison(a === b ? null : await board_.compare(dim, a, b, sel));
+  }, []);
+
+  async function changeCompare(dim: CompareDimension, a: string, b: string) {
+    setCmpDim(dim);
+    setCmpA(a);
+    setCmpB(b);
+    try {
+      await refreshComparison(dim, a, b, selection);
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
+
   const choices = useMemo(() => anchorChoices(allPaths), [allPaths]);
   const around = useMemo(() => anchoredFlow(allPaths, { anchor, before, after, topN }), [allPaths, anchor, before, after, topN]);
 
@@ -162,6 +242,7 @@ export default function JourneysPage() {
       board.current = await createBrowserJourneyBoard(ROWS);
       setLoaded(true);
       await refresh({}, rarity);
+      await refreshComparison(cmpDim, cmpA, cmpB, {});
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -176,6 +257,7 @@ export default function JourneysPage() {
     setSelection(next);
     try {
       await refresh(next, rarity);
+      await refreshComparison(cmpDim, cmpA, cmpB, next);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -184,6 +266,7 @@ export default function JourneysPage() {
   async function clearAll() {
     setSelection({});
     await refresh({}, rarity);
+    await refreshComparison(cmpDim, cmpA, cmpB, {});
   }
 
   async function pickRarity(value: (typeof RARITY)[number]) {
@@ -292,6 +375,110 @@ export default function JourneysPage() {
                 ))}
               </tbody>
             </table>
+          </section>
+
+          <section aria-labelledby="h-compare">
+            <h2 id="h-compare">Compare two groups</h2>
+            <p>
+              Two groups on the same journey, on the same scale. Each bar is the share of people who reached the step
+              before and went on to this one, so every step is measured only on people who got that far. Results here
+              are exploratory and show association, not cause.
+            </p>
+            <p role="group" aria-label="Compare by">
+              Compare by:{" "}
+              {COMPARE_DIMENSIONS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={cmpDim === d}
+                  onClick={() => {
+                    const list = d === "segment" ? SEGMENTS : CHANNELS;
+                    void changeCompare(d, list[0], list[1]);
+                  }}
+                >
+                  {d === "segment" ? "Segment" : "Channel"}
+                </button>
+              ))}
+            </p>
+            <p>
+              <label>
+                First group{" "}
+                <select value={cmpA} onChange={(e) => void changeCompare(cmpDim, e.target.value, cmpB)}>
+                  {(cmpDim === "segment" ? SEGMENTS : CHANNELS).map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>{" "}
+              <label>
+                Second group{" "}
+                <select value={cmpB} onChange={(e) => void changeCompare(cmpDim, cmpA, e.target.value)}>
+                  {(cmpDim === "segment" ? SEGMENTS : CHANNELS).map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </p>
+            {cmpA === cmpB && <p role="alert">Choose two different groups to compare.</p>}
+            {comparison && (
+              <div>
+                {[comparison.a, comparison.b]
+                  .filter((g) => g.tooSmall)
+                  .map((g) => (
+                    <p key={g.value} role="alert">
+                      {g.value} has only {g.entered.toLocaleString("en-US")} people, under the 30 person minimum, so its
+                      numbers are shown muted and are not to be trusted.
+                    </p>
+                  ))}
+                <Chart
+                  label={`Share of people who went on at each step, ${comparison.a.value} and ${comparison.b.value}`}
+                  option={comparisonOption(comparison, CHART_THEME)}
+                  height={320}
+                />
+                <table aria-label="Compare two groups">
+                  <thead>
+                    <tr>
+                      <th scope="col">Step</th>
+                      <th scope="col">{comparison.a.value}</th>
+                      <th scope="col">{comparison.b.value}</th>
+                      <th scope="col">Difference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison.a.rates.map((ra, i) => {
+                      const rb = comparison.b.rates[i];
+                      const d = comparison.differences.find((x) => x.step === ra.step);
+                      const cell = (r: typeof ra) =>
+                        r.rate === null
+                          ? "nobody to measure"
+                          : `${formatPercent(r.rate, 1)}, ${formatPercent(r.low ?? 0, 1)} to ${formatPercent(r.high ?? 0, 1)}, ${r.to.toLocaleString("en-US")} of ${r.from.toLocaleString("en-US")}`;
+                      return (
+                        <tr key={ra.step}>
+                          <td>{ra.step}</td>
+                          <td>{cell(ra)}</td>
+                          <td>{cell(rb)}</td>
+                          <td>
+                            {d
+                              ? `${formatSignedPoints(d.difference, 1)}, ${formatSignedPoints(d.low, 1)} to ${formatSignedPoints(d.high, 1)}${d.excludesZero ? ", interval excludes zero" : ", interval includes zero"}`
+                              : "not measured"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <ul>
+                  {comparison.differences.map((d) => (
+                    <li key={d.step}>{differenceSentence(comparison, d)}</li>
+                  ))}
+                </ul>
+                <p>{comparison.note}</p>
+                <Explain summary="How this comparison was worked out" items={explainComparison(comparison)} />
+              </div>
+            )}
           </section>
 
           <section aria-labelledby="h-around">

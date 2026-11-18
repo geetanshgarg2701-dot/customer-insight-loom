@@ -1,4 +1,5 @@
 import type { AnchoredFlow } from "../charts/anchored";
+import { MIN_GROUP, type Comparison } from "../charts/compare";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
@@ -267,4 +268,42 @@ export function explainAnchored(f: AnchoredFlow): Explanation[] {
     });
   }
   return out;
+}
+
+export function explainComparison(c: Comparison): Explanation[] {
+  const first = c.a.rates[0];
+  return [
+    {
+      label: "Step rate",
+      value: "people who went on, over people who reached the step before",
+      how:
+        `For example, in ${c.a.value}, ${formatCount(first.to)} of ${formatCount(first.from)} people who reached ` +
+        `${first.step.split(" to ")[0]} went on to ${first.step.split(" to ")[1]}, which is ${formatPercent(first.rate ?? 0)}. ` +
+        `Each step is measured only on people who reached the step before it.`,
+    },
+    {
+      label: "Interval on a rate",
+      value: "95 percent",
+      how: "Each rate carries a Wilson score interval. It shows how much a rate could move from chance alone at this group size.",
+    },
+    {
+      label: "Difference",
+      value: "first group minus second group",
+      how:
+        "The gap between the groups carries a 95 percent Newcombe hybrid score interval, method 10 in Newcombe 1998, " +
+        "built from the two Wilson intervals. A gap is flagged only where the interval excludes zero.",
+    },
+    {
+      label: "Comparisons made",
+      value: String(c.comparisons),
+      how: c.note,
+    },
+    {
+      label: "Small groups",
+      value: `${MIN_GROUP} people`,
+      how:
+        `A group with fewer than ${MIN_GROUP} people is shown muted with a warning, not hidden. ` +
+        `${MIN_GROUP} is a judgment, not a rule from statistics.`,
+    },
+  ];
 }

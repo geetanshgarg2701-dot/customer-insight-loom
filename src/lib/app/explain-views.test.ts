@@ -1,4 +1,5 @@
 import { anchoredFlow } from "../charts/anchored";
+import type { Comparison } from "../charts/compare";
 import { describe, expect, it } from "vitest";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { TopPaths } from "../charts/crossfilter";
@@ -10,6 +11,7 @@ import {
   explainFunnel,
   explainOutlook,
   explainAnchored,
+  explainComparison,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -295,6 +297,48 @@ describe("explainAnchored", () => {
     const ended = find(list, "Ended after anchor");
     expect(ended.value).toBe("15 customers");
     expect(ended.how).toContain("has not acted yet");
+  });
+
+  it("keeps the words plain", () => clean(list));
+});
+
+describe("explainComparison", () => {
+  const group = (value: string, from: number, to: number) => ({
+    value,
+    entered: from,
+    reached: [from, to, 0, 0],
+    rates: [{ step: "Visit to Product", from, to, rate: to / from, low: 0.5, high: 0.7 }],
+    tooSmall: false,
+  });
+  const c = {
+    dimension: "segment",
+    a: group("new", 200, 160),
+    b: group("returning", 100, 90),
+    differences: [{ step: "Visit to Product", difference: -0.1, low: -0.18, high: -0.02, excludesZero: true }],
+    comparisons: 1,
+    note: "Comparisons made: 1. Every result here is labeled exploratory and is an association, not cause.",
+  } as unknown as Comparison;
+  const list = explainComparison(c);
+
+  it("works one step rate through with the real counts", () => {
+    const e = find(list, "Step rate");
+    expect(e.how).toContain("160 of 200");
+    expect(e.how).toContain("80.00 percent");
+    expect(e.how).toContain("new");
+  });
+
+  it("names both interval methods, and the number of comparisons with the exploratory label", () => {
+    expect(find(list, "Interval on a rate").how).toContain("Wilson");
+    expect(find(list, "Difference").how).toContain("Newcombe");
+    const n = find(list, "Comparisons made");
+    expect(n.value).toBe("1");
+    expect(n.how).toContain("exploratory");
+  });
+
+  it("says the small group rule is a judgment", () => {
+    const s = find(list, "Small groups");
+    expect(s.value).toBe("30 people");
+    expect(s.how).toContain("judgment");
   });
 
   it("keeps the words plain", () => clean(list));

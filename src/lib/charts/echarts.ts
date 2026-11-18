@@ -18,9 +18,9 @@ export function loadEcharts(): Promise<typeof import("echarts/core")> {
     loaded = (async () => {
       const echarts = await import("echarts/core");
       const { BarChart, SankeyChart } = await import("echarts/charts");
-      const { AriaComponent, GridComponent, TooltipComponent } = await import("echarts/components");
+      const { AriaComponent, GridComponent, TitleComponent, TooltipComponent } = await import("echarts/components");
       const { CanvasRenderer } = await import("echarts/renderers");
-      echarts.use([BarChart, SankeyChart, AriaComponent, GridComponent, TooltipComponent, CanvasRenderer]);
+      echarts.use([BarChart, SankeyChart, AriaComponent, GridComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
       return echarts;
     })();
     loaded.catch(() => {
