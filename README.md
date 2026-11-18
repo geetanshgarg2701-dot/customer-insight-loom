@@ -1,6 +1,6 @@
-# Evidence ledger
+# Customer Insight Loom
 
-A free ledger for email experiments. You record the bet before you send, hold back a control group, and read the result once, after the conversion window closes. When a result is too small to tell, it says so plainly.
+Customer journeys, pipelines and email experiments, woven into one picture with the evidence kept and the uncertainty shown. It is free. The ledger records each experiment: you record the bet before you send, hold back a control group, and read the result once, after the conversion window closes. When a result is too small to tell, it says so plainly.
 
 It runs entirely in your browser. Your files are read on your own computer, held in memory, and never uploaded. There is no account and no tracking. See `/privacy` in the app for the details, and `src/lib/app/privacy-claims.test.ts` for the test that keeps those claims true.
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Evidence ledger",
+  title: "Customer Insight Loom",
   description:
     "A free ledger for email experiments. Record the bet before you send, hold back a control group, and read the result once, with the uncertainty shown.",
 };

@@ -4,7 +4,7 @@ Written Wednesday November 18, 2026. For someone who has not seen this project. 
 
 ## What it is
 
-A free evidence ledger for email experiments, running entirely in the browser. A person records a hypothesis, checks that the audience is big enough, assigns a holdout by a keyed hash, and reads the result with its uncertainty. The design locks at registration, results stay locked until the conversion window closes, and later readouts are numbered versions with a reason. Around that are journey and pipeline views over synthetic data, a data check screen, and a methods page that shows the checks run on generated data.
+Customer Insight Loom, called Evidence ledger until 2026-11-18, is a free tool for customer journeys, pipelines and email experiments, running entirely in the browser. A person records a hypothesis, checks that the audience is big enough, assigns a holdout by a keyed hash, and reads the result with its uncertainty. The design locks at registration, results stay locked until the conversion window closes, and later readouts are numbered versions with a reason. Around that are journey and pipeline views over synthetic data, a data check screen, and a methods page that shows the checks run on generated data.
 
 Rules it was built under: cost zero, every number comes from code and none from a model, no customer data leaves the browser, and the statistics code was written test first.
 

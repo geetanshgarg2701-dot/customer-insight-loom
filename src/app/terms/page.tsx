@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Nav } from "../nav";
 
 export const metadata: Metadata = {
-  title: "Terms | Evidence ledger",
+  title: "Terms | Customer Insight Loom",
   description: "The plain terms for using this free early version.",
 };
 
