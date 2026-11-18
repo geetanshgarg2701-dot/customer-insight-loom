@@ -5,11 +5,16 @@
 // On Windows in Git Bash, write the prefix without the leading slash, or run this from PowerShell.
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { readdirSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const prefix = process.argv[2] ?? process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const nextBin = createRequire(import.meta.url).resolve("next/dist/bin/next");
+
+// Start from nothing. A leftover .next folder from another kind of build once made Next fail with an internal error, and
+// a publish build should never depend on what an earlier build left behind.
+rmSync(".next", { recursive: true, force: true });
+rmSync("out", { recursive: true, force: true });
 
 const build = spawnSync(process.execPath, [nextBin, "build"], {
   stdio: "inherit",
