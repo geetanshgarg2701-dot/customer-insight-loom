@@ -50,6 +50,7 @@ These are your steps, not mine.
 
 1. Create the public repository for the built site.
 2. `npm run build:static -- <repo name>`, or without a name for a site of its own.
+   Then run `npm run check:site`. It scans `out/` for real email addresses, developer paths, key-like strings and source maps, and exits with an error if it finds any. It passed on 2026-11-18.
 3. Put the contents of `out/` in the repository, including the file `.nojekyll`, and turn on Pages for it.
 4. Open the live link and check, in order:
    - the home page loads in the editorial style, and the icon is the ledger mark;
@@ -58,6 +59,7 @@ These are your steps, not mine.
    - the browser's network tab shows requests only to the same site, and the wasm file loads;
    - `/privacy` and `/terms` open, and an unknown address shows the 404 page.
 5. Read the live site once as a stranger, on a phone.
+6. Do the screen reader pass in `docs/2026-11-18-screen-reader-checklist.md`, about an hour, before telling anyone outside.
 
 ## 6. What to say publicly
 

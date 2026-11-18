@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "postinstall": "node scripts/copy-duckdb-wasm.mjs",
     "build:static": "node scripts/build-static.mjs",
+    "check:site": "node scripts/check-site.mjs",
     "test:static": "playwright test -c playwright.static.config.ts",
     "typecheck": "next typegen && tsc --noEmit"
   },
