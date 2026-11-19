@@ -23,7 +23,7 @@ function customer(segment: JourneyRow["segment"], enter: number, gaps: number[])
 
 describe("loadJourneys stores the times", () => {
   it("keeps one UTC millisecond time per main step, and the whole path's times, per customer", async () => {
-    const e = await createNodeEngine();
+    const e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", [customer("new", 0, [1, 2])]);
     const [row] = await e.query("SELECT customer, t1, t2, t3, t4, times FROM journeys", []);
     expect(Number(row.customer)).toBe(0);
@@ -51,7 +51,7 @@ describe("timeInStep on times worked out by hand", () => {
   ];
   let e: SqlEngine;
   beforeAll(async () => {
-    e = await createNodeEngine();
+    e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", rows);
   });
   afterAll(async () => {
@@ -105,7 +105,7 @@ describe("timeInStep on the generator, counted a second way", () => {
   const generated = syntheticJourneys(20_000, 11);
   let e: SqlEngine;
   beforeAll(async () => {
-    e = await createNodeEngine();
+    e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", generated);
   }, 120_000);
   afterAll(async () => {

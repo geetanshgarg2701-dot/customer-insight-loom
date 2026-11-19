@@ -197,9 +197,12 @@ table {
   font-variant-numeric: tabular-nums;
   margin-bottom: var(--gap);
 }
-/* Headers break a word only when it cannot fit on a line of its own, never mid-word to save space. */
-th {
-  overflow-wrap: break-word;
+/* On a laptop, headers break a word only when it cannot fit on a line of its own, never mid-word. On a phone the page
+   rule that breaks anywhere stays, so a table with many columns still fits the screen. */
+@media (min-width: 700px) {
+  th {
+    overflow-wrap: break-word;
+  }
 }
 th,
 td {

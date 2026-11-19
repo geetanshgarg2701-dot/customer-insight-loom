@@ -41,7 +41,7 @@ describe("compareGroups on counts worked out by hand", () => {
   ];
 
   beforeAll(async () => {
-    engine = await createNodeEngine();
+    engine = await createNodeEngine({ isolated: true });
     await loadJourneys(engine, "journeys", rows);
   });
 
@@ -93,7 +93,7 @@ describe("compareGroups on counts worked out by hand", () => {
   it("warns when a group is under the minimum size, and the rule is the stated number", async () => {
     expect(MIN_GROUP).toBe(30);
     const small = [...many(10, "vip", "ads", 2), ...many(10, "vip", "ads", 4)];
-    const e2 = await createNodeEngine();
+    const e2 = await createNodeEngine({ isolated: true });
     await loadJourneys(e2, "journeys", [...rows, ...small]);
     const c = await compareGroups(e2, "journeys", { dimension: "segment", a: "new", b: "vip", selection: {} });
     expect(c.a.tooSmall).toBe(false);
@@ -116,7 +116,7 @@ describe("compareGroups on counts worked out by hand", () => {
   });
 
   it("leaves out a step difference when a group has nobody to measure it on, and does not count it", async () => {
-    const e3 = await createNodeEngine();
+    const e3 = await createNodeEngine({ isolated: true });
     await loadJourneys(e3, "journeys", [...many(40, "new", "ads", 1), ...many(40, "returning", "ads", 4)]);
     const c = await compareGroups(e3, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
     expect(c.a.rates[0]).toMatchObject({ from: 40, to: 0, rate: 0 });
@@ -147,7 +147,7 @@ describe("compareGroups against the synthetic generator, counted a second way", 
   let e: SqlEngine;
 
   beforeAll(async () => {
-    e = await createNodeEngine();
+    e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", generated);
   }, 120_000);
   afterAll(async () => {
@@ -192,7 +192,7 @@ describe("differenceSentence, the plain reading next to every range", () => {
   ];
 
   it("says who went on, the gap in points, the interval, and that it is exploratory", async () => {
-    const e = await createNodeEngine();
+    const e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", hand);
     const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
     const s = differenceSentence(c, c.differences[1]);
@@ -205,7 +205,7 @@ describe("differenceSentence, the plain reading next to every range", () => {
   });
 
   it("says plainly when the interval includes zero, so it does not show a gap", async () => {
-    const e = await createNodeEngine();
+    const e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", [...many(20, "new", "ads", 4), ...many(20, "returning", "ads", 4), ...many(5, "new", "ads", 1), ...many(5, "returning", "ads", 1)]);
     const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
     const first = c.differences[0];
@@ -215,7 +215,7 @@ describe("differenceSentence, the plain reading next to every range", () => {
   });
 
   it("says the interval excludes zero when it does, without claiming a cause", async () => {
-    const e = await createNodeEngine();
+    const e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", hand);
     const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
     const wide = c.differences[1];

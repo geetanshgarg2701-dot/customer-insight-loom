@@ -1,6 +1,7 @@
 import type { AnchoredFlow } from "../charts/anchored";
 import { MIN_GROUP, type Comparison } from "../charts/compare";
 import type { Timing } from "../charts/timing";
+import type { BehindStep } from "../charts/behind";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
@@ -340,6 +341,33 @@ export function explainTiming(t: Timing): Explanation[] {
       how:
         "The demo times come from assumptions written in the generator: entries over 28 days, gaps that are random with " +
         "a stated typical length and capped at 14 days, and new customers planted to take twice as long to buy.",
+    },
+  ];
+}
+
+export function explainBehind(b: BehindStep): Explanation[] {
+  const flow =
+    b.next === null || b.movedOn === null
+      ? `${b.step} is the last step, so there is no next step to go on to.`
+      : `${formatCount(b.movedOn)} went on to ${b.next} and ${formatCount(b.left ?? 0)} left at ${b.step}.`;
+  return [
+    {
+      label: "People at this step",
+      value: formatCount(b.reached),
+      how: `Everyone in the current selection who reached ${b.step}. Of them, ${flow} Every person counts once.`,
+    },
+    {
+      label: "Rate of going on",
+      value: "with a 95 percent range",
+      how: "For each group, the people who went on divided by the people who reached the step, with a Wilson score interval.",
+    },
+    {
+      label: "Privacy",
+      value: "aggregates only",
+      how:
+        `No individual person or path is shown, only groups by segment and channel. Groups under ${b.minGroup} people are ` +
+        `merged into one row, and if that row is still under ${b.minGroup}, its numbers are hidden. The step totals still ` +
+        `include everyone.`,
     },
   ];
 }

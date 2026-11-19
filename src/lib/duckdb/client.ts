@@ -4,6 +4,7 @@ import { verifyResultsWhenOpen } from "../assignment/gated";
 import { pathCounts, type PathCount } from "../charts/anchored";
 import { compareGroups, type CompareDimension, type Comparison } from "../charts/compare";
 import { timeInStep, type Timing } from "../charts/timing";
+import { behindStep, type BehindStep } from "../charts/behind";
 import {
   countsBy,
   loadJourneys,
@@ -169,6 +170,7 @@ export type JourneyBoard = {
   pathCounts(selection: Selection): Promise<PathCount[]>;
   compare(dimension: CompareDimension, a: string, b: string, selection: Selection): Promise<Comparison>;
   timing(windowHours: number, selection: Selection): Promise<Timing>;
+  behind(stepIndex: number, selection: Selection): Promise<BehindStep>;
   close(): Promise<void>;
 };
 
@@ -185,6 +187,7 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     pathCounts: (selection) => pathCounts(engine, table, selection),
     compare: (dimension, a, b, selection) => compareGroups(engine, table, { dimension, a, b, selection }),
     timing: (windowHours, selection) => timeInStep(engine, table, selection, { asOf: JOURNEYS_AS_OF, windowHours }),
+    behind: (stepIndex, selection) => behindStep(engine, table, selection, stepIndex),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

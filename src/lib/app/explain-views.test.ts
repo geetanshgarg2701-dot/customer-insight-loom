@@ -1,6 +1,7 @@
 import { anchoredFlow } from "../charts/anchored";
 import type { Comparison } from "../charts/compare";
 import type { Timing } from "../charts/timing";
+import type { BehindStep } from "../charts/behind";
 import { describe, expect, it } from "vitest";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { TopPaths } from "../charts/crossfilter";
@@ -14,6 +15,7 @@ import {
   explainAnchored,
   explainComparison,
   explainTiming,
+  explainBehind,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -369,6 +371,36 @@ describe("explainTiming", () => {
 
   it("says the demo times are assumed, and where the assumptions are", () => {
     expect(find(list, "Synthetic timing").how).toContain("twice as long");
+  });
+
+  it("keeps the words plain", () => clean(list));
+});
+
+describe("explainBehind", () => {
+  const b: BehindStep = {
+    step: "Cart", next: "Purchase", reached: 175, movedOn: 114, left: 61, minGroup: 30,
+    groups: [
+      { label: "new, ads", segment: "new", channel: "ads", reached: 100, movedOn: 60, left: 40, rate: 0.6, low: 0.5, high: 0.7, merged: false, mergedGroups: 0, hidden: false },
+      { label: "2 smaller groups, merged", segment: null, channel: null, reached: null, movedOn: null, left: null, rate: null, low: null, high: null, merged: true, mergedGroups: 2, hidden: true },
+    ],
+  };
+  const list = explainBehind(b);
+
+  it("adds the step up from the real counts", () => {
+    const e = find(list, "People at this step");
+    expect(e.value).toBe("175");
+    expect(e.how).toContain("114 went on to Purchase and 61 left at Cart");
+  });
+
+  it("says only aggregates are shown and how small groups are merged and hidden", () => {
+    const p = find(list, "Privacy");
+    expect(p.how).toContain("No individual person");
+    expect(p.how).toContain("30");
+    expect(p.how).toContain("hidden");
+  });
+
+  it("names the interval method on the rate of going on", () => {
+    expect(find(list, "Rate of going on").how).toContain("Wilson");
   });
 
   it("keeps the words plain", () => clean(list));

@@ -5,12 +5,14 @@ import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge,
 import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
 import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
 import { formatDuration, timingSentence, type Timing } from "@/lib/charts/timing";
+import type { BehindStep } from "@/lib/charts/behind";
+import { JOURNEY_STEPS } from "@/lib/demo/journeys";
 import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
-import { explainAnchored, explainComparison, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
+import { explainAnchored, explainBehind, explainComparison, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
@@ -233,6 +235,8 @@ export default function JourneysPage() {
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [windowHours, setWindowHours] = useState<(typeof WINDOWS)[number]>(168);
   const [timing, setTiming] = useState<Timing | null>(null);
+  const [behindIndex, setBehindIndex] = useState(2);
+  const [behind, setBehind] = useState<BehindStep | null>(null);
   const [whatStep, setWhatStep] = useState(1);
   const [whatPoints, setWhatPoints] = useState<(typeof CHANGES)[number]>(10);
 
@@ -264,6 +268,27 @@ export default function JourneysPage() {
     if (!board_) return;
     setTiming(await board_.timing(hours, sel));
   }, []);
+
+  const refreshBehind = useCallback(async (index: number, sel: Selection) => {
+    const board_ = board.current;
+    if (!board_) return;
+    setBehind(await board_.behind(index, sel));
+  }, []);
+
+  async function pickBehind(index: number) {
+    setBehindIndex(index);
+    try {
+      await refreshBehind(index, selection);
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
+
+  /** A click on a flow node opens the step it belongs to: "2. Product" and "Dropped after 2. Product" both mean step 2. */
+  function pickFromFlow(name: string) {
+    const m = /^(?:Dropped after )?(\d)\. /.exec(name);
+    if (m) void pickBehind(Number(m[1]) - 1);
+  }
 
   async function changeWindow(hours: (typeof WINDOWS)[number]) {
     setWindowHours(hours);
@@ -297,6 +322,7 @@ export default function JourneysPage() {
       await refresh({}, rarity);
       await refreshComparison(cmpDim, cmpA, cmpB, {});
       await refreshTiming(windowHours, {});
+      await refreshBehind(behindIndex, {});
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -313,6 +339,7 @@ export default function JourneysPage() {
       await refresh(next, rarity);
       await refreshComparison(cmpDim, cmpA, cmpB, next);
       await refreshTiming(windowHours, next);
+      await refreshBehind(behindIndex, next);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -323,6 +350,7 @@ export default function JourneysPage() {
     await refresh({}, rarity);
     await refreshComparison(cmpDim, cmpA, cmpB, {});
     await refreshTiming(windowHours, {});
+    await refreshBehind(behindIndex, {});
   }
 
   async function pickRarity(value: (typeof RARITY)[number]) {
@@ -412,7 +440,8 @@ export default function JourneysPage() {
 
           <section aria-labelledby="h-flow">
             <h2 id="h-flow">Flow between steps</h2>
-            <Chart label="Flow of customers between steps, with drop off" option={sankeyOption(edges, CHART_THEME)} height={320} />
+            <Chart label="Flow of customers between steps, with drop off" option={sankeyOption(edges, CHART_THEME)} height={320} onSelect={(name) => pickFromFlow(name)} />
+            <p>Select a step or a drop off in the flow to see who is behind it, below.</p>
             <table className="flow" aria-label="Flow between steps">
               <thead>
                 <tr>
@@ -431,6 +460,62 @@ export default function JourneysPage() {
                 ))}
               </tbody>
             </table>
+          </section>
+
+          <section aria-labelledby="h-behind">
+            <h2 id="h-behind">Behind a step</h2>
+            <p>
+              Who reached a step, by segment and channel, and how many went on or left there. Only groups are shown,
+              never a single person, and small groups are merged.
+            </p>
+            <p role="group" aria-label="Step to look behind">
+              Step:{" "}
+              {JOURNEY_STEPS.map((s, i) => (
+                <button key={s} type="button" aria-pressed={behindIndex === i} onClick={() => void pickBehind(i)}>
+                  {s}
+                </button>
+              ))}
+            </p>
+            {behind && (
+              <div>
+                <p>
+                  {behind.reached.toLocaleString("en-US")} people reached {behind.step}.
+                  {behind.next !== null && behind.movedOn !== null
+                    ? ` ${behind.movedOn.toLocaleString("en-US")} went on to ${behind.next} and ${(behind.left ?? 0).toLocaleString("en-US")} left at ${behind.step}.`
+                    : ` It is the last step, so nobody goes on from here.`}
+                </p>
+                <table aria-label="Behind a step">
+                  <thead>
+                    <tr>
+                      <th scope="col">Group</th>
+                      <th scope="col">Reached {behind.step}</th>
+                      {behind.next !== null && <th scope="col">Went on to {behind.next}</th>}
+                      {behind.next !== null && <th scope="col">Left at {behind.step}</th>}
+                      {behind.next !== null && <th scope="col">Rate of going on, with range</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {behind.groups.map((g) => (
+                      <tr key={g.label}>
+                        <td>{g.label}</td>
+                        <td>{g.reached === null ? "hidden" : g.reached.toLocaleString("en-US")}</td>
+                        {behind.next !== null && <td>{g.movedOn === null ? "hidden" : g.movedOn.toLocaleString("en-US")}</td>}
+                        {behind.next !== null && <td>{g.left === null ? "hidden" : g.left.toLocaleString("en-US")}</td>}
+                        {behind.next !== null && (
+                          <td>
+                            {g.rate === null
+                              ? "hidden"
+                              : `${formatPercent(g.rate, 1)}, ${formatPercent(g.low ?? 0, 1)} to ${formatPercent(g.high ?? 0, 1)}`}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p>Groups with a lower rate go with more people leaving here. That is an association, not a cause.</p>
+                <Explain summary="How who is behind a step was worked out" items={explainBehind(behind)} />
+              </div>
+            )}
           </section>
 
           <section aria-labelledby="h-compare">
