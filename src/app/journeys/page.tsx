@@ -6,13 +6,14 @@ import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "
 import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
 import { formatDuration, timingSentence, type Timing } from "@/lib/charts/timing";
 import type { BehindStep } from "@/lib/charts/behind";
+import type { ExampleJourney } from "@/lib/charts/replay";
 import { JOURNEY_STEPS } from "@/lib/demo/journeys";
 import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
-import { explainAnchored, explainBehind, explainComparison, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
+import { explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
@@ -29,6 +30,12 @@ const RARITY = [0.01, 0.02, 0.05] as const;
 const CHANGES = [-10, 5, 10, 20] as const;
 const STEPS = [0, 1, 2, 3] as const;
 const WINDOWS = [168, 720] as const;
+const REPLAY_OUTCOMES = [
+  { reached: "Purchase", label: "Bought" },
+  { reached: "Cart", label: "Left at Cart" },
+  { reached: "Product", label: "Left at Product" },
+  { reached: "Visit", label: "Left at Visit" },
+] as const;
 const TOP_N = [3, 5, Infinity] as const;
 
 function messageOf(error: unknown): string {
@@ -237,6 +244,10 @@ export default function JourneysPage() {
   const [timing, setTiming] = useState<Timing | null>(null);
   const [behindIndex, setBehindIndex] = useState(2);
   const [behind, setBehind] = useState<BehindStep | null>(null);
+  const [replayReached, setReplayReached] = useState("Purchase");
+  const [replayOffset, setReplayOffset] = useState(0);
+  const [replay, setReplay] = useState<ExampleJourney | null>(null);
+  const [eventIndex, setEventIndex] = useState(0);
   const [whatStep, setWhatStep] = useState(1);
   const [whatPoints, setWhatPoints] = useState<(typeof CHANGES)[number]>(10);
 
@@ -274,6 +285,24 @@ export default function JourneysPage() {
     if (!board_) return;
     setBehind(await board_.behind(index, sel));
   }, []);
+
+  const refreshReplay = useCallback(async (reached: string, offset: number, sel: Selection) => {
+    const board_ = board.current;
+    if (!board_) return;
+    const next = await board_.replay(reached, offset, sel);
+    setReplay(next);
+    setEventIndex(Math.max(0, next.events.length - 1));
+  }, []);
+
+  async function pickReplay(reached: string, offset: number) {
+    setReplayReached(reached);
+    setReplayOffset(offset);
+    try {
+      await refreshReplay(reached, offset, selection);
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
 
   async function pickBehind(index: number) {
     setBehindIndex(index);
@@ -323,6 +352,7 @@ export default function JourneysPage() {
       await refreshComparison(cmpDim, cmpA, cmpB, {});
       await refreshTiming(windowHours, {});
       await refreshBehind(behindIndex, {});
+      await refreshReplay(replayReached, replayOffset, {});
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -340,6 +370,8 @@ export default function JourneysPage() {
       await refreshComparison(cmpDim, cmpA, cmpB, next);
       await refreshTiming(windowHours, next);
       await refreshBehind(behindIndex, next);
+      await refreshReplay(replayReached, 0, next);
+      setReplayOffset(0);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -351,6 +383,8 @@ export default function JourneysPage() {
     await refreshComparison(cmpDim, cmpA, cmpB, {});
     await refreshTiming(windowHours, {});
     await refreshBehind(behindIndex, {});
+    await refreshReplay(replayReached, 0, {});
+    setReplayOffset(0);
   }
 
   async function pickRarity(value: (typeof RARITY)[number]) {
@@ -679,6 +713,86 @@ export default function JourneysPage() {
                   closed by the cutoff, so nobody is still waiting here.
                 </p>
                 <Explain summary="How time between steps was worked out" items={explainTiming(timing)} />
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="h-replay">
+            <h2 id="h-replay">Replay one path</h2>
+            <p>
+              Step through one synthetic customer, event by event, with the time each step took. The customer has only a
+              made up label, and a single path is shown only when at least 30 people match, so it cannot single anyone
+              out.
+            </p>
+            <p role="group" aria-label="Customers who">
+              Customers who:{" "}
+              {REPLAY_OUTCOMES.map((o) => (
+                <button key={o.reached} type="button" aria-pressed={replayReached === o.reached} onClick={() => void pickReplay(o.reached, 0)}>
+                  {o.label}
+                </button>
+              ))}
+            </p>
+            {replay && replay.hidden && <p role="alert">{replay.label}.</p>}
+            {replay && !replay.hidden && (
+              <div>
+                <p>
+                  {replay.label}, {replay.segment} segment, {replay.channel} channel. Customer {replay.position} of{" "}
+                  {replay.of.toLocaleString("en-US")} who match.{" "}
+                  <button type="button" onClick={() => void pickReplay(replayReached, replayOffset + 1)}>
+                    Show another customer
+                  </button>
+                </p>
+                <p>
+                  <button type="button" disabled={eventIndex <= 0} onClick={() => setEventIndex(Math.max(0, eventIndex - 1))}>
+                    Previous event
+                  </button>{" "}
+                  <button type="button" disabled={eventIndex >= replay.events.length - 1} onClick={() => setEventIndex(Math.min(replay.events.length - 1, eventIndex + 1))}>
+                    Next event
+                  </button>{" "}
+                  <button type="button" onClick={() => setEventIndex(0)}>
+                    Replay from the start
+                  </button>{" "}
+                  <label>
+                    Event shown{" "}
+                    <input
+                      type="range"
+                      min={1}
+                      max={replay.events.length}
+                      value={eventIndex + 1}
+                      onChange={(e) => setEventIndex(Number(e.target.value) - 1)}
+                    />
+                  </label>
+                </p>
+                <p aria-live="polite">
+                  Event {eventIndex + 1} of {replay.events.length}: {replay.events[eventIndex].step},{" "}
+                  {formatDuration(replay.events[eventIndex].hoursSinceEntry)} after entry
+                  {replay.events[eventIndex].hoursSincePrevious === null
+                    ? "."
+                    : `, ${formatDuration(replay.events[eventIndex].hoursSincePrevious!)} after ${replay.events[eventIndex - 1].step}.`}
+                </p>
+                <table aria-label="Replay one path">
+                  <thead>
+                    <tr>
+                      <th scope="col">Event</th>
+                      <th scope="col">Step</th>
+                      <th scope="col">UTC time</th>
+                      <th scope="col">Since entry</th>
+                      <th scope="col">Since the step before</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {replay.events.slice(0, eventIndex + 1).map((ev, i) => (
+                      <tr key={`${i}-${ev.at}`}>
+                        <td>{i + 1}</td>
+                        <td>{ev.step}</td>
+                        <td>{ev.at.replace("T", " ").slice(0, 16)} UTC</td>
+                        <td>{formatDuration(ev.hoursSinceEntry)}</td>
+                        <td>{ev.hoursSincePrevious === null ? "start" : formatDuration(ev.hoursSincePrevious)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Explain summary="How this replay was worked out" items={explainReplay(replay)} />
               </div>
             )}
           </section>

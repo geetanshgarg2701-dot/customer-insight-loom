@@ -2,6 +2,7 @@ import type { AnchoredFlow } from "../charts/anchored";
 import { MIN_GROUP, type Comparison } from "../charts/compare";
 import type { Timing } from "../charts/timing";
 import type { BehindStep } from "../charts/behind";
+import type { ExampleJourney } from "../charts/replay";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
@@ -368,6 +369,31 @@ export function explainBehind(b: BehindStep): Explanation[] {
         `No individual person or path is shown, only groups by segment and channel. Groups under ${b.minGroup} people are ` +
         `merged into one row, and if that row is still under ${b.minGroup}, its numbers are hidden. The step totals still ` +
         `include everyone.`,
+    },
+  ];
+}
+
+export function explainReplay(j: ExampleJourney): Explanation[] {
+  return [
+    {
+      label: "Synthetic customer",
+      value: j.label,
+      how: "The data holds no email or name. The label is a made up number, and the whole demo is generated, not real people.",
+    },
+    {
+      label: "Privacy",
+      value: "groups of at least " + String(j.minGroup),
+      how:
+        `A single path is shown only when at least ${j.minGroup} people match the selection and the outcome. ` +
+        `${formatCount(j.groupSize)} match now. Under that, no path is shown at all. With real data, individual paths ` +
+        `would also be limited to authorized users.`,
+    },
+    {
+      label: "Times",
+      value: "UTC",
+      how:
+        "Every time is stored and shown in UTC. Since entry counts from the first event. Since the step before counts " +
+        "from the event just above it, and a detour such as Search is shown in its place.",
     },
   ];
 }

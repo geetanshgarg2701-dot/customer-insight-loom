@@ -2,6 +2,7 @@ import { anchoredFlow } from "../charts/anchored";
 import type { Comparison } from "../charts/compare";
 import type { Timing } from "../charts/timing";
 import type { BehindStep } from "../charts/behind";
+import type { ExampleJourney } from "../charts/replay";
 import { describe, expect, it } from "vitest";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { TopPaths } from "../charts/crossfilter";
@@ -16,6 +17,7 @@ import {
   explainComparison,
   explainTiming,
   explainBehind,
+  explainReplay,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -401,6 +403,32 @@ describe("explainBehind", () => {
 
   it("names the interval method on the rate of going on", () => {
     expect(find(list, "Rate of going on").how).toContain("Wilson");
+  });
+
+  it("keeps the words plain", () => clean(list));
+});
+
+describe("explainReplay", () => {
+  const j: ExampleJourney = {
+    hidden: false, groupSize: 5000, minGroup: 30, label: "Synthetic customer 12", segment: "new", channel: "ads",
+    events: [], position: 1, of: 5000,
+  };
+  const list = explainReplay(j);
+
+  it("says the customer is made up and the data holds no email or name", () => {
+    const e = find(list, "Synthetic customer");
+    expect(e.value).toBe("Synthetic customer 12");
+    expect(e.how).toContain("no email or name");
+  });
+
+  it("states the group rule with the real numbers", () => {
+    const p = find(list, "Privacy");
+    expect(p.how).toContain("at least 30 people");
+    expect(p.how).toContain("5,000");
+  });
+
+  it("says times are UTC", () => {
+    expect(find(list, "Times").how).toContain("UTC");
   });
 
   it("keeps the words plain", () => clean(list));
