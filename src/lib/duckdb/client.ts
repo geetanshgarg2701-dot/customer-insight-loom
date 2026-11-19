@@ -39,6 +39,8 @@ import {
   type Stalled,
 } from "../charts/pipeline";
 import { JOURNEYS_AS_OF, syntheticJourneys } from "../demo/journeys";
+import { createCommentsBoard, type CommentsBoard } from "../insights/board";
+import { syntheticComments } from "../insights/comments";
 import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
@@ -241,4 +243,11 @@ export async function createBrowserPipelineBoard(rows = 100_000, seed = 21): Pro
       await engine.close?.();
     },
   };
+}
+
+/** Loads synthetic customers and their synthetic comments for the comments screen. Text is redacted before it is stored. */
+export async function createBrowserCommentsBoard(customers = 20_000, count = 3_000, seed = 17): Promise<CommentsBoard> {
+  const engine = await createBrowserEngine();
+  const journeys = syntheticJourneys(customers, 11);
+  return createCommentsBoard(engine, journeys, syntheticComments(journeys, count, seed));
 }

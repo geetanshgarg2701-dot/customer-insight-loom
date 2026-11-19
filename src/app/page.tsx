@@ -35,6 +35,10 @@ export default function Home() {
             have stalled, on synthetic data.
           </li>
           <li>
+            <Link href="/insights">Comments</Link>. What customers say, read next to what they did, with a redaction
+            scorecard and a step to correct a comment, on synthetic data.
+          </li>
+          <li>
             <Link href="/check">Data check</Link>. Match two files on email and check a time column against clock
             changes, in the browser.
           </li>

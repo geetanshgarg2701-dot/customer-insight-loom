@@ -7,6 +7,8 @@ import type { PipelineAt, StageRecords } from "../charts/pipeline-drill";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
+import { PAIN_LABELS } from "../insights/comments";
+import type { MentionRates } from "../insights/mentions";
 import { formatCount, formatPercent, formatSignedPoints } from "./format";
 import type { Explanation } from "./explain";
 
@@ -492,6 +494,48 @@ export function explainSnapshot(s: PipelineAt): Explanation[] {
       label: "Won and lost",
       value: "by that date",
       how: "Won and lost are running totals: every deal won or marked lost on or before the date.",
+    },
+  ];
+}
+
+export function explainMentions(r: MentionRates): Explanation[] {
+  const shown = r.groups.find((g) => !g.tooSmall);
+  const top = shown?.pains.reduce((a, b) => (b.mentions > a.mentions ? b : a));
+  const hidden = r.groups.filter((g) => g.tooSmall);
+  return [
+    {
+      label: "Mention rate",
+      value: "comments that mention a pain, over all comments in the group",
+      how:
+        shown && top
+          ? `For example, ${formatCount(top.mentions)} of the ${formatCount(shown.comments)} comments in ${shown.value} were coded ` +
+            `${PAIN_LABELS[top.pain]}, which is ${formatPercent(top.rate, 1)}. Each comment has one coded pain.`
+          : "No group is large enough to show.",
+    },
+    {
+      label: "Groups",
+      value: "from what customers did",
+      how:
+        "Each comment is joined to its customer in the journeys table, and the group comes from that row, so a group is a fact " +
+        "about behavior. A higher rate in one group is an association. It does not show that the pain caused the behavior.",
+    },
+    {
+      label: "Range",
+      value: "95 percent",
+      how: "Each rate carries a Wilson score interval. It shows how much a rate could move from chance alone at this group size. Ranges are not adjusted for the many rates shown.",
+    },
+    {
+      label: "Small groups",
+      value: `${MIN_GROUP} comments`,
+      how:
+        hidden.length > 0
+          ? `${hidden.map((g) => g.value).join(", ")} had fewer than ${MIN_GROUP} comments, so their numbers are hidden.`
+          : `A group with fewer than ${MIN_GROUP} comments would have its numbers hidden. None is that small here.`,
+    },
+    {
+      label: "Not linked",
+      value: `${formatCount(r.unlinked)} comments`,
+      how: "Comments whose customer is not in the journeys table cannot be grouped, so they are counted here and left out of the rates.",
     },
   ];
 }
