@@ -81,7 +81,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On 2026-11-19: 855 unit tests, 80 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On 2026-11-19: 879 unit tests, 80 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 
@@ -116,3 +116,5 @@ Only two runtime packages are used beyond the app shell. This is a record, becau
 - `@duckdb/duckdb-wasm` 1.32.0, approved in the first week, self hosted.
 - `echarts` 6.1.0, approved by the owner on 2026-11-17 for the journey charts. Apache-2.0, published 2026-05-19, with `zrender` and `tslib` as its own dependencies. Loaded only in the browser and only with the bar chart, flow chart, tooltip, grid, accessibility and canvas parts. `npm audit` lists 7 moderate findings, all in the lint toolchain through `minimatch`, none in ECharts, and they predate it.
 - `@axe-core/playwright` 4.14.0, a development dependency only, approved by the owner on 2026-11-17 for automated accessibility checks. MPL-2.0, a file level license, and it never ships to visitors. Its one dependency is `axe-core` 4.14.0, also MPL-2.0. `npm audit` still lists the same 7 moderate findings in the lint toolchain, none from axe.
+
+Insights module, first part (SOURCED, tested): a seeded generator makes synthetic customer comments, each tied to a real synthetic journey customer, with planted pains (shipping cost for Cart leavers and new customers, pricing for ads, slow support for Support users, slow delivery for buyers) and planted fake personal details on reserved domains and numbers. A redaction scorecard compares planted with caught. Emails, phones, cards and addresses show 0 missed. Names are planted and all missed, by design, because the rules do not cover names, and the scorecard says so. Only consented comments are kept, and only as redacted quotes. An edit is redacted again. Not yet built: the DuckDB comments table, the comments screen, pain counts, the evidence chain and the journeys why panel. Semgrep did not run for this commit because its venv is broken. Gitleaks ran clean.
