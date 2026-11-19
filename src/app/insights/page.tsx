@@ -11,6 +11,7 @@ import { PAIN_LABELS, PAINS, type Pain } from "@/lib/insights/comments";
 import type { MentionDimension, MentionRates } from "@/lib/insights/mentions";
 import type { Scorecard } from "@/lib/insights/prepare";
 import { Explain } from "../explain";
+import { ChainGraph } from "./chain-graph";
 import { Nav } from "../nav";
 
 const GROUPINGS: { value: MentionDimension; label: string }[] = [
@@ -304,6 +305,8 @@ export default function InsightsPage() {
                 </select>
               </label>
             </p>
+            {chain && <ChainGraph steps={chain} title={`Evidence chain graph for ${PAIN_LABELS[chainPain]}`} />}
+            {chain && <h3 className="chain-text-heading">The chain as text</h3>}
             {chain && (
               <ol aria-label={`Evidence chain for ${PAIN_LABELS[chainPain]}`} className="chain">
                 {chain.map((step) => (

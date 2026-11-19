@@ -318,3 +318,16 @@ ol.chain > li[data-status="missing"] > span {
 ol.chain > li > p {
   margin: 0.3rem 0 0 0;
 }
+
+/* The chain graph is for wide screens. On a phone the list is the chain, so the graph is not drawn at all. */
+.chain-graph {
+  display: none;
+  width: 100%;
+  border: 1px solid var(--line);
+  margin: 1rem 0;
+}
+@media (min-width: 700px) {
+  .chain-graph {
+    display: block;
+  }
+}

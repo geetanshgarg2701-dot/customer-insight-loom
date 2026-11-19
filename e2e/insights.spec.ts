@@ -100,7 +100,7 @@ test("the ranking matches an independent count, and the chain shows each link or
   await expect(chain.getByRole("listitem").nth(4)).toContainText("Missing");
   await expect(chain.getByRole("listitem").nth(5)).toContainText("No decision.");
 
-  await page.getByLabel("Theme").selectOption("support_slow");
+  await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption("support_slow");
   await expect(page.getByRole("list", { name: "Evidence chain for Support was slow to answer" })).toBeVisible();
 });
 
