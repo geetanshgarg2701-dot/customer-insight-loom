@@ -45,8 +45,8 @@ Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript stric
 
 | Check | Result |
 |---|---|
-| Unit tests, Vitest | 806 passed in 61 files |
-| Browser tests, Playwright in Edge | 71 passed in 19 files |
+| Unit tests, Vitest | 828 passed in 62 files |
+| Browser tests, Playwright in Edge | 74 passed in 20 files |
 | Static mirror test | 1 passed. It proves the site works under a project prefix with no request to another host |
 | Database tests, SQL on a Supabase test project | 6 files plus a seventh for the correction label. Not rerun on every change |
 | Type check and lint | Clean. Lint has one old warning |
@@ -75,7 +75,7 @@ A feature counts here only if a screen calls it.
 - **Demo.** Three synthetic entries whose outcomes are fixed by design, labeled synthetic.
 - **Data intake.** Load a CSV with DuckDB, map columns, and preview 20 rows. Columns that look like personal data are blocked by name and by value.
 - **Journeys.** 100,000 synthetic customers. Linked bar charts, a flow with drop off, top paths with rare routes merged into one labeled group, a what if that says what it assumes, an anchored view with up to three steps before and after one event, and a side by side comparison of two groups with each step rate and gap shown with its interval, the number of comparisons, a small group warning, and every result labeled exploratory. Time between steps shows the median and spread of hours to the next step, with people still inside their window shown apart from those who dropped. The synthetic journeys have UTC timestamps from documented assumptions, with one planted timing fact: new customers take twice as long to buy. Behind a step shows who reached a step by segment and channel, with groups under 30 people merged and hidden if still too small, and selecting a step in the flow chart opens it. Replay one path steps through a single synthetic customer with times in UTC, and the code returns no path at all when fewer than 30 people match. The filter update reads 164 to 251 ms in the browser, a noisy figure whose rise from 135 ms is unexplained. The eight view queries total about 130 ms in Node, a guard test watches them, and two small speedups were measured to help only a little.
-- **Pipeline.** Funnel, time in stage, stalled deals, a cohort ladder, a period comparison, and an outlook for open deals that learns win rates from closed deals and shows its uncertainty.
+- **Pipeline.** Records behind any stage, a page at a time with made up deal numbers and a 30 deal minimum, and a week by week scrubber of the pipeline on any past date. Funnel, time in stage, stalled deals, a cohort ladder, a period comparison, and an outlook for open deals that learns win rates from closed deals and shows its uncertainty.
 - **Data check.** Email matching on the normalized address with masked lists, and a time column check that lists, by row, times that never happened or happened twice around clock changes.
 - **Methods page, privacy and terms pages, a 404 page, an icon.** A test fails if the app starts using storage, cookies, network calls or analytics.
 - **Static export tooling.** One command builds the site under a prefix, a scan checks the output for email addresses, developer paths, keys and source maps, and a browser test checks the prefix.
@@ -89,7 +89,7 @@ A feature counts here only if a screen calls it.
 - **Time rules.** Only the local time reader is used, by the data check, which reports flagged rows and does not exclude them. The window and day functions in the time library are used only by tests.
 - **Supabase.** The schema has 8 migrations and row level security, on the test project only. The app has no client and no dependency on it.
 
-**Not built, with no code:** wait steps and exit conditions on the canvas, saving a design, the time scrubber, saved and shareable views, the evidence chain, deck export, webhook ingestion, hosted AI features, and accounts or sign in.
+**Not built, with no code:** wait steps and exit conditions on the canvas, saving a design, a time scrubber for journeys, saved and shareable views, the evidence chain, deck export, webhook ingestion, hosted AI features, and accounts or sign in.
 
 ## 8. Problems found and fixed, in the order they came up
 

@@ -19,6 +19,8 @@ import {
   explainBehind,
   explainReplay,
   explainDesigned,
+  explainRecords,
+  explainSnapshot,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -468,4 +470,23 @@ describe("explainDesigned", () => {
   });
 
   it("keeps the words plain", () => clean(explainDesigned(stats, [], true)));
+});
+
+describe("explainRecords and explainSnapshot", () => {
+  it("says how days in a stage are counted and that deals have made up numbers", () => {
+    const list = explainRecords({ stage: "Proposal", which: "reached", groupSize: 4000, minGroup: 30, hidden: false, records: [], offset: 0, of: 4000 }, "2026-11-01T00:00:00Z");
+    expect(find(list, "Days in stage").how).toContain("2026-11-01");
+    expect(find(list, "Deals listed").value).toBe("4,000");
+    expect(find(list, "Privacy").how).toContain("made up number");
+    clean(list);
+  });
+
+  it("adds up a snapshot so every deal is counted once, with the real numbers", () => {
+    const list = explainSnapshot({ at: "2026-05-01T00:00:00.000Z", entered: 100, open: [20, 15, 5], won: 40, lost: 20 });
+    const e = find(list, "Deals entered by then");
+    expect(e.value).toBe("100");
+    expect(e.how).toContain("20 plus 15 plus 5 open, 40 won and 20 lost make 100");
+    expect(find(list, "Open in a stage").how).toContain("from the moment");
+    clean(list);
+  });
 });

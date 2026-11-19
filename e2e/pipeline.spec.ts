@@ -29,7 +29,7 @@ test("the pipeline views filter each other on 100,000 synthetic deals, and the u
   await expect(page.getByRole("figure", { name: /Deals that reached each stage/ })).toBeVisible();
   await expect(page.getByRole("figure", { name: /Days from Proposal to Won/ })).toBeVisible();
   await expect(page.getByRole("figure", { name: /Stalled deals by stage/ })).toBeVisible();
-  await expect(page.locator("canvas")).toHaveCount(3);
+  await expect(page.locator("canvas")).toHaveCount(4);
 
   // Enterprise deals: fewer reach Won, and they wait longer in Proposal. These are the planted facts.
   const medianOf = async () => Number(/Median ([\d.]+) days/.exec(await page.locator("p", { hasText: /deals moved from .* Median/ }).innerText())![1]);

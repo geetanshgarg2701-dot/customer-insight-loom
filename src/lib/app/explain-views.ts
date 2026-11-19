@@ -3,6 +3,7 @@ import { MIN_GROUP, type Comparison } from "../charts/compare";
 import type { Timing } from "../charts/timing";
 import type { BehindStep } from "../charts/behind";
 import type { ExampleJourney } from "../charts/replay";
+import type { PipelineAt, StageRecords } from "../charts/pipeline-drill";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
@@ -432,6 +433,56 @@ export function explainDesigned(
       label: "Median to next",
       value: timingLoaded ? "main steps only" : "not loaded yet",
       how: "The median hours to the next step is measured for the four main steps. Detours have no time measured yet.",
+    },
+  ];
+}
+
+export function explainRecords(r: StageRecords, asOf: string): Explanation[] {
+  return [
+    {
+      label: "Deals listed",
+      value: formatCount(r.groupSize),
+      how:
+        r.which === "reached"
+          ? `Every deal in the current selection that reached ${r.stage}, in a fixed order, a page at a time.`
+          : `Every deal in the current selection still open in ${r.stage}, in a fixed order, a page at a time.`,
+    },
+    {
+      label: "Days in stage",
+      value: "elapsed days",
+      how:
+        `From entering ${r.stage} to entering the next stage, or to being marked lost, or to the data cutoff of ` +
+        `${asOf.slice(0, 10)} if the deal is still open. Counted in elapsed time, so clock changes do not move it.`,
+    },
+    {
+      label: "Privacy",
+      value: `at least ${r.minGroup} deals`,
+      how: `Each deal has only a made up number. Records are listed only when at least ${r.minGroup} deals match, so a list cannot pick out one account in a tiny group.`,
+    },
+  ];
+}
+
+export function explainSnapshot(s: PipelineAt): Explanation[] {
+  const [o1, o2, o3] = s.open;
+  return [
+    {
+      label: "Deals entered by then",
+      value: formatCount(s.entered),
+      how:
+        `Every deal that had entered by ${s.at.slice(0, 10)} is counted once: ${formatCount(o1)} plus ${formatCount(o2)} ` +
+        `plus ${formatCount(o3)} open, ${formatCount(s.won)} won and ${formatCount(s.lost)} lost make ${formatCount(s.entered)}.`,
+    },
+    {
+      label: "Open in a stage",
+      value: "on that date",
+      how:
+        "A deal counts in a stage from the moment it enters, until it enters the next stage or is marked lost, so a deal " +
+        "is never in two stages at once.",
+    },
+    {
+      label: "Won and lost",
+      value: "by that date",
+      how: "Won and lost are running totals: every deal won or marked lost on or before the date.",
     },
   ];
 }

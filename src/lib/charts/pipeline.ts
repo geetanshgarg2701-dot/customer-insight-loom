@@ -30,13 +30,14 @@ export function pipelineWhere(selection: PipelineSelection, except?: string): { 
 export async function loadPipeline(engine: SqlEngine, table: string, rows: readonly PipelineRow[]): Promise<void> {
   checkTable(table);
   await engine.exec(
-    `CREATE OR REPLACE TABLE ${table} (segment VARCHAR, source VARCHAR, e1 TIMESTAMP, e2 TIMESTAMP, e3 TIMESTAMP, e4 TIMESTAMP, stage VARCHAR, lost_at TIMESTAMP, status VARCHAR)`,
+    `CREATE OR REPLACE TABLE ${table} (deal INTEGER, segment VARCHAR, source VARCHAR, e1 TIMESTAMP, e2 TIMESTAMP, e3 TIMESTAMP, e4 TIMESTAMP, stage VARCHAR, lost_at TIMESTAMP, status VARCHAR)`,
   );
+  // deal is the row's position, a made up number used only to list and page through records.
   await insertRows(
     engine,
     table,
-    ["segment", "source", ...STAGE_COLUMNS, "stage", "lost_at", "status"],
-    rows.map((r) => [r.segment, r.source, ...r.entered, r.stage, r.lostAt, r.status]),
+    ["deal", "segment", "source", ...STAGE_COLUMNS, "stage", "lost_at", "status"],
+    rows.map((r, i) => [i, r.segment, r.source, ...r.entered, r.stage, r.lostAt, r.status]),
   );
 }
 

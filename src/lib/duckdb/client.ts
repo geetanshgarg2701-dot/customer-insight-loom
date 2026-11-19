@@ -6,6 +6,7 @@ import { compareGroups, type CompareDimension, type Comparison } from "../charts
 import { timeInStep, type Timing } from "../charts/timing";
 import { behindStep, type BehindStep } from "../charts/behind";
 import { exampleJourney, type ExampleJourney } from "../charts/replay";
+import { firstEntry, pipelineSeries, stageRecords, type PipelineAt, type StageRecords } from "../charts/pipeline-drill";
 import {
   countsBy,
   loadJourneys,
@@ -209,6 +210,9 @@ export type PipelineBoard = {
   cohorts(windowDays: number, selection: PipelineSelection): Promise<CohortRow[]>;
   periods(windowDays: number, selection: PipelineSelection): Promise<PeriodComparison>;
   outlook(thresholdDays: number, selection: PipelineSelection): Promise<Outlook>;
+  records(stageIndex: number, which: "reached" | "open", offset: number, selection: PipelineSelection): Promise<StageRecords>;
+  series(dates: string[], selection: PipelineSelection): Promise<PipelineAt[]>;
+  firstEntry(): Promise<string>;
   close(): Promise<void>;
 };
 
@@ -228,6 +232,10 @@ export async function createBrowserPipelineBoard(rows = 100_000, seed = 21): Pro
     outlook: (thresholdDays, selection) => openDealOutlook(engine, table, selection, { thresholdDays, asOf: PIPELINE_AS_OF }),
     periods: (windowDays, selection) =>
       periodComparison(engine, table, { windowDays, asOf: PIPELINE_AS_OF, ...defaultPeriods(PIPELINE_AS_OF, windowDays) }, selection),
+    records: (stageIndex, which, offset, selection) =>
+      stageRecords(engine, table, selection, { stageIndex, which, offset, limit: 20, asOf: PIPELINE_AS_OF }),
+    series: (dates, selection) => pipelineSeries(engine, table, selection, dates),
+    firstEntry: () => firstEntry(engine, table),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

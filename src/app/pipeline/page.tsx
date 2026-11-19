@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PIPELINE_DIMENSIONS, type Count, type PipelineDimension, type PipelineSelection } from "@/lib/charts/pipeline";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "@/lib/charts/pipeline";
+import { scrubberDates, type PipelineAt, type StageRecords } from "@/lib/charts/pipeline-drill";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
-import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainStalled } from "@/lib/app/explain-views";
+import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 
@@ -23,6 +24,7 @@ const ROWS = 100_000;
 const THRESHOLDS = [14, 30, 60] as const;
 const STAGE_STEPS = [0, 1, 2] as const;
 const WINDOWS = [30, 60, 90] as const;
+const PAGE = 20;
 const STATUS_ORDER = ["open", "won", "lost"];
 
 function messageOf(error: unknown): string {
@@ -98,6 +100,40 @@ function stalledOption(stalled: Stalled[], theme: ChartTheme): ChartOption {
 const days = (n: number) => `${n.toFixed(1)} days`;
 const dateOf = (iso: string) => iso.slice(0, 10);
 
+/** Rounds up to a round number for an axis top, such as 5,403 to 6,000, so the top label does not crowd the last line. */
+function roundUp(n: number): number {
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(n)));
+  return Math.ceil(n / step) * step;
+}
+
+/**
+ * Open deals by stage on one date, on one fixed scale for every date so the bars can be compared by eye. Won and lost
+ * are running totals that only grow, so they are left out of the chart and given in the sentence and the table.
+ */
+function snapshotOption(s: PipelineAt, max: number, theme: ChartTheme): ChartOption {
+  const labels = ["Open in Lead", "Open in Qualified", "Open in Proposal"];
+  const values = s.open;
+  return {
+    ...base(theme),
+    grid: { left: 64, right: 16, top: 16, bottom: 40 },
+    xAxis: { type: "category", data: labels, axisLabel: { color: theme.text, interval: 0 }, axisLine: { lineStyle: { color: theme.line } } },
+    yAxis: { type: "value", min: 0, max, axisLabel: { color: theme.text }, splitLine: { lineStyle: { color: theme.line } } },
+    series: [
+      {
+        type: "bar",
+        data: values.map((v) => ({ value: v, itemStyle: { color: theme.palette[0] } })),
+        label: {
+          show: true,
+          position: "top",
+          color: theme.text,
+          fontFamily: theme.fontFamily,
+          formatter: (p) => (typeof p.value === "number" ? p.value.toLocaleString("en-US") : ""),
+        },
+      },
+    ],
+  };
+}
+
 export default function PipelinePage() {
   const board = useRef<PipelineBoard | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -115,6 +151,12 @@ export default function PipelinePage() {
   const [periods, setPeriods] = useState<PeriodComparison | null>(null);
   const [outlook, setOutlook] = useState<Outlook | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
+  const [recStage, setRecStage] = useState(2);
+  const [recWhich, setRecWhich] = useState<"reached" | "open">("reached");
+  const [records, setRecords] = useState<StageRecords | null>(null);
+  const [scrubDates, setScrubDates] = useState<string[]>([]);
+  const [scrubIndex, setScrubIndex] = useState(0);
+  const [series, setSeries] = useState<PipelineAt[]>([]);
 
   const refresh = useCallback(async (next: PipelineSelection, step: number, days: number, windowDays: number) => {
     const b = board.current;
@@ -139,6 +181,30 @@ export default function PipelinePage() {
     setElapsed(Math.round(performance.now() - started));
   }, []);
 
+  /** The records list and the scrubber snapshot, for a selection. */
+  async function refreshExtras(sel: PipelineSelection, stage: number, which: "reached" | "open", offset: number, dates: string[]) {
+    const b = board.current;
+    if (!b) return;
+    setRecords(await b.records(stage, which, offset, sel));
+    if (dates.length > 0) setSeries(await b.series(dates, sel));
+  }
+
+  async function pickRecords(stage: number, which: "reached" | "open", offset: number) {
+    setRecStage(stage);
+    setRecWhich(which);
+    try {
+      const b = board.current;
+      if (b) setRecords(await b.records(stage, which, offset, selection));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
+
+  /** Every date is already loaded, so moving the scrubber asks the database nothing. */
+  function pickDate(index: number) {
+    setScrubIndex(index);
+  }
+
   async function onLoad() {
     setBusy(true);
     setError(null);
@@ -146,6 +212,10 @@ export default function PipelinePage() {
       board.current = await createBrowserPipelineBoard(ROWS);
       setLoaded(true);
       await refresh({}, stageStep, threshold, cohortWindow);
+      const dates = scrubberDates(await board.current.firstEntry(), PIPELINE_AS_OF, 7);
+      setScrubDates(dates);
+      setScrubIndex(dates.length - 1);
+      await refreshExtras({}, recStage, recWhich, 0, dates);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -156,6 +226,7 @@ export default function PipelinePage() {
   async function run(next: PipelineSelection, step = stageStep, days = threshold, windowDays = cohortWindow) {
     try {
       await refresh(next, step, days, windowDays);
+      await refreshExtras(next, recStage, recWhich, 0, scrubDates);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -196,6 +267,9 @@ export default function PipelinePage() {
     };
   }, []);
 
+  const snapshot = series[scrubIndex] ?? null;
+  // One fixed scale for the scrubber: the largest open count on any date in the current selection.
+  const scaleMax = roundUp(Math.max(1, ...series.flatMap((s) => s.open)));
   const anySelected = PIPELINE_DIMENSIONS.some((d) => (selection[d] ?? []).length > 0);
   const shown = funnel[0]?.count ?? 0;
   const stalledTotal = stalled.reduce((n, s) => n + s.count, 0);
@@ -282,6 +356,153 @@ export default function PipelinePage() {
               </tbody>
             </table>
             <Explain summary="How the funnel was worked out" items={explainFunnel(funnel)} />
+          </section>
+
+          <section aria-labelledby="h-records">
+            <h2 id="h-records">Records behind a stage</h2>
+            <p>
+              The deals behind a stage, a page at a time, with how long each spent there and what happened next. Each
+              deal has only a made up number, and records are listed only when at least 30 deals match.
+            </p>
+            <p role="group" aria-label="Stage to list">
+              Stage:{" "}
+              {PIPELINE_STAGES.map((s, i) => (
+                <button key={s} type="button" aria-pressed={recStage === i} onClick={() => void pickRecords(i, recWhich, 0)}>
+                  {s}
+                </button>
+              ))}
+            </p>
+            <p role="group" aria-label="Which deals">
+              Show:{" "}
+              <button type="button" aria-pressed={recWhich === "reached"} onClick={() => void pickRecords(recStage, "reached", 0)}>
+                Every deal that reached it
+              </button>{" "}
+              <button type="button" aria-pressed={recWhich === "open"} onClick={() => void pickRecords(recStage, "open", 0)}>
+                Deals still open in it
+              </button>
+            </p>
+            {records && records.hidden && (
+              <p role="alert">
+                Only {records.groupSize.toLocaleString("en-US")} {records.groupSize === 1 ? "deal matches" : "deals match"}, under the
+                minimum of {records.minGroup}, so no records are listed.
+              </p>
+            )}
+            {records && !records.hidden && (
+              <div>
+                <table aria-label="Records behind a stage">
+                  <caption>
+                    Deals {(records.offset + 1).toLocaleString("en-US")} to{" "}
+                    {(records.offset + records.records.length).toLocaleString("en-US")} of {records.of.toLocaleString("en-US")}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Deal</th>
+                      <th scope="col">Segment</th>
+                      <th scope="col">Source</th>
+                      <th scope="col">Entered {records.stage}</th>
+                      <th scope="col">Days there</th>
+                      <th scope="col">What happened</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.records.map((r) => (
+                      <tr key={r.label}>
+                        <td>{r.label}</td>
+                        <td>{r.segment}</td>
+                        <td>{r.source}</td>
+                        <td>{r.enteredAt}</td>
+                        <td>{r.days === null ? "end" : r.days.toFixed(1)}</td>
+                        <td>{r.outcome}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p>
+                  <button
+                    type="button"
+                    disabled={records.offset === 0}
+                    onClick={() => void pickRecords(recStage, recWhich, Math.max(0, records.offset - PAGE))}
+                  >
+                    Previous page
+                  </button>{" "}
+                  <button
+                    type="button"
+                    disabled={records.offset + PAGE >= records.of}
+                    onClick={() => void pickRecords(recStage, recWhich, records.offset + PAGE)}
+                  >
+                    Next page
+                  </button>
+                </p>
+                <Explain summary="How the records were worked out" items={explainRecords(records, PIPELINE_AS_OF)} />
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="h-scrub">
+            <h2 id="h-scrub">Pipeline over time</h2>
+            <p>
+              Move through time a week at a time to see how the pipeline stood on each date: deals open in each stage,
+              and how many had been won or lost by then. The scale stays fixed so the bars can be compared across dates.
+            </p>
+            {scrubDates.length > 0 && snapshot && (
+              <div>
+                <p>
+                  <button type="button" disabled={scrubIndex <= 0} onClick={() => pickDate(scrubIndex - 1)}>
+                    Previous week
+                  </button>{" "}
+                  <button type="button" disabled={scrubIndex >= scrubDates.length - 1} onClick={() => pickDate(scrubIndex + 1)}>
+                    Next week
+                  </button>{" "}
+                  <button type="button" onClick={() => pickDate(scrubDates.length - 1)}>
+                    Jump to the cutoff
+                  </button>{" "}
+                  <label>
+                    Date{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={scrubDates.length - 1}
+                      value={scrubIndex}
+                      onChange={(e) => pickDate(Number(e.target.value))}
+                    />
+                  </label>
+                </p>
+                <p aria-live="polite">
+                  On {snapshot.at.slice(0, 10)}, {snapshot.entered.toLocaleString("en-US")} deals had entered.{" "}
+                  {snapshot.open[0].toLocaleString("en-US")} were open in Lead, {snapshot.open[1].toLocaleString("en-US")} in
+                  Qualified and {snapshot.open[2].toLocaleString("en-US")} in Proposal, {snapshot.won.toLocaleString("en-US")} had
+                  been won and {snapshot.lost.toLocaleString("en-US")} lost.
+                </p>
+                <Chart
+                  label="Deals open in each stage on the chosen date"
+                  option={snapshotOption(snapshot, scaleMax, CHART_THEME)}
+                  height={240}
+                />
+                <table aria-label="Pipeline over time">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col">Open in Lead</th>
+                      <th scope="col">Open in Qualified</th>
+                      <th scope="col">Open in Proposal</th>
+                      <th scope="col">Won by then</th>
+                      <th scope="col">Lost by then</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{snapshot.at.slice(0, 10)}</td>
+                      <td>{snapshot.open[0].toLocaleString("en-US")}</td>
+                      <td>{snapshot.open[1].toLocaleString("en-US")}</td>
+                      <td>{snapshot.open[2].toLocaleString("en-US")}</td>
+                      <td>{snapshot.won.toLocaleString("en-US")}</td>
+                      <td>{snapshot.lost.toLocaleString("en-US")}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <Explain summary="How the pipeline over time was worked out" items={explainSnapshot(snapshot)} />
+              </div>
+            )}
           </section>
 
           <section aria-labelledby="h-dwell">

@@ -145,9 +145,10 @@ test("every chart has the same information as text, so nothing depends on seeing
     for (const text of await buttons.allInnerTexts()) expect(text).toMatch(/, [\d,]+$/);
   }
   expect(await page.getByRole("table", { name: "Flow between steps" }).getByRole("row").count()).toBeGreaterThan(3);
-  expect(await page.getByRole("table", { name: "Around one event" }).getByRole("row").count()).toBeGreaterThan(3);
+  // The lower sections fill in just after the main refresh, so these wait and retry instead of counting once.
+  await expect.poll(() => page.getByRole("table", { name: "Around one event" }).getByRole("row").count()).toBeGreaterThan(3);
   // The canvas itself is named by its figure, so a screen reader announces what it is.
-  expect(await page.getByRole("figure").count()).toBe(7);
+  await expect(page.getByRole("figure")).toHaveCount(7);
 });
 
 test("charts draw at once when the system asks to reduce motion, and follow the setting live", async ({ page }) => {
