@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import type { Why } from "@/lib/insights/why";
 import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection, type TopPaths } from "@/lib/charts/crossfilter";
 import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
 import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
@@ -15,7 +17,7 @@ import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
 import { createCycle, runWhileCurrent } from "@/lib/app/latest";
 import { decodeJourneyView, encodeJourneyView, type JourneyView } from "@/lib/app/view-state";
-import { explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
+import { explainWhy, explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
@@ -249,6 +251,11 @@ export default function JourneysPage() {
   const [timing, setTiming] = useState<Timing | null>(null);
   const [behindIndex, setBehindIndex] = useState(2);
   const [behind, setBehind] = useState<BehindStep | null>(null);
+  const [why, setWhy] = useState<Why | null>(null);
+  const [whyOn, setWhyOn] = useState(false);
+  const [whyBusy, setWhyBusy] = useState(false);
+  // Read inside refresh functions, which are made once, so they see whether the panel is open without a new closure.
+  const whyOpen = useRef(false);
   const [replayReached, setReplayReached] = useState("Purchase");
   const [copied, setCopied] = useState<string | null>(null);
   const [fromLink, setFromLink] = useState<string[] | null>(null);
@@ -293,6 +300,27 @@ export default function JourneysPage() {
     setBehind(await board_.behind(index, sel));
   }, []);
 
+  /** The why panel only queries once it has been opened, so filter clicks stay as fast as before until then. */
+  const refreshWhy = useCallback(async (index: number, sel: Selection) => {
+    const board_ = board.current;
+    if (!board_ || !whyOpen.current) return;
+    setWhy(await board_.why(index, sel));
+  }, []);
+
+  async function showWhy() {
+    whyOpen.current = true;
+    setWhyBusy(true);
+    try {
+      await refreshWhy(behindIndex, selection);
+      setWhyOn(true);
+    } catch (e) {
+      whyOpen.current = false;
+      setError(messageOf(e));
+    } finally {
+      setWhyBusy(false);
+    }
+  }
+
   const refreshReplay = useCallback(async (reached: string, offset: number, sel: Selection) => {
     const board_ = board.current;
     if (!board_) return;
@@ -315,6 +343,7 @@ export default function JourneysPage() {
     setBehindIndex(index);
     try {
       await refreshBehind(index, selection);
+      await refreshWhy(index, selection);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -379,6 +408,7 @@ export default function JourneysPage() {
       () => refreshComparison(v?.compare?.dim ?? cmpDim, v?.compare?.a ?? cmpA, v?.compare?.b ?? cmpB, sel),
       () => refreshTiming(v?.windowHours ?? windowHours, sel),
       () => refreshBehind(v?.behindIndex ?? behindIndex, sel),
+      () => refreshWhy(v?.behindIndex ?? behindIndex, sel),
       () => refreshReplay(v?.replayReached ?? replayReached, replayAt, sel),
     ]);
   }
@@ -655,6 +685,74 @@ export default function JourneysPage() {
                 <p>Groups with a lower rate go with more people leaving here. That is an association, not a cause.</p>
                 <Explain summary="How who is behind a step was worked out" items={explainBehind(behind)} />
               </div>
+            )}
+          </section>
+
+          <section aria-labelledby="h-why">
+            <h2 id="h-why">Why people may leave here</h2>
+            <p>
+              Themes from customer comments and segments that go with more people leaving at the step chosen in Behind a
+              step, with the filters above. Every item is an association.
+            </p>
+            {!whyOn ? (
+              <p>
+                <button type="button" onClick={() => void showWhy()} disabled={whyBusy}>
+                  {whyBusy ? "Loading comments" : "Show what goes with leaving here"}
+                </button>
+              </p>
+            ) : (
+              why && (
+                <div>
+                  {why.next === null ? (
+                    <p>{why.step} is the last step, so nobody leaves it. Choose an earlier step in Behind a step.</p>
+                  ) : (
+                    <>
+                      <p>
+                        {why.reached.toLocaleString("en-US")} people reached {why.step} and {why.left.toLocaleString("en-US")} left
+                        there. {why.commenters.left.toLocaleString("en-US")} who left and {why.commenters.wentOn.toLocaleString("en-US")}{" "}
+                        who went on wrote a comment. {why.comparisons} comparisons were made and adjusted together.
+                      </p>
+                      {why.items.length === 0 ? (
+                        <p>Nothing goes with more leaving here after the correction, with these filters.</p>
+                      ) : (
+                        <ol aria-label={`What goes with leaving at ${why.step}`}>
+                          {why.items.map((item) => (
+                            <li key={`${item.kind}-${item.key}`}>
+                              <strong>
+                                {item.kind === "theme" ? "Theme" : "Segment"}: {item.label}
+                              </strong>
+                              <p>
+                                {item.kind === "theme"
+                                  ? `${formatPercent(item.a.x / item.a.n, 1)} of the ${item.a.n.toLocaleString("en-US")} who left and commented raised it, against ${formatPercent(item.b.x / item.b.n, 1)} of the ${item.b.n.toLocaleString("en-US")} who went on.`
+                                  : `${formatPercent(item.a.x / item.a.n, 1)} of the ${item.a.n.toLocaleString("en-US")} in this group left here, against ${formatPercent(item.b.x / item.b.n, 1)} of the other ${item.b.n.toLocaleString("en-US")}.`}{" "}
+                                Gap {formatSignedPoints(item.difference, 1)}, range {formatSignedPoints(item.low, 1)} to {formatSignedPoints(item.high, 1)}.
+                              </p>
+                              <p>
+                                Association, not cause. Adjusted p value {item.adjusted < 0.0001 ? "under 0.0001" : item.adjusted.toFixed(4)}, one of{" "}
+                                {why.comparisons} comparisons.
+                              </p>
+                              {item.quotes.length > 0 && (
+                                <details>
+                                  <summary>Redacted quotes from customers who left here</summary>
+                                  {item.quotes.map((q) => (
+                                    <blockquote key={q.customer}>
+                                      {q.text} <small>Customer {q.customer}</small>
+                                    </blockquote>
+                                  ))}
+                                  <p>
+                                    More on the <Link href="/insights">Comments</Link> screen. Names are not removed from comment text.
+                                  </p>
+                                </details>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      <Explain summary="How what goes with leaving was worked out" items={explainWhy(why)} />
+                    </>
+                  )}
+                </div>
+              )
             )}
           </section>
 

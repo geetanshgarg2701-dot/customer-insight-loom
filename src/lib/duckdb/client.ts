@@ -41,6 +41,9 @@ import {
 import { JOURNEYS_AS_OF, syntheticJourneys } from "../demo/journeys";
 import { createCommentsBoard, type CommentsBoard } from "../insights/board";
 import { syntheticComments } from "../insights/comments";
+import { loadComments } from "../insights/mentions";
+import { prepareComments } from "../insights/prepare";
+import { whyAtStep, type Why } from "../insights/why";
 import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
@@ -176,6 +179,8 @@ export type JourneyBoard = {
   timing(windowHours: number, selection: Selection): Promise<Timing>;
   behind(stepIndex: number, selection: Selection): Promise<BehindStep>;
   replay(reached: string, offset: number, selection: Selection): Promise<ExampleJourney>;
+  /** Loads the synthetic comments the first time it is asked, then reuses them. */
+  why(stepIndex: number, selection: Selection): Promise<Why>;
   close(): Promise<void>;
 };
 
@@ -183,7 +188,18 @@ export type JourneyBoard = {
 export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Promise<JourneyBoard> {
   const engine = await createBrowserEngine();
   const table = "journeys";
+  const comments = "journey_comments";
   await loadJourneys(engine, table, syntheticJourneys(rows, seed));
+  // The comments belong to the first 20,000 customers, the same ones as on the comments screen. A unit test checks that
+  // those customers are identical in both sets of journeys. Redaction runs before anything is stored.
+  let commentsLoaded: Promise<void> | null = null;
+  const ensureComments = () => {
+    commentsLoaded ??= (async () => {
+      const base = syntheticJourneys(Math.min(rows, 20_000), seed);
+      await loadComments(engine, comments, prepareComments(syntheticComments(base, Math.min(3_000, base.length), 17)).rows);
+    })();
+    return commentsLoaded;
+  };
   return {
     rows,
     counts: (dimension, selection) => countsBy(engine, table, dimension, selection),
@@ -194,7 +210,12 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     timing: (windowHours, selection) => timeInStep(engine, table, selection, { asOf: JOURNEYS_AS_OF, windowHours }),
     behind: (stepIndex, selection) => behindStep(engine, table, selection, stepIndex),
     replay: (reached, offset, selection) => exampleJourney(engine, table, selection, { reached, offset }),
+    why: async (stepIndex, selection) => {
+      await ensureComments();
+      return whyAtStep(engine, { comments, journeys: table }, stepIndex, selection);
+    },
     close: async () => {
+      await engine.exec(`DROP TABLE IF EXISTS ${comments}`);
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();
     },

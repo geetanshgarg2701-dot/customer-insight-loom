@@ -9,6 +9,7 @@ import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison,
 import type { StageCount, WhatIf } from "../charts/whatif";
 import { PAIN_LABELS } from "../insights/comments";
 import type { MentionRates } from "../insights/mentions";
+import type { Why } from "../insights/why";
 import { formatCount, formatPercent, formatSignedPoints } from "./format";
 import type { Explanation } from "./explain";
 
@@ -536,6 +537,40 @@ export function explainMentions(r: MentionRates): Explanation[] {
       label: "Not linked",
       value: `${formatCount(r.unlinked)} comments`,
       how: "Comments whose customer is not in the journeys table cannot be grouped, so they are counted here and left out of the rates.",
+    },
+  ];
+}
+
+export function explainWhy(w: Why): Explanation[] {
+  return [
+    {
+      label: "Themes",
+      value: `${formatCount(w.commenters.left)} who left and ${formatCount(w.commenters.wentOn)} who went on wrote a comment`,
+      how:
+        `Among customers who reached ${w.step} and wrote a comment, the share raising each theme is compared between those who left ` +
+        `at ${w.step} and those who went on. The comments come from 3,000 of the first 20,000 synthetic customers, the same ones as on ` +
+        "the comments screen, so most customers here have no comment. Each comment has one coded theme.",
+    },
+    {
+      label: "Segments",
+      value: "each group against everyone else at the step",
+      how: `For each segment and channel group, the share who left at ${w.step} is compared with the share among everyone else who reached it.`,
+    },
+    {
+      label: "Comparisons",
+      value: String(w.comparisons),
+      how:
+        `Each gap gets a pooled two proportion z test p value. Benjamini Hochberg adjusts all ${w.comparisons} together at a false ` +
+        `discovery rate of ${w.q}, the method the plan chose for discovery scans. Only adjusted p values at or under ${w.q} are listed, ` +
+        `and only gaps that go with more leaving. A side with fewer than ${MIN_GROUP} people is not compared. The ranges are 95 percent ` +
+        "Newcombe intervals and are not adjusted.",
+    },
+    {
+      label: "What it can say",
+      value: "association",
+      how:
+        "A listed item goes with more people leaving here. It does not show that it made them leave. Themes and segments overlap, " +
+        "so one listed item can be the same customers as another. Only a ledger test with a holdout can support a causal reading.",
     },
   ];
 }
