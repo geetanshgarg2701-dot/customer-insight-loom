@@ -14,6 +14,7 @@ import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
 import { createCycle, runWhileCurrent } from "@/lib/app/latest";
+import { decodeJourneyView, encodeJourneyView, type JourneyView } from "@/lib/app/view-state";
 import { explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
@@ -224,6 +225,7 @@ function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
 
 export default function JourneysPage() {
   const board = useRef<JourneyBoard | null>(null);
+  const openedFromLink = useRef(false);
   const [cycle] = useState(createCycle);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -248,6 +250,8 @@ export default function JourneysPage() {
   const [behindIndex, setBehindIndex] = useState(2);
   const [behind, setBehind] = useState<BehindStep | null>(null);
   const [replayReached, setReplayReached] = useState("Purchase");
+  const [copied, setCopied] = useState<string | null>(null);
+  const [fromLink, setFromLink] = useState<string[] | null>(null);
   const [replayOffset, setReplayOffset] = useState(0);
   const [replay, setReplay] = useState<ExampleJourney | null>(null);
   const [eventIndex, setEventIndex] = useState(0);
@@ -342,28 +346,69 @@ export default function JourneysPage() {
     }
   }
 
+  const shareLink =
+    loaded && typeof window !== "undefined"
+      ? `${window.location.origin}${window.location.pathname}#${encodeJourneyView({
+          selection,
+          compare: { dim: cmpDim, a: cmpA, b: cmpB },
+          windowHours,
+          behindIndex: behindIndex as 0 | 1 | 2 | 3,
+          replayReached,
+          anchor,
+          before,
+          after,
+          topN,
+        })}`
+      : "";
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopied("Link copied.");
+    } catch {
+      setCopied("The link could not be copied. Select it above and copy it.");
+    }
+  }
+
   const choices = useMemo(() => anchorChoices(allPaths), [allPaths]);
   const around = useMemo(() => anchoredFlow(allPaths, { anchor, before, after, topN }), [allPaths, anchor, before, after, topN]);
 
   /** The lower sections, one after another, stopping as soon as a newer click has started its own cycle. */
-  async function refreshLower(id: number, sel: Selection, replayAt: number) {
+  async function refreshLower(id: number, sel: Selection, replayAt: number, v?: Partial<JourneyView>) {
     await runWhileCurrent(cycle, id, [
-      () => refreshComparison(cmpDim, cmpA, cmpB, sel),
-      () => refreshTiming(windowHours, sel),
-      () => refreshBehind(behindIndex, sel),
-      () => refreshReplay(replayReached, replayAt, sel),
+      () => refreshComparison(v?.compare?.dim ?? cmpDim, v?.compare?.a ?? cmpA, v?.compare?.b ?? cmpB, sel),
+      () => refreshTiming(v?.windowHours ?? windowHours, sel),
+      () => refreshBehind(v?.behindIndex ?? behindIndex, sel),
+      () => refreshReplay(v?.replayReached ?? replayReached, replayAt, sel),
     ]);
   }
 
-  async function onLoad() {
+  /** Loads the synthetic data. A shared link passes its choices, already checked against fixed lists, and they are set first. */
+  async function onLoad(view?: Partial<JourneyView>) {
     setBusy(true);
     setError(null);
+    const sel: Selection = view?.selection ?? {};
+    if (view) {
+      setSelection(sel);
+      if (view.compare) {
+        setCmpDim(view.compare.dim);
+        setCmpA(view.compare.a);
+        setCmpB(view.compare.b);
+      }
+      if (view.windowHours) setWindowHours(view.windowHours);
+      if (view.behindIndex !== undefined) setBehindIndex(view.behindIndex);
+      if (view.replayReached) setReplayReached(view.replayReached);
+      if (view.anchor) setAnchor(view.anchor);
+      if (view.before !== undefined) setBefore(view.before);
+      if (view.after !== undefined) setAfter(view.after);
+      if (view.topN !== undefined) setTopN(view.topN);
+    }
     try {
       board.current = await createBrowserJourneyBoard(ROWS);
       setLoaded(true);
       const id = cycle.start();
-      await refresh({}, rarity);
-      await refreshLower(id, {}, replayOffset);
+      await refresh(sel, rarity);
+      await refreshLower(id, sel, replayOffset, view);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -403,6 +448,23 @@ export default function JourneysPage() {
     }
   }
 
+  // A shared link opens the same view. It is read once on arrival, and anything in it that is not on a fixed list is ignored.
+  useEffect(() => {
+    // React runs this effect twice in development, and a second load would insert every customer again.
+    if (openedFromLink.current) return;
+    const raw = window.location.hash;
+    if (raw.length <= 1) return;
+    const { view, ignored } = decodeJourneyView(raw);
+    if (ignored.includes("v") || ignored.includes("length")) return;
+    openedFromLink.current = true;
+    void Promise.resolve().then(() => {
+      setFromLink(ignored);
+      return onLoad(view);
+    });
+    // Runs once on arrival. onLoad is a new function on every render and reads only state that is set before it is called.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     return () => {
       void board.current?.close();
@@ -440,6 +502,12 @@ export default function JourneysPage() {
         </p>
       )}
       {error && <p role="alert">{error}</p>}
+      {fromLink !== null && (
+        <p role="status">
+          Opened from a shared link. The data is synthetic, and the link holds only filter and section choices.
+          {fromLink.length > 0 && ` These parts of the link were not recognized and were ignored: ${fromLink.join(", ")}.`}
+        </p>
+      )}
 
       {loaded && (
         <>
@@ -478,6 +546,27 @@ export default function JourneysPage() {
               </section>
             );
           })}
+
+          <section aria-labelledby="h-share">
+            <h2 id="h-share">Share this view</h2>
+            <p>
+              A link to exactly what you see now: the filters and the choices in each section. It holds only those
+              choices, never data and never a name. Whoever opens it gets the same view on the synthetic data, and it
+              cannot change anything.
+            </p>
+            <p>
+              <label>
+                Link to this view{" "}
+                <input type="text" readOnly value={shareLink} style={{ width: "100%" }} onFocus={(e) => e.currentTarget.select()} />
+              </label>
+            </p>
+            <p>
+              <button type="button" onClick={() => void copyLink()}>
+                Copy link
+              </button>
+            </p>
+            {copied && <p role="status">{copied}</p>}
+          </section>
 
           <section aria-labelledby="h-designed">
             <h2 id="h-designed">Designed journey</h2>

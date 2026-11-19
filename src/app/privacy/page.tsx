@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <main>
       <Nav />
       <h1>Privacy</h1>
-      <p>Last updated 17 November 2026. This describes the early version of the app, which is what you are using.</p>
+      <p>Last updated 19 November 2026. This describes the early version of the app, which is what you are using.</p>
 
       <section aria-labelledby="short">
         <h2 id="short">The short version</h2>
@@ -51,6 +51,11 @@ export default function PrivacyPage() {
           <li>It does not use cookies, local storage or any other store in your browser.</li>
           <li>It makes no network requests of its own. The database files it needs are served from the same site.</li>
           <li>It has no analytics, no error reporting, no advertising and no outside fonts or scripts.</li>
+          <li>
+            A shared link to a journeys or pipeline view holds only your filter and section choices, after a hash sign
+            in the address. It never holds data or a name. A browser does not send the part after the hash to the
+            server that hosts this page. Anything in a link that is not on a fixed list of allowed choices is ignored.
+          </li>
         </ul>
         <p>
           These statements are checked by an automated test that fails if the code starts using a storage, cookie or

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PIPELINE_DIMENSIONS, type Count, type PipelineDimension, type PipelineSelection } from "@/lib/charts/pipeline";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "@/lib/charts/pipeline";
 import { scrubberDates, type PipelineAt, type StageRecords } from "@/lib/charts/pipeline-drill";
+import { decodePipelineView, encodePipelineView, type PipelineView } from "@/lib/app/view-state";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
@@ -136,6 +137,9 @@ function snapshotOption(s: PipelineAt, max: number, theme: ChartTheme): ChartOpt
 
 export default function PipelinePage() {
   const board = useRef<PipelineBoard | null>(null);
+  const openedFromLink = useRef(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [fromLink, setFromLink] = useState<string[] | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,17 +209,35 @@ export default function PipelinePage() {
     setScrubIndex(index);
   }
 
-  async function onLoad() {
+  /** Loads the synthetic data. A shared link passes its choices, already checked against fixed lists, and they are set first. */
+  async function onLoad(view?: Partial<PipelineView>) {
     setBusy(true);
     setError(null);
+    const sel: PipelineSelection = view?.selection ?? {};
+    const step = view?.stageStep ?? stageStep;
+    const days = view?.threshold ?? threshold;
+    const win = view?.cohortWindow ?? cohortWindow;
+    const rs = view?.recStage ?? recStage;
+    const rw = view?.recWhich ?? recWhich;
+    if (view) {
+      setSelection(sel);
+      setStageStep(step);
+      setThreshold(days);
+      setCohortWindow(win);
+      setRecStage(rs);
+      setRecWhich(rw);
+    }
     try {
       board.current = await createBrowserPipelineBoard(ROWS);
       setLoaded(true);
-      await refresh({}, stageStep, threshold, cohortWindow);
+      await refresh(sel, step, days, win);
       const dates = scrubberDates(await board.current.firstEntry(), PIPELINE_AS_OF, 7);
       setScrubDates(dates);
-      setScrubIndex(dates.length - 1);
-      await refreshExtras({}, recStage, recWhich, 0, dates);
+      // The date in a link is a calendar date. Use the last scrubber week on or before it, or the cutoff if it is later.
+      const wanted = view?.scrubDate;
+      const at = wanted === undefined ? dates.length - 1 : Math.max(0, dates.filter((d) => d.slice(0, 10) <= wanted).length - 1);
+      setScrubIndex(at);
+      await refreshExtras(sel, rs, rw, 0, dates);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -260,12 +282,51 @@ export default function PipelinePage() {
     await run({});
   }
 
+  // A shared link opens the same view. It is read once on arrival, and anything in it that is not on a fixed list is ignored.
+  useEffect(() => {
+    // React runs this effect twice in development, and a second load would insert every deal again.
+    if (openedFromLink.current) return;
+    const raw = window.location.hash;
+    if (raw.length <= 1) return;
+    const { view, ignored } = decodePipelineView(raw);
+    if (ignored.includes("v") || ignored.includes("length")) return;
+    openedFromLink.current = true;
+    void Promise.resolve().then(() => {
+      setFromLink(ignored);
+      return onLoad(view);
+    });
+    // Runs once on arrival. onLoad is a new function on every render and reads only state that is set before it is called.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     return () => {
       void board.current?.close();
       board.current = null;
     };
   }, []);
+
+  const shareLink =
+    loaded && typeof window !== "undefined"
+      ? `${window.location.origin}${window.location.pathname}#${encodePipelineView({
+          selection,
+          stageStep,
+          threshold,
+          cohortWindow,
+          recStage: recStage as 0 | 1 | 2 | 3,
+          recWhich,
+          scrubDate: (scrubDates[scrubIndex] ?? PIPELINE_AS_OF).slice(0, 10),
+        })}`
+      : "";
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopied("Link copied.");
+    } catch {
+      setCopied("The link could not be copied. Select it above and copy it.");
+    }
+  }
 
   const snapshot = series[scrubIndex] ?? null;
   // One fixed scale for the scrubber: the largest open count on any date in the current selection.
@@ -292,6 +353,12 @@ export default function PipelinePage() {
         </p>
       )}
       {error && <p role="alert">{error}</p>}
+      {fromLink !== null && (
+        <p role="status">
+          Opened from a shared link. The data is synthetic, and the link holds only filter and section choices.
+          {fromLink.length > 0 && ` These parts of the link were not recognized and were ignored: ${fromLink.join(", ")}.`}
+        </p>
+      )}
 
       {loaded && (
         <>
@@ -326,6 +393,27 @@ export default function PipelinePage() {
                 </p>
               );
             })}
+          </section>
+
+          <section aria-labelledby="h-share">
+            <h2 id="h-share">Share this view</h2>
+            <p>
+              A link to exactly what you see now: the filters and the choices in each section. It holds only those
+              choices, never data and never a name. Whoever opens it gets the same view on the synthetic data, and it
+              cannot change anything.
+            </p>
+            <p>
+              <label>
+                Link to this view{" "}
+                <input type="text" readOnly value={shareLink} style={{ width: "100%" }} onFocus={(e) => e.currentTarget.select()} />
+              </label>
+            </p>
+            <p>
+              <button type="button" onClick={() => void copyLink()}>
+                Copy link
+              </button>
+            </p>
+            {copied && <p role="status">{copied}</p>}
           </section>
 
           <section aria-labelledby="h-funnel">
