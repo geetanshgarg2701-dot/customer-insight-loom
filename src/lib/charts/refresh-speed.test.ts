@@ -12,8 +12,10 @@ import { timeInStep } from "./timing";
 /**
  * A click on a filter refreshes every journey view. Each view's query is timed on 100,000 customers, because the
  * browser update crept from 135 to 213 ms as views were added, and nobody noticed until it was measured.
- * The limits are loose on purpose, about three times what a quiet machine measured on 2026-11-18, so a loaded test
- * run does not fail but a view that gets several times slower does.
+ * The limits are ratios to a baseline timed at the same moment, the three count queries, so a loaded machine slows both
+ * and the ratio holds. A fixed number of milliseconds failed twice in the full suite when 61 test files ran at once.
+ * Each time is the best of seven runs, which load disturbs least. On 2026-11-18 on a quiet machine timing was 1.6 times
+ * the baseline, before its quantile change 2.5 times, and the whole refresh 7.7 times.
  */
 describe("the journey views stay fast on 100,000 customers", () => {
   let e: SqlEngine;
@@ -25,32 +27,33 @@ describe("the journey views stay fast on 100,000 customers", () => {
     await e.close?.();
   });
 
-  async function median(f: () => Promise<unknown>): Promise<number> {
+  async function best(f: () => Promise<unknown>): Promise<number> {
     await f();
-    const runs: number[] = [];
-    for (let i = 0; i < 5; i++) {
+    let fastest = Infinity;
+    for (let i = 0; i < 7; i++) {
       const t = performance.now();
       await f();
-      runs.push(performance.now() - t);
+      fastest = Math.min(fastest, performance.now() - t);
     }
-    return runs.sort((a, b) => a - b)[2];
+    return fastest;
   }
 
-  it("keeps timing under 40 ms and the whole refresh under 450 ms, in plain Node", async () => {
+  it("keeps timing within 4 times the counts and the whole refresh within 20 times, on any machine", async () => {
     const sel = {};
     const each: Record<string, number> = {
-      counts: await median(() => Promise.all(["channel", "segment", "reached"].map((d) => countsBy(e, "journeys", d, sel)))),
-      flow: await median(() => sankeyEdges(e, "journeys", sel)),
-      topPaths: await median(() => topPaths(e, "journeys", sel, { minShare: 0.02 })),
-      pathCounts: await median(() => pathCounts(e, "journeys", sel)),
-      compare: await median(() => compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: sel })),
-      timing: await median(() => timeInStep(e, "journeys", sel, { asOf: JOURNEYS_AS_OF, windowHours: 168 })),
-      behind: await median(() => behindStep(e, "journeys", sel, 2)),
-      replay: await median(() => exampleJourney(e, "journeys", sel, { reached: "Purchase", offset: 0 })),
+      counts: await best(() => Promise.all(["channel", "segment", "reached"].map((d) => countsBy(e, "journeys", d, sel)))),
+      flow: await best(() => sankeyEdges(e, "journeys", sel)),
+      topPaths: await best(() => topPaths(e, "journeys", sel, { minShare: 0.02 })),
+      pathCounts: await best(() => pathCounts(e, "journeys", sel)),
+      compare: await best(() => compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: sel })),
+      timing: await best(() => timeInStep(e, "journeys", sel, { asOf: JOURNEYS_AS_OF, windowHours: 168 })),
+      behind: await best(() => behindStep(e, "journeys", sel, 2)),
+      replay: await best(() => exampleJourney(e, "journeys", sel, { reached: "Purchase", offset: 0 })),
     };
     const total = Object.values(each).reduce((a, b) => a + b, 0);
-    console.log(`REFRESH SPEED ${JSON.stringify(Object.fromEntries(Object.entries(each).map(([k, v]) => [k, Math.round(v * 10) / 10])))} total ${total.toFixed(1)} ms`);
-    expect(each.timing, "timing").toBeLessThan(40);
-    expect(total, "whole refresh").toBeLessThan(450);
+    const base = each.counts;
+    console.log(`REFRESH SPEED ${JSON.stringify(Object.fromEntries(Object.entries(each).map(([k, v]) => [k, Math.round(v * 10) / 10])))} total ${total.toFixed(1)} ms, timing ${(each.timing / base).toFixed(1)} and total ${(total / base).toFixed(1)} times the baseline`);
+    expect(each.timing / base, "timing against the baseline").toBeLessThan(4);
+    expect(total / base, "whole refresh against the baseline").toBeLessThan(20);
   }, 120_000);
 });

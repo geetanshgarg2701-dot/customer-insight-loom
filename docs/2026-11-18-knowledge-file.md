@@ -11,7 +11,7 @@ Paste the whole file into a new Claude chat, then ask for a review. Good questio
 Customer Insight Loom is a free tool for marketing teams, running entirely in the browser. It was called Evidence ledger until November 18, 2026. It does three jobs:
 
 - **Experiments.** A ledger for email experiments. A person records the bet before sending, assigns a holdout group by a keyed hash, and reads the result with its uncertainty. A result stays locked until the conversion window closes. It says plainly when a test is too small to tell.
-- **Journeys.** Linked charts of where customers drop off, on synthetic data, a view of what customers did before and after any one event, a side by side comparison of two segments or two channels, the time people take between steps, who is behind any step shown as groups only, and a replay of one synthetic customer's path.
+- **Journeys.** Linked charts of where customers drop off, on synthetic data, a view of what customers did before and after any one event, a side by side comparison of two segments or two channels, the time people take between steps, who is behind any step shown as groups only, a replay of one synthetic customer's path, and a designed journey canvas with live numbers on every step.
 - **Pipeline.** Where deals wait, how long they sit in each stage, which have stalled, how a period compares with another, and an outlook for open deals.
 
 Two helper screens: a data check that matches two files on email and checks a time column against clock changes, and a methods page showing the checks that were run on generated data.
@@ -33,7 +33,7 @@ Two helper screens: a data check that matches two files on email and checks a ti
 
 ## 3. Stack
 
-Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript strict, Vitest 5, Playwright run in Edge, DuckDB-Wasm 1.32.0, ECharts 6.1.0 drawn on canvas and tree shaken, and axe-core for accessibility checks as a development dependency. Supabase exists as a schema on a test project only. The app does not call it.
+Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript strict, Vitest 5, Playwright run in Edge, DuckDB-Wasm 1.32.0, ECharts 6.1.0 drawn on canvas and tree shaken, and axe-core for accessibility checks as a development dependency. Supabase exists as a schema on a test project only. The designed journey canvas uses React Flow 13.0.2, MIT, which was added on 2026-11-18. The app does not call it.
 
 ## 4. Size, as of the last commit
 
@@ -45,8 +45,8 @@ Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript stric
 
 | Check | Result |
 |---|---|
-| Unit tests, Vitest | 786 passed in 60 files |
-| Browser tests, Playwright in Edge | 68 passed in 18 files |
+| Unit tests, Vitest | 806 passed in 61 files |
+| Browser tests, Playwright in Edge | 71 passed in 19 files |
 | Static mirror test | 1 passed. It proves the site works under a project prefix with no request to another host |
 | Database tests, SQL on a Supabase test project | 6 files plus a seventh for the correction label. Not rerun on every change |
 | Type check and lint | Clean. Lint has one old warning |
@@ -89,7 +89,7 @@ A feature counts here only if a screen calls it.
 - **Time rules.** Only the local time reader is used, by the data check, which reports flagged rows and does not exclude them. The window and day functions in the time library are used only by tests.
 - **Supabase.** The schema has 8 migrations and row level security, on the test project only. The app has no client and no dependency on it.
 
-**Not built, with no code:** the designed journey canvas, the time scrubber, saved and shareable views, the evidence chain, deck export, webhook ingestion, hosted AI features, and accounts or sign in.
+**Not built, with no code:** wait steps and exit conditions on the canvas, saving a design, the time scrubber, saved and shareable views, the evidence chain, deck export, webhook ingestion, hosted AI features, and accounts or sign in.
 
 ## 8. Problems found and fixed, in the order they came up
 

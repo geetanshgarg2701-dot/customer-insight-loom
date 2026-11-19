@@ -18,6 +18,7 @@ import {
   explainTiming,
   explainBehind,
   explainReplay,
+  explainDesigned,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -432,4 +433,39 @@ describe("explainReplay", () => {
   });
 
   it("keeps the words plain", () => clean(list));
+});
+
+describe("explainDesigned", () => {
+  const stats = new Map([
+    ["Visit", { entered: 110, completed: 100, endedHere: 10, share: 1 }],
+    ["Cart", { entered: 70, completed: 50, endedHere: 20, share: 70 / 110 }],
+  ]);
+
+  it("explains entered, went on and ended here with the real numbers for the first step", () => {
+    const list = explainDesigned(stats, [], true);
+    const e = find(list, "Entered, went on, ended here");
+    expect(e.how).toContain("110 customers reached Visit");
+    expect(e.how).toContain("100 went on");
+    expect(e.how).toContain("10 ended there");
+  });
+
+  it("says the design covers every transition, or names the ones it misses", () => {
+    expect(find(explainDesigned(stats, [], true), "Design check").value).toBe("complete");
+    const bad = find(explainDesigned(stats, ["Visit>Purchase"], true), "Design check");
+    expect(bad.value).toBe("1 missing");
+    expect(bad.how).toContain("Visit>Purchase");
+  });
+
+  it("says what a sketch is, and that it is not saved", () => {
+    const s = find(explainDesigned(stats, [], true), "Sketched connections");
+    expect(s.how).toContain("not saved");
+    expect(s.how).toContain("loop");
+  });
+
+  it("says time to next is measured only for main steps", () => {
+    expect(find(explainDesigned(stats, [], true), "Median to next").how).toContain("main steps");
+    expect(find(explainDesigned(stats, [], false), "Median to next").value).toBe("not loaded yet");
+  });
+
+  it("keeps the words plain", () => clean(explainDesigned(stats, [], true)));
 });

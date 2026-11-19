@@ -397,3 +397,41 @@ export function explainReplay(j: ExampleJourney): Explanation[] {
     },
   ];
 }
+
+export function explainDesigned(
+  stats: ReadonlyMap<string, { entered: number; completed: number; endedHere: number; share: number }>,
+  notDesigned: readonly string[],
+  timingLoaded: boolean,
+): Explanation[] {
+  const first = stats.get("Visit");
+  return [
+    {
+      label: "Entered, went on, ended here",
+      value: "from the real paths",
+      how: first
+        ? `${formatCount(first.entered)} customers reached Visit. ${formatCount(first.completed)} went on to another step and ` +
+          `${formatCount(first.endedHere)} ended there. Each customer counts once per step, and entered is always went on plus ended here.`
+        : "Each customer counts once per step, and entered is always went on plus ended here.",
+    },
+    {
+      label: "Design check",
+      value: notDesigned.length === 0 ? "complete" : `${notDesigned.length} missing`,
+      how:
+        notDesigned.length === 0
+          ? "Every move customers made from one step to the next has a connection on the canvas, so the design describes the data."
+          : `Customers made moves the design has no connection for: ${notDesigned.join(", ")}. The canvas does not show them.`,
+    },
+    {
+      label: "Sketched connections",
+      value: "not saved",
+      how:
+        "A connection you sketch is not saved and carries no customer numbers. If it would make a loop, it is drawn as a " +
+        "dashed back edge and the page warns, so you can check that the loop is intended.",
+    },
+    {
+      label: "Median to next",
+      value: timingLoaded ? "main steps only" : "not loaded yet",
+      how: "The median hours to the next step is measured for the four main steps. Detours have no time measured yet.",
+    },
+  ];
+}

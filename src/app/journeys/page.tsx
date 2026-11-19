@@ -18,6 +18,7 @@ import { explainAnchored, explainBehind, explainComparison, explainReplay, expla
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
+import { JourneyCanvas } from "./canvas";
 import { CHART_THEME, GROUP_COLOR, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
@@ -477,6 +478,16 @@ export default function JourneysPage() {
               </section>
             );
           })}
+
+          <section aria-labelledby="h-designed">
+            <h2 id="h-designed">Designed journey</h2>
+            <p>
+              The journey as it was designed, with the live numbers on every step and a count on every connection. Select
+              a main step to open who is behind it. The two detours, Search and Support, are branches off the main steps.
+              The numbers follow the filters above.
+            </p>
+            {allPaths.length > 0 && <JourneyCanvas paths={allPaths} timing={timing} onOpenStep={(i) => void pickBehind(i)} />}
+          </section>
 
           <section aria-labelledby="h-flow">
             <h2 id="h-flow">Flow between steps</h2>
