@@ -13,6 +13,7 @@ import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
+import { createCycle, runWhileCurrent } from "@/lib/app/latest";
 import { explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
@@ -222,6 +223,7 @@ function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
 
 export default function JourneysPage() {
   const board = useRef<JourneyBoard | null>(null);
+  const [cycle] = useState(createCycle);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,17 +344,25 @@ export default function JourneysPage() {
   const choices = useMemo(() => anchorChoices(allPaths), [allPaths]);
   const around = useMemo(() => anchoredFlow(allPaths, { anchor, before, after, topN }), [allPaths, anchor, before, after, topN]);
 
+  /** The lower sections, one after another, stopping as soon as a newer click has started its own cycle. */
+  async function refreshLower(id: number, sel: Selection, replayAt: number) {
+    await runWhileCurrent(cycle, id, [
+      () => refreshComparison(cmpDim, cmpA, cmpB, sel),
+      () => refreshTiming(windowHours, sel),
+      () => refreshBehind(behindIndex, sel),
+      () => refreshReplay(replayReached, replayAt, sel),
+    ]);
+  }
+
   async function onLoad() {
     setBusy(true);
     setError(null);
     try {
       board.current = await createBrowserJourneyBoard(ROWS);
       setLoaded(true);
+      const id = cycle.start();
       await refresh({}, rarity);
-      await refreshComparison(cmpDim, cmpA, cmpB, {});
-      await refreshTiming(windowHours, {});
-      await refreshBehind(behindIndex, {});
-      await refreshReplay(replayReached, replayOffset, {});
+      await refreshLower(id, {}, replayOffset);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -365,12 +375,10 @@ export default function JourneysPage() {
     const nextValues = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
     const next: Selection = { ...selection, [dimension]: nextValues };
     setSelection(next);
+    const id = cycle.start();
     try {
       await refresh(next, rarity);
-      await refreshComparison(cmpDim, cmpA, cmpB, next);
-      await refreshTiming(windowHours, next);
-      await refreshBehind(behindIndex, next);
-      await refreshReplay(replayReached, 0, next);
+      await refreshLower(id, next, 0);
       setReplayOffset(0);
     } catch (e) {
       setError(messageOf(e));
@@ -379,11 +387,9 @@ export default function JourneysPage() {
 
   async function clearAll() {
     setSelection({});
+    const id = cycle.start();
     await refresh({}, rarity);
-    await refreshComparison(cmpDim, cmpA, cmpB, {});
-    await refreshTiming(windowHours, {});
-    await refreshBehind(behindIndex, {});
-    await refreshReplay(replayReached, 0, {});
+    await refreshLower(id, {}, 0);
     setReplayOffset(0);
   }
 

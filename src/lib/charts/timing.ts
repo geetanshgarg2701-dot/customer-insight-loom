@@ -58,24 +58,26 @@ export async function timeInStep(
     // The window is counted from entry into the journey, t1. It is open while the cutoff is at or before its end.
     const [row] = (
       await engine.query(
-        `SELECT count(${to}) AS moved, ` +
-          `quantile_cont(${hours}, 0.5) AS p50, quantile_cont(${hours}, 0.1) AS p10, quantile_cont(${hours}, 0.25) AS p25, ` +
-          `quantile_cont(${hours}, 0.75) AS p75, quantile_cont(${hours}, 0.9) AS p90, ` +
+        // One quantile call with a list sorts once. Five separate calls sorted five times and cost most of the 42 ms.
+        `SELECT count(${to}) AS moved, CAST(quantile_cont(${hours}, [0.1, 0.25, 0.5, 0.75, 0.9]) AS VARCHAR) AS q, ` +
           `count(*) FILTER (WHERE ${to} IS NULL AND ? <= t1 + ?) AS waiting, ` +
           `count(*) FILTER (WHERE ${to} IS NULL AND ? > t1 + ?) AS dropped ` +
           `FROM ${table} ${joiner} ${from} IS NOT NULL`,
         [asOfMs, windowMs, asOfMs, windowMs, ...where.params],
       )
     ).map(toPlainRow);
-    const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    // Cast to text inside SQL so Node and the browser return the same plain string, such as "[0.1, 0.2, 0.3, 0.4, 0.5]".
+    // It is null when nobody moved.
+    const q: unknown = row.q === null || row.q === undefined ? [] : JSON.parse(String(row.q));
+    const at = (k: number) => (Array.isArray(q) && q.length === 5 && Number.isFinite(q[k]) ? Number(q[k]) : null);
     steps.push({
       step: `${JOURNEY_STEPS[i - 1]} to ${JOURNEY_STEPS[i]}`,
       moved: Number(row.moved),
-      medianHours: num(row.p50),
-      p10Hours: num(row.p10),
-      p25Hours: num(row.p25),
-      p75Hours: num(row.p75),
-      p90Hours: num(row.p90),
+      medianHours: at(2),
+      p10Hours: at(0),
+      p25Hours: at(1),
+      p75Hours: at(3),
+      p90Hours: at(4),
       waiting: Number(row.waiting),
       dropped: Number(row.dropped),
     });
