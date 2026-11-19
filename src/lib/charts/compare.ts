@@ -2,7 +2,8 @@ import { formatPercent, formatSignedPoints } from "../app/format";
 import { JOURNEY_STEPS } from "../demo/journeys";
 import { toPlainRow } from "../duckdb/normalize";
 import type { SqlEngine } from "../intake/types";
-import { newcombeDifference, wilsonInterval } from "../stats/readout";
+import { holm } from "../stats/holm";
+import { newcombeDifference, twoProportionPValue, wilsonInterval } from "../stats/readout";
 import { whereClause, type Selection } from "./crossfilter";
 
 /**
@@ -53,6 +54,12 @@ export type StepDifference = {
   low: number;
   high: number;
   excludesZero: boolean;
+  /** Pooled two proportion z test, two sided. */
+  pValue: number;
+  /** Holm adjusted across every step difference in this comparison. */
+  adjustedP: number;
+  /** True when the Holm adjusted value is at most 0.05. This, not the interval, decides the flag. */
+  flagged: boolean;
 };
 
 export type Comparison = {
@@ -62,6 +69,8 @@ export type Comparison = {
   differences: StepDifference[];
   /** How many step differences were compared. A step with nobody to measure it on is not counted. */
   comparisons: number;
+  /** The correction applied across the comparisons. Plan part B: Holm for fewer than 10. */
+  correction: "holm";
   note: string;
 };
 
@@ -107,28 +116,32 @@ export async function compareGroups(
     groupOf(engine, table, dimension, b, selection),
   ]);
 
-  const differences: StepDifference[] = [];
+  const raw: Omit<StepDifference, "adjustedP" | "flagged">[] = [];
   ga.rates.forEach((ra, i) => {
     const rb = gb.rates[i];
     if (ra.rate === null || rb.rate === null) return;
     const n = newcombeDifference(ra.to, ra.from, rb.to, rb.from, ALPHA);
-    differences.push({
+    raw.push({
       step: ra.step,
       difference: ra.rate - rb.rate,
       low: n.low,
       high: n.high,
       excludesZero: n.low > 0 || n.high < 0,
+      pValue: twoProportionPValue(ra.to, ra.from, rb.to, rb.from),
     });
   });
+  const h = holm(raw.map((d) => d.pValue), ALPHA);
+  const differences: StepDifference[] = raw.map((d, i) => ({ ...d, adjustedP: h.adjusted[i], flagged: h.rejected[i] }));
 
   const comparisons = differences.length;
   const note =
     `Comparisons made: ${comparisons}. ${comparisons} step ${comparisons === 1 ? "difference was" : "differences were"} ` +
-    `compared between ${a} and ${b}. A difference is flagged only where its 95 percent interval excludes zero. Every ` +
-    `result here is labeled exploratory, because the groups were not registered before a launch and no correction is ` +
-    `applied across the comparisons. This is an association, not cause.`;
+    `compared between ${a} and ${b}. The Holm correction is applied across them, so a gap is flagged only if its ` +
+    `adjusted p value is at most 0.05. Each interval is at 95 percent on its own and is not adjusted. Every result ` +
+    `here is still labeled exploratory, because the groups were not registered before a launch. This is an ` +
+    `association, not cause.`;
 
-  return { dimension, a: ga, b: gb, differences, comparisons, note };
+  return { dimension, a: ga, b: gb, differences, comparisons, correction: "holm", note };
 }
 
 /**
@@ -142,9 +155,10 @@ export function differenceSentence(c: Comparison, d: StepDifference): string {
   const verdict = d.excludesZero
     ? "The interval excludes zero. This is still exploratory and an association, not a finding that one group causes the gap."
     : "The interval includes zero, so this does not show a gap. It is exploratory.";
+  const family = `After the Holm correction across ${c.comparisons} ${c.comparisons === 1 ? "comparison" : "comparisons"}, this gap is ${d.flagged ? "flagged" : "not flagged"}.`;
   return (
     `Of people who reached ${fromStep}, ${formatPercent(ra.rate!, 1)} of ${c.a.value} went on to ${toStep}, ` +
     `against ${formatPercent(rb.rate!, 1)} of ${c.b.value}. The gap is ${formatSignedPoints(d.difference, 1)}, ` +
-    `with a 95 percent interval of ${formatSignedPoints(d.low, 1)} to ${formatSignedPoints(d.high, 1)}. ${verdict}`
+    `with a 95 percent interval of ${formatSignedPoints(d.low, 1)} to ${formatSignedPoints(d.high, 1)}. ${verdict} ${family}`
   );
 }

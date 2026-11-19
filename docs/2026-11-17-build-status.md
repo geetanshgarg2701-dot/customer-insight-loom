@@ -12,7 +12,8 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Readout, Newcombe interval, pooled z p value, inconclusive wording | BUILT | `readout.ts`, `src/lib/app/verdict.ts` |
 | Warning that significant results from small tests run high | BUILT | `verdict.ts` |
 | Sample ratio check | BUILT | `srm.ts` |
-| Benjamini Hochberg function | PARTIAL | `bh.ts` exists. No screen applies a correction. Holm is not built. Tested on 2026-11-18 with real and null effects mixed in `bh-mixed.test.ts`: the false discovery rate matched the null share times q within 3 standard errors, and a hand checked example shows it flags 2 of 5 where a plain p below 0.05 flags 4. |
+| Benjamini Hochberg function | PARTIAL | `bh.ts` exists. No screen applies it. Holm is built and applied, see the next row. Tested on 2026-11-18 with real and null effects mixed in `bh-mixed.test.ts`: the false discovery rate matched the null share times q within 3 standard errors, and a hand checked example shows it flags 2 of 5 where a plain p below 0.05 flags 4. |
+| Holm correction | BUILT | `holm.ts`, built test first on 2026-11-19 from plan part B's own example: for p values 0.012, 0.03 and 0.04, Holm flags only the first while Benjamini Hochberg flags all three. It matches R's p.adjust, flags everything Bonferroni flags and nothing Benjamini Hochberg leaves out on 500 random sets, and under 10 null tests it flagged something in 187 of 4,000 runs against an expected 4.9 percent. The side by side comparison of two groups now applies it across its step differences, and the screen says the 95 percent intervals are not adjusted. Results there stay labeled exploratory. |
 | Correction label on confirmatory results | PARTIAL | Confirmatory results are now labeled `not_applied` with one comparison, until the family correction is built. Results saved earlier keep the label `benjamini_hochberg` and the screen says no correction ran. |
 | A/A, coverage and planted lift checks, shown on the methods page | BUILT | `honesty.ts`, `src/app/methods` |
 | Property tests of the statistics, text and time code | BUILT | 30 properties on random inputs plus simulation: interval coverage 95.5 and 96.2 percent, power 81.8 percent against the promised 80, false positives 4.6 to 5.1 percent at 30,000 runs, Benjamini Hochberg 5.3 percent under the null, local times across seven zones. No wrong answer found. One performance defect found and fixed: cutting 100,000 events into days went from 6.3 s to 0.4 s. See `2026-11-17-property-test-results.md`. |
@@ -80,7 +81,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On 2026-11-18: 828 unit tests, 74 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On 2026-11-19: 841 unit tests, 74 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 

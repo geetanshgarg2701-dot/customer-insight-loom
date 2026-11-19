@@ -26,6 +26,10 @@ test("compare two groups shows the generator's counts, flags the planted gap, an
   await expect(last).toContainText(`${n(rr[3])} of ${n(rr[2])}`);
   // The planted gap: new customers who reach the cart buy far less often, and the interval excludes zero.
   await expect(last).toContainText("interval excludes zero");
+  // The flag comes from the Holm correction across the three steps. The planted gap survives it, and a step with no
+  // planted gap is not flagged.
+  await expect(last).toContainText(", flagged after Holm");
+  await expect(table.getByRole("row", { name: /^Visit to Product/ })).toContainText("not flagged after Holm");
   await expect(section.locator("p", { hasText: "Comparisons made: 3." }).first()).toBeVisible();
   await expect(section.getByText(/exploratory and an association, not a finding that one group causes the gap/).first()).toBeVisible();
 

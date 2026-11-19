@@ -45,7 +45,7 @@ Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript stric
 
 | Check | Result |
 |---|---|
-| Unit tests, Vitest | 828 passed in 62 files |
+| Unit tests, Vitest | 841 passed in 63 files |
 | Browser tests, Playwright in Edge | 74 passed in 20 files |
 | Static mirror test | 1 passed. It proves the site works under a project prefix with no request to another host |
 | Database tests, SQL on a Supabase test project | 6 files plus a seventh for the correction label. Not rerun on every change |
@@ -83,7 +83,7 @@ A feature counts here only if a screen calls it.
 ## 7. Partly built or not built
 
 **Partly built, from the code:**
-- **Multiple comparison correction.** `bh.ts` and its tests exist, and no screen calls it. A readout makes one comparison, so there is nothing to correct. Holm, which the plan prefers for fewer than 10 comparisons, is not built.
+- **Multiple comparison correction.** Holm, which the plan prefers for fewer than 10 comparisons, is built and applied across the step differences in the side by side comparison of two groups. Benjamini Hochberg exists with tests and no screen uses it. A ledger readout makes one comparison, so it needs no correction.
 - **Incremental revenue.** A helper exists, and no screen uses it.
 - **Text redaction.** The function runs only on a planted test set shown on the methods page. It is not applied to any data a person loads. Intake only blocks columns.
 - **Time rules.** Only the local time reader is used, by the data check, which reports flagged rows and does not exclude them. The window and day functions in the time library are used only by tests.

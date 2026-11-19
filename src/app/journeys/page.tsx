@@ -654,7 +654,7 @@ export default function JourneysPage() {
                           <td>{cell(rb)}</td>
                           <td>
                             {d
-                              ? `${formatSignedPoints(d.difference, 1)}, ${formatSignedPoints(d.low, 1)} to ${formatSignedPoints(d.high, 1)}${d.excludesZero ? ", interval excludes zero" : ", interval includes zero"}`
+                              ? `${formatSignedPoints(d.difference, 1)}, ${formatSignedPoints(d.low, 1)} to ${formatSignedPoints(d.high, 1)}${d.excludesZero ? ", interval excludes zero" : ", interval includes zero"}${d.flagged ? ", flagged after Holm" : ", not flagged after Holm"}`
                               : "not measured"}
                           </td>
                         </tr>

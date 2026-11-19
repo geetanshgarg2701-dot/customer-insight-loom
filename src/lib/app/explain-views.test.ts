@@ -344,6 +344,14 @@ describe("explainComparison", () => {
     expect(n.how).toContain("exploratory");
   });
 
+  it("says the flag comes from the Holm correction, not from the unadjusted interval", () => {
+    const d = find(list, "Difference");
+    expect(d.how).not.toContain("flagged only where the interval excludes zero");
+    const h = find(list, "Holm correction");
+    expect(h.how).toContain("adjusted p value");
+    expect(h.how).toContain("fewer than 10");
+  });
+
   it("says the small group rule is a judgment", () => {
     const s = find(list, "Small groups");
     expect(s.value).toBe("30 people");

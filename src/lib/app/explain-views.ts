@@ -295,7 +295,16 @@ export function explainComparison(c: Comparison): Explanation[] {
       value: "first group minus second group",
       how:
         "The gap between the groups carries a 95 percent Newcombe hybrid score interval, method 10 in Newcombe 1998, " +
-        "built from the two Wilson intervals. A gap is flagged only where the interval excludes zero.",
+        "built from the two Wilson intervals. Each interval is at 95 percent on its own and is not adjusted for the " +
+        "other comparisons.",
+    },
+    {
+      label: "Holm correction",
+      value: "applied",
+      how:
+        "Each gap also gets a pooled two proportion z test p value, and the Holm step down procedure adjusts them across " +
+        "every step compared. A gap is flagged only if its adjusted p value is at most 0.05. The plan uses Holm for fewer " +
+        "than 10 comparisons because it keeps the chance of any false flag at 5 percent and loses little power.",
     },
     {
       label: "Comparisons made",

@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { JOURNEY_STEPS, syntheticJourneys, type JourneyRow } from "../demo/journeys";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
-import { newcombeDifference, wilsonInterval } from "../stats/readout";
+import { holm } from "../stats/holm";
+import { newcombeDifference, twoProportionPValue, wilsonInterval } from "../stats/readout";
 import { compareGroups, differenceSentence, MIN_GROUP } from "./compare";
 import { loadJourneys } from "./crossfilter";
 
@@ -224,6 +225,71 @@ describe("differenceSentence, the plain reading next to every range", () => {
     expect(s).toContain("The interval excludes zero.");
     expect(s).toContain("association");
     expect(s).not.toMatch(/\bbecause\b|\bcaused\b/);
+    await e.close?.();
+  });
+});
+
+describe("compareGroups applies the Holm correction across its comparisons", () => {
+  const hand = [
+    ...many(40, "new", "ads", 1),
+    ...many(60, "new", "ads", 2),
+    ...many(50, "new", "email", 3),
+    ...many(50, "new", "email", 4),
+    ...many(10, "returning", "ads", 1),
+    ...many(10, "returning", "ads", 2),
+    ...many(30, "returning", "email", 3),
+    ...many(50, "returning", "email", 4),
+  ];
+
+  it("gives each gap its pooled z p value, the Holm adjusted value across the family, and flags by the adjusted value", async () => {
+    const e = await createNodeEngine({ isolated: true });
+    await loadJourneys(e, "journeys", hand);
+    const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
+    const raw = [
+      twoProportionPValue(160, 200, 90, 100),
+      twoProportionPValue(100, 160, 80, 90),
+      twoProportionPValue(50, 100, 50, 80),
+    ];
+    const adjusted = holm(raw, 0.05).adjusted;
+    c.differences.forEach((d, i) => {
+      expect(d.pValue, d.step).toBeCloseTo(raw[i], 12);
+      expect(d.adjustedP, d.step).toBeCloseTo(adjusted[i], 12);
+      expect(d.flagged, d.step).toBe(adjusted[i] <= 0.05);
+    });
+    expect(c.correction).toBe("holm");
+    await e.close?.();
+  });
+
+  it("says in the note that Holm is applied and that the intervals are not adjusted", async () => {
+    const e = await createNodeEngine({ isolated: true });
+    await loadJourneys(e, "journeys", hand);
+    const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
+    expect(c.note).toContain("Holm");
+    expect(c.note).toContain("not adjusted");
+    expect(c.note).not.toContain("no correction is applied");
+    expect(c.note).not.toMatch(/[\u2014()]/);
+    await e.close?.();
+  });
+
+  it("states the Holm result in each plain sentence", async () => {
+    const e = await createNodeEngine({ isolated: true });
+    await loadJourneys(e, "journeys", hand);
+    const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
+    for (const d of c.differences) {
+      const s = differenceSentence(c, d);
+      expect(s).toContain(d.flagged ? "After the Holm correction across 3 comparisons, this gap is flagged." : "After the Holm correction across 3 comparisons, this gap is not flagged.");
+    }
+    await e.close?.();
+  });
+});
+
+describe("the planted gap survives the Holm correction", () => {
+  it("flags new against returning at Cart to Purchase, and not the steps with no planted gap", async () => {
+    const e = await createNodeEngine({ isolated: true });
+    await loadJourneys(e, "journeys", syntheticJourneys(20_000, 11));
+    const c = await compareGroups(e, "journeys", { dimension: "segment", a: "new", b: "returning", selection: {} });
+    expect(c.differences.find((d) => d.step === "Cart to Purchase")!.flagged).toBe(true);
+    expect(c.differences.find((d) => d.step === "Visit to Product")!.flagged).toBe(false);
     await e.close?.();
   });
 });
