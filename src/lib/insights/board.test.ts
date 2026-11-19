@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { syntheticJourneys } from "../demo/journeys";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
-import { createCommentsBoard, QUOTE_PAGE, type CommentsBoard } from "./board";
+import { createCommentsBoard, QUOTE_PAGE, TABLES, type CommentsBoard } from "./board";
 import { syntheticComments } from "./comments";
 import { prepareComments } from "./prepare";
 
@@ -49,7 +49,7 @@ describe("createCommentsBoard", () => {
     expect(result.removed).toBe(2);
     const after = (await board.quotes("pricing", 0)).rows.find((r) => r.customer === target.customer)!;
     expect(after.text).toBe(result.text);
-    const raw = await e.query("SELECT count(*) AS n FROM comments WHERE quote LIKE '%example.invalid%'", []);
+    const raw = await e.query(`SELECT count(*) AS n FROM ${TABLES.comments} WHERE quote LIKE '%example.invalid%'`, []);
     expect(Number(Object.values(raw[0] as object)[0])).toBe(0);
   });
 
@@ -64,5 +64,17 @@ describe("createCommentsBoard", () => {
     const withheld = comments.find((c) => !c.consent)!;
     await expect(board.correct(withheld.customer, "Hello.")).rejects.toThrow(RangeError);
     await expect(board.correct(999_999, "Hello.")).rejects.toThrow(RangeError);
+  });
+
+  it("uses table names of its own, so the journeys screen closing cannot drop them", () => {
+    expect(Object.values(TABLES)).toEqual(["insight_comments", "insight_journeys", "insight_revenue"]);
+  });
+
+  it("gives the chain parts from its own tables, including revenue", async () => {
+    const ranking = await board.ranking();
+    expect(ranking.length).toBe(6);
+    expect(ranking.reduce((n, r) => n + r.mentions, 0)).toBe(prepared.rows.filter((r) => r.pain !== "no_issue").length);
+    expect((await board.drops()).comparisons).toBeGreaterThan(0);
+    expect((await board.carriers()).every((c) => c.share >= 0.2)).toBe(true);
   });
 });

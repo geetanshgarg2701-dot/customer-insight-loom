@@ -36,7 +36,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 | Assignment by keyed hash, rebuild, results upload and check | BUILT | `src/lib/assignment` |
 | Received column in the results upload, delivery shares and a rough scaled lift | BUILT | `src/lib/stats/delivery.ts`. Optional. The readout itself is never changed. The scaled lift is a rough division by the delivery gap, with no interval. |
 | Synthetic demo data | BUILT | `src/lib/demo` |
-| Evidence chain | NOT STARTED | |
+| Evidence chain | PARTIAL | Pain ranking and evidence chain, on synthetic data, SOURCED by tests: the Comments screen ranks pains by mentions with severe count, customers who did not buy, and the summed synthetic revenue of those who raised each, labeled association. For a chosen theme, a chain of six links shows the theme, the segment and channel groups that carry it at the plan's 20 percent share, the steps where it goes with stopping after Benjamini Hochberg across all comparisons with the count shown, the revenue, the ledger entry that names the theme, and the decision. A missing link is shown as missing. Groups under 30 are hidden or marked too small to trust. Each pain has a fixed UUID theme id so a ledger entry can name it. Tested on hand counts, against an independent count of the generator, and with a case where a raw p value of about 0.04 is rightly not flagged. Three mutations each failed tests. Not built: naming a theme on an entry from the ledger screen, so the test link is always missing for now; the chain as a React Flow graph, since it is shown as a list on every width; and the journeys why panel. The comments board now uses its own table names, insight_comments, insight_journeys and insight_revenue, because every screen shares one database. A clash with the journeys screen's table was a risk I first called a bug. A test could not reproduce it, so it is recorded as a guarded risk, not a seen failure. |
 | Click to explain on every number | BUILT | A "How ... was worked out" section on the power check, the readout, the funnel, time in stage, stalled deals, the cohort ladder, the period comparison, top paths and the what if. Each sentence is built from the real values by `src/lib/app/explain.ts` and `explain-views.ts`, with tests. Not on the plain counts in the filter buttons, which are counts of rows. |
 
 ## Data and privacy
@@ -81,7 +81,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On 2026-11-19: 895 unit tests, 85 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On 2026-11-19: 908 unit tests, 87 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 

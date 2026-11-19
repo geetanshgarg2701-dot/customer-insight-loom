@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { syntheticJourneys } from "../src/lib/demo/journeys";
 import { syntheticComments } from "../src/lib/insights/comments";
 import { prepareComments } from "../src/lib/insights/prepare";
+import { customerRevenue } from "../src/lib/insights/evidence";
 
 const journeys = syntheticJourneys(20_000, 11);
 const comments = syntheticComments(journeys, 3_000, 17);
@@ -76,4 +77,43 @@ test("the comments screen has no axe violations and fits a phone once loaded", a
   expect(overflow).toBeLessThanOrEqual(0);
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).exclude("nextjs-portal").analyze();
   expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((x) => x.target.join(" ")).join(" | ")}`)).toEqual([]);
+});
+
+test("the ranking matches an independent count, and the chain shows each link or says it is missing", async ({ page }) => {
+  test.setTimeout(180_000);
+  await load(page);
+  const revenue = customerRevenue(journeys, 31);
+  const ship = prepared.rows.filter((r) => r.pain === "shipping_cost");
+  const ranking = page.getByRole("table", { name: "Pains by number of mentions" });
+  const shipRow = ranking.getByRole("row", { name: /^Shipping costs too much/ }).getByRole("cell");
+  await expect(shipRow.nth(0)).toHaveText(n(ship.length));
+  await expect(shipRow.nth(1)).toHaveText(n(ship.filter((r) => r.severity === 3).length));
+  await expect(shipRow.nth(2)).toHaveText(n(ship.filter((r) => r.reached !== "Purchase").length));
+  await expect(shipRow.nth(3)).toHaveText(`${n(ship.reduce((t, r) => t + revenue[r.customer], 0))} dollars`);
+
+  const chain = page.getByRole("list", { name: "Evidence chain for Shipping costs too much" });
+  await expect(chain.getByRole("listitem")).toHaveCount(6);
+  await expect(chain.getByRole("listitem").nth(0)).toContainText(`${n(ship.length)} comments`);
+  await expect(chain.getByRole("listitem").nth(2)).toContainText(/At Cart, [\d.]+ percent of those who stopped raised it/);
+  await expect(chain.getByRole("listitem").nth(2)).toContainText("Association, not cause.");
+  await expect(chain.getByRole("listitem").nth(4)).toContainText("No ledger entry names this theme yet.");
+  await expect(chain.getByRole("listitem").nth(4)).toContainText("Missing");
+  await expect(chain.getByRole("listitem").nth(5)).toContainText("No decision.");
+
+  await page.getByLabel("Theme").selectOption("support_slow");
+  await expect(page.getByRole("list", { name: "Evidence chain for Support was slow to answer" })).toBeVisible();
+});
+
+test("going from the journeys screen to the comments screen loads the comments with no error", async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.goto("/journeys");
+  await page.getByRole("button", { name: "Load synthetic journeys" }).click();
+  await expect(page.getByText(/Showing 100,000 of 100,000 customers/)).toBeVisible({ timeout: 180_000 });
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Comments" }).click();
+  await page.getByRole("button", { name: "Load synthetic comments" }).click();
+  await expect(page.getByRole("list", { name: "Evidence chain for Shipping costs too much" })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  await page.getByLabel("Group by").selectOption("segment");
+  await expect(page.getByRole("table", { name: /Share of comments mentioning each pain, by segment/ })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
 });

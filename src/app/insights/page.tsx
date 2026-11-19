@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { formatCount, formatPercent } from "@/lib/app/format";
 import { explainMentions } from "@/lib/app/explain-views";
-import { createBrowserCommentsBoard } from "@/lib/duckdb/client";
+import { createBrowserCommentsBoard, getBrowserLedger } from "@/lib/duckdb/client";
+import { assembleChain, CARRIER_SHARE, THEMES, type Carrier, type ChainEntry, type DropLinks, type RankRow } from "@/lib/insights/evidence";
 import { QUOTE_PAGE, type CommentsBoard, type QuotePage } from "@/lib/insights/board";
 import { PAIN_LABELS, PAINS, type Pain } from "@/lib/insights/comments";
 import type { MentionDimension, MentionRates } from "@/lib/insights/mentions";
@@ -38,6 +40,11 @@ export default function InsightsPage() {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const [ranking, setRanking] = useState<RankRow[] | null>(null);
+  const [drops, setDrops] = useState<DropLinks | null>(null);
+  const [carriers, setCarriers] = useState<Carrier[]>([]);
+  const [entries, setEntries] = useState<ChainEntry[]>([]);
+  const [chainPain, setChainPain] = useState<Pain>("shipping_cost");
 
   async function showRates(dim: MentionDimension) {
     if (!board.current) return;
@@ -60,6 +67,16 @@ export default function InsightsPage() {
       setLoaded(true);
       await showRates(grouping);
       await showQuotes(pain, 0);
+      setRanking(await b.ranking());
+      setDrops(await b.drops());
+      setCarriers(await b.carriers());
+      // Ledger entries that name a theme. The ledger lives in this browser only, and an empty one simply has none.
+      try {
+        const ledger = await getBrowserLedger();
+        setEntries((await ledger.listEntries()).map((x) => ({ id: x.id, title: x.title, themeId: x.themeId, status: x.status })));
+      } catch {
+        setEntries([]);
+      }
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -90,6 +107,10 @@ export default function InsightsPage() {
   }, []);
 
   const card = summary?.card;
+  const chain = useMemo(
+    () => (ranking && drops ? assembleChain(chainPain, ranking, drops, carriers, entries) : null),
+    [chainPain, ranking, drops, carriers, entries],
+  );
   const shownGroups = rates?.groups.filter((g) => !g.tooSmall) ?? [];
   const hiddenGroups = rates?.groups.filter((g) => g.tooSmall) ?? [];
 
@@ -223,6 +244,116 @@ export default function InsightsPage() {
                 )}
                 <Explain summary="How the shares were worked out" items={explainMentions(rates)} />
               </>
+            )}
+          </section>
+
+          <section aria-labelledby="h-ranking">
+            <h2 id="h-ranking">Pains ranked</h2>
+            <p>
+              Mentions are counted in the database. Revenue is the summed synthetic revenue of the customers who raised
+              each pain, over the whole demo period. It goes with the pain. It is not caused by it, and only a ledger
+              test with a holdout could say more.
+            </p>
+            {ranking && (
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <caption>Pains by number of mentions</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Pain</th>
+                      <th scope="col">Mentions</th>
+                      <th scope="col">Rated severe</th>
+                      <th scope="col">Did not buy</th>
+                      <th scope="col">Revenue of those who raised it</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ranking.map((r) => (
+                      <tr key={r.pain} style={r.tooSmall ? { color: "var(--muted)" } : undefined}>
+                        <th scope="row">
+                          {PAIN_LABELS[r.pain]}
+                          {r.tooSmall && <small> Fewer than 30 customers, too small to trust.</small>}
+                        </th>
+                        <td>{formatCount(r.mentions)}</td>
+                        <td>{formatCount(r.severe)}</td>
+                        <td>{formatCount(r.notBought)}</td>
+                        <td>{formatCount(r.revenue)} dollars</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="h-chain">
+            <h2 id="h-chain">Evidence chain</h2>
+            <p>
+              From a theme to revenue, one link at a time. A missing link is shown as missing, not filled in. Every link
+              before the ledger test is an association.
+            </p>
+            <p>
+              <label>
+                Theme{" "}
+                <select value={chainPain} onChange={(e) => setChainPain(e.target.value as Pain)}>
+                  {THEMES.map((p) => (
+                    <option key={p} value={p}>
+                      {PAIN_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </p>
+            {chain && (
+              <ol aria-label={`Evidence chain for ${PAIN_LABELS[chainPain]}`} className="chain">
+                {chain.map((step) => (
+                  <li key={step.kind} data-status={step.status}>
+                    <strong>{step.label}</strong>
+                    {step.status === "missing" && <span> Missing</span>}
+                    <p>{step.text}</p>
+                    {step.kind === "test" &&
+                      (step.entryId ? (
+                        <p>
+                          <Link href={`/ledger/entry?id=${step.entryId}`}>Open the ledger entry</Link>
+                        </p>
+                      ) : (
+                        <p>
+                          A test is registered in the <Link href="/ledger">Ledger</Link>. Naming a theme on an entry
+                          from the ledger screen is not built yet.
+                        </p>
+                      ))}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {drops && (
+              <Explain
+                summary="How the links were worked out"
+                items={[
+                  {
+                    label: "Segments that carry it",
+                    value: `${formatPercent(CARRIER_SHARE, 0)} of commenting customers`,
+                    how:
+                      `A segment and channel group carries a theme when at least ${formatPercent(CARRIER_SHARE, 0)} of its commenting ` +
+                      "customers raised it. The share is a judgment from the plan, not a rule from statistics. Groups under 30 are left out.",
+                  },
+                  {
+                    label: "Where it goes with stopping",
+                    value: `${drops.comparisons} comparisons`,
+                    how:
+                      "At each step, the share raising the theme among commenting customers who stopped there is compared with those " +
+                      "who went on. Each gap gets a pooled two proportion z test p value, and Benjamini Hochberg adjusts them across " +
+                      `all ${drops.comparisons} comparisons at a false discovery rate of ${drops.q}. A step is compared only when both ` +
+                      "groups have at least 30 customers. Each comment has one coded pain, so a group that raises one pain more raises " +
+                      "others less, and a link can come from who the customers are rather than from the pain.",
+                  },
+                  {
+                    label: "Revenue",
+                    value: "synthetic",
+                    how: "Each customer who bought has a synthetic order value from 20 to 400 dollars. Customers who did not buy have none.",
+                  },
+                ]}
+              />
             )}
           </section>
 
