@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatPoints } from "@/lib/app/format";
 import { getBrowserLedger } from "@/lib/duckdb/client";
 import { readoutOpensAt } from "@/lib/ledger/window";
 import type { AuditRow, Ledger, LedgerEntry } from "@/lib/ledger/ledger";
+import { PAIN_LABELS } from "@/lib/insights/comments";
+import { THEME_IDS, THEMES, themeOf } from "@/lib/insights/evidence";
 import { Nav } from "../../nav";
 import { AssignmentSection } from "./assignment-section";
 import { DesignSection } from "./design-section";
@@ -74,6 +77,19 @@ export function EntryView() {
     };
   }, [id]);
 
+  async function onTheme(themeId: string) {
+    if (!loaded) return;
+    setBusy(true);
+    try {
+      await loaded.ledger.update(loaded.entry.id, { themeId: themeId === "" ? null : themeId }, "user");
+      await load();
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onLaunch() {
     if (!loaded) return;
     setBusy(true);
@@ -132,6 +148,33 @@ export function EntryView() {
       )}
       <p>Hypothesis: {entry.hypothesis}</p>
       {entry.frameworkTag && <p>Framework tag: {entry.frameworkTag}</p>}
+      {entry.registeredAt !== null ? (
+        <p>
+          Theme: {themeOf(entry.themeId) ? PAIN_LABELS[themeOf(entry.themeId)!] : entry.themeId ? "An id this app does not know" : "None"}.
+          {" "}Locked once registered.
+          {themeOf(entry.themeId) && (
+            <>
+              {" "}
+              <Link href="/insights">See its evidence chain</Link>
+            </>
+          )}
+        </p>
+      ) : (
+        <p>
+          <label>
+            Theme{" "}
+            <select value={entry.themeId ?? ""} disabled={busy} onChange={(e) => void onTheme(e.target.value)}>
+              <option value="">None</option>
+              {THEMES.map((p) => (
+                <option key={p} value={THEME_IDS[p]}>
+                  {PAIN_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </label>{" "}
+          Saved as soon as you choose. It locks when the entry is registered.
+        </p>
+      )}
 
       <DesignSection key={`design-${entry.id}`} entry={entry} ledger={ledger} onChange={load} />
       <AssignmentSection key={`assign-${entry.id}`} entry={entry} ledger={ledger} assignedCount={assigned} onChange={load} />

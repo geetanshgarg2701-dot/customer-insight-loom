@@ -106,6 +106,20 @@ describe("entries", () => {
     expect((await ledger.update(e.id, { title: "Win back, v2" }, "u")).title).toBe("Win back, v2");
   });
 
+  it("lets a draft name a theme and change it, and locks the theme once registered", async () => {
+    const shipping = "3b0c6a1e-5f2d-4c8e-9a71-0d1e2f3a4b01";
+    const pricing = "3b0c6a1e-5f2d-4c8e-9a71-0d1e2f3a4b02";
+    const e = await ledger.createDraft({ ...DRAFT, themeId: shipping }, "u");
+    expect(e.themeId).toBe(shipping);
+    expect((await ledger.update(e.id, { themeId: pricing }, "u")).themeId).toBe(pricing);
+    expect((await ledger.update(e.id, { themeId: null }, "u")).themeId).toBeNull();
+    await ledger.update(e.id, { themeId: shipping }, "u");
+    await ledger.register(e.id, "u");
+    await expect(ledger.update(e.id, { themeId: pricing }, "u")).rejects.toBeInstanceOf(LedgerLockError);
+    await expect(ledger.update(e.id, { themeId: null }, "u")).rejects.toBeInstanceOf(LedgerLockError);
+    expect((await ledger.getEntry(e.id)).themeId).toBe(shipping);
+  });
+
   it("refuses to register twice or launch twice", async () => {
     const e = await ledger.createDraft(DRAFT, "u");
     await ledger.register(e.id, "u");

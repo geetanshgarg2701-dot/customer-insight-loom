@@ -132,7 +132,8 @@ export const HASH_HEX = /^[0-9a-f]{64}$/;
 export const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const EDITABLE = new Set(["title", "hypothesis", "frameworkTag", "design", "themeId", "segmentId", "journeyId"]);
-const LOCKED_ONCE_REGISTERED = new Set(["hypothesis", "design", "frameworkTag"]);
+/** The theme is locked too, so a test cannot be relabeled after the fact to fit an evidence chain. */
+const LOCKED_ONCE_REGISTERED = new Set(["hypothesis", "design", "frameworkTag", "themeId"]);
 const INSERT_CHUNK = 500;
 
 export const SCHEMA_SQL = [

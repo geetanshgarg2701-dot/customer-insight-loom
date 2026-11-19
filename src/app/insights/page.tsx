@@ -318,10 +318,15 @@ export default function InsightsPage() {
                         </p>
                       ) : (
                         <p>
-                          A test is registered in the <Link href="/ledger">Ledger</Link>. Naming a theme on an entry
-                          from the ledger screen is not built yet.
+                          Name this theme on an entry in the <Link href="/ledger">Ledger</Link> to link a test here.
+                          The ledger lives in this browser tab, so a full page reload empties it.
                         </p>
                       ))}
+                    {step.kind === "decision" && step.entryId && (
+                      <p>
+                        <Link href={`/ledger/entry?id=${step.entryId}`}>Read the result</Link>
+                      </p>
+                    )}
                   </li>
                 ))}
               </ol>

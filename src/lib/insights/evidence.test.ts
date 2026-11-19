@@ -16,6 +16,7 @@ import {
   painRanking,
   segmentCarriers,
   THEME_IDS,
+  themeOf,
   type EvidenceTables,
 } from "./evidence";
 import { loadComments } from "./mentions";
@@ -151,6 +152,22 @@ describe("the evidence chain on counts worked out by hand", () => {
     expect(chain[4].text).toBe("Free shipping over 50 dollars, running.");
     expect(chain[4].status).toBe("present");
     expect(chain[4].entryId).toBe("a");
+  });
+
+  it("reads a theme id back to its theme, and gives null for no theme, no complaint, or an unknown id", () => {
+    expect(themeOf(THEME_IDS.shipping_cost)).toBe("shipping_cost");
+    expect(themeOf(THEME_IDS.support_slow)).toBe("support_slow");
+    expect(themeOf(null)).toBeNull();
+    expect(themeOf(THEME_IDS.no_issue)).toBeNull();
+    expect(themeOf("00000000-0000-4000-8000-000000000000")).toBeNull();
+  });
+
+  it("calls a closed linked test a decision, and an open one not yet", () => {
+    const closed = [{ id: "c", title: "Free shipping test", themeId: THEME_IDS.shipping_cost, status: "closed" }];
+    const chain = assembleChain("shipping_cost", [], { comparisons: 0, q: 0.05, links: [] }, [], closed);
+    expect(chain[5].status).toBe("present");
+    expect(chain[5].text).toBe("A test on this theme is closed. Read its result in the ledger.");
+    expect(chain[5].entryId).toBe("c");
   });
 
   it("gives every pain a different fixed UUID as its theme id", () => {

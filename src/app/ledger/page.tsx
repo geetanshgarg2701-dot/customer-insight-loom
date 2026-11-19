@@ -9,6 +9,8 @@ import { familywiseLine } from "@/lib/ledger/familywise";
 import { ledgerCsv } from "@/lib/ledger/csv";
 import { NO_FILTER, filterEntries, type EntryFilter } from "@/lib/ledger/filter";
 import { STATUSES, FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
+import { PAIN_LABELS } from "@/lib/insights/comments";
+import { THEME_IDS, THEMES } from "@/lib/insights/evidence";
 import { Nav } from "../nav";
 
 function messageOf(error: unknown): string {
@@ -25,6 +27,7 @@ export default function LedgerPage() {
   const [title, setTitle] = useState("");
   const [hypothesis, setHypothesis] = useState("");
   const [tag, setTag] = useState<"" | FrameworkTag>("");
+  const [theme, setTheme] = useState("");
   const [filter, setFilter] = useState<EntryFilter>(NO_FILTER);
 
   const refresh = useCallback(async () => {
@@ -58,8 +61,9 @@ export default function LedgerPage() {
     setNotice(null);
     try {
       const ledger = await getBrowserLedger();
-      await ledger.createDraft({ title, hypothesis, frameworkTag: tag === "" ? null : tag }, "user");
+      await ledger.createDraft({ title, hypothesis, frameworkTag: tag === "" ? null : tag, themeId: theme === "" ? null : theme }, "user");
       setTitle("");
+      setTheme("");
       setHypothesis("");
       setTag("");
       await refresh();
@@ -179,6 +183,21 @@ export default function LedgerPage() {
                 ))}
               </select>
             </label>
+          </p>
+          <p>
+            <label>
+              Theme{" "}
+              <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+                <option value="">None</option>
+                {THEMES.map((p) => (
+                  <option key={p} value={THEME_IDS[p]}>
+                    {PAIN_LABELS[p]}
+                  </option>
+                ))}
+              </select>
+            </label>{" "}
+            The customer pain this test answers, from the <Link href="/insights">Comments</Link> screen. It links the
+            test into that theme&rsquo;s evidence chain, and it is locked once the entry is registered.
           </p>
           <button type="submit" disabled={busy}>
             Create draft

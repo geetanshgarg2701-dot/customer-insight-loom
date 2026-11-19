@@ -31,6 +31,13 @@ export const THEME_IDS: Readonly<Record<Pain, string>> = {
   no_issue: "3b0c6a1e-5f2d-4c8e-9a71-0d1e2f3a4b07",
 };
 
+/** The theme a ledger entry names, or null for none, for no complaint, or for an id this app did not issue. */
+export function themeOf(themeId: string | null): Pain | null {
+  if (themeId === null) return null;
+  const found = (Object.keys(THEME_IDS) as Pain[]).find((p) => THEME_IDS[p] === themeId);
+  return found === undefined || found === "no_issue" ? null : found;
+}
+
 /** The pains that are themes. A comment with no complaint is not a theme. */
 export const THEMES: readonly Pain[] = PAINS.filter((p) => p !== "no_issue");
 
@@ -268,8 +275,9 @@ export function assembleChain(
     ? { kind: "test", label: "Ledger test", status: "present", text: tests.map((e) => `${e.title}, ${e.status}.`).join(" "), entryId: tests[0].id }
     : { kind: "test", label: "Ledger test", status: "missing", text: "No ledger entry names this theme yet." };
 
-  const decision: ChainStep = tests.some((e) => e.status === "closed")
-    ? { kind: "decision", label: "Decision", status: "present", text: "A test on this theme is closed. Read its result in the ledger." }
+  const closed = tests.find((e) => e.status === "closed");
+  const decision: ChainStep = closed
+    ? { kind: "decision", label: "Decision", status: "present", text: "A test on this theme is closed. Read its result in the ledger.", entryId: closed.id }
     : { kind: "decision", label: "Decision", status: "missing", text: "No decision. A decision needs a test with a holdout behind it." };
 
   return [theme, segment, path, revenue, test, decision];
