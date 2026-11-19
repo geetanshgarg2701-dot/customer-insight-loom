@@ -23,7 +23,37 @@ export type JourneyRow = {
   reached: string;
   /** Every step in order, including the Search and Support detours. Removing the detours leaves the main steps. */
   path: string[];
+  /** When each step in `path` happened, as UTC ISO times, one per step, in order. */
+  times: string[];
 };
+
+/*
+ * Timing assumptions, documented because every timing view in the demo inherits them. All synthetic.
+ * - People enter at a uniformly random moment in the 28 days from JOURNEY_START.
+ * - The gap between two events is exponential with the mean below, in hours, capped at 14 days. An exponential gap has a
+ *   median of its mean times ln 2, so most people move fast and a few take much longer.
+ * - Planted timing fact: new customers take twice as long to buy, from Cart or from Support to Purchase.
+ * - The data cutoff, JOURNEYS_AS_OF, is after the latest possible event, so in the demo every window has closed and no
+ *   customer is still in progress. Views must still handle open customers, and their tests use hand made data for it.
+ * - Times come from their own seeded stream, drawn after every customer is made, so adding them changed no customer.
+ */
+export const JOURNEY_START = "2026-07-01T00:00:00.000Z";
+export const ENTRY_DAYS = 28;
+export const JOURNEYS_AS_OF = "2026-10-15T00:00:00.000Z";
+export const MAX_GAP_HOURS = 14 * 24;
+export const SLOW_NEW_FACTOR = 2;
+export const GAP_MEAN_HOURS: Readonly<Record<string, number>> = {
+  "Visit to Search": 0.1,
+  "Visit to Product": 0.1,
+  "Search to Product": 0.05,
+  "Product to Cart": 6,
+  "Cart to Support": 12,
+  "Cart to Purchase": 24,
+  "Support to Purchase": 24,
+};
+const HOUR_MS = 3_600_000;
+/** Mixed into the seed so the time stream never repeats the customer stream. */
+const TIME_STREAM = 0x5bd1e995;
 
 const PICK_CHANNEL: readonly [(typeof CHANNELS)[number], number][] = [["ads", 0.3], ["email", 0.4], ["organic", 0.3]];
 const PICK_SEGMENT: readonly [(typeof SEGMENTS)[number], number][] = [["new", 0.4], ["returning", 0.45], ["vip", 0.15]];
@@ -75,7 +105,22 @@ export function syntheticJourneys(count: number, seed: number): JourneyRow[] {
       path.push(step);
       if (s === 2 && support) path.push("Support");
     });
-    rows.push({ channel, segment, steps, reached, path });
+    rows.push({ channel, segment, steps, reached, path, times: [] });
+  }
+
+  const timeRng = mulberry32((seed ^ TIME_STREAM) >>> 0);
+  const start = Date.parse(JOURNEY_START);
+  for (const row of rows) {
+    let t = start + Math.floor(timeRng() * ENTRY_DAYS * 24 * HOUR_MS);
+    row.times.push(new Date(t).toISOString());
+    for (let i = 1; i < row.path.length; i++) {
+      const key = `${row.path[i - 1]} to ${row.path[i]}`;
+      const slow = row.segment === "new" && row.path[i] === "Purchase" ? SLOW_NEW_FACTOR : 1;
+      const mean = GAP_MEAN_HOURS[key] * slow;
+      const hours = Math.min(MAX_GAP_HOURS, -mean * Math.log(1 - timeRng()));
+      t += Math.round(hours * HOUR_MS);
+      row.times.push(new Date(t).toISOString());
+    }
   }
   return rows;
 }

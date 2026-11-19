@@ -9,7 +9,9 @@ import { loadJourneys } from "./crossfilter";
 /** A customer who reached the first `reached` steps. */
 function customer(segment: JourneyRow["segment"], channel: JourneyRow["channel"], reached: number): JourneyRow {
   const steps = JOURNEY_STEPS.map((s, i) => (i < reached ? s : null));
-  return { segment, channel, steps, reached: JOURNEY_STEPS[reached - 1], path: JOURNEY_STEPS.slice(0, reached) as string[] };
+  const path = JOURNEY_STEPS.slice(0, reached) as string[];
+  const times = path.map((_, i) => new Date(Date.UTC(2026, 6, 1, i)).toISOString());
+  return { segment, channel, steps, reached: JOURNEY_STEPS[reached - 1], path, times };
 }
 
 /** `count` customers who stopped after step `reached`. */

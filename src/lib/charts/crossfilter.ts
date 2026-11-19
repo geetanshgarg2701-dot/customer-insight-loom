@@ -20,6 +20,7 @@ export type Selection = Partial<Record<JourneyDimension, string[]>>;
 
 const TABLE_NAME = /^[a-z_][a-z0-9_]*$/;
 const STEP_COLUMNS = ["s1", "s2", "s3", "s4"] as const;
+const TIME_COLUMNS = ["t1", "t2", "t3", "t4"] as const;
 const PATH_SEPARATOR = " > ";
 
 function checkTable(table: string): void {
@@ -59,14 +60,26 @@ export function whereClause(selection: Selection, except?: string): { sql: strin
 
 export async function loadJourneys(engine: SqlEngine, table: string, rows: readonly JourneyRow[]): Promise<void> {
   checkTable(table);
+  // Times are UTC milliseconds in whole number columns, exact and free of any time zone parsing. t1 to t4 are when each
+  // main step was reached, null if it was not. times holds every event's time along the full path, detours included.
   await engine.exec(
-    `CREATE OR REPLACE TABLE ${table} (channel VARCHAR, segment VARCHAR, s1 VARCHAR, s2 VARCHAR, s3 VARCHAR, s4 VARCHAR, reached VARCHAR, path VARCHAR)`,
+    `CREATE OR REPLACE TABLE ${table} (customer INTEGER, channel VARCHAR, segment VARCHAR, s1 VARCHAR, s2 VARCHAR, s3 VARCHAR, s4 VARCHAR, ` +
+      `reached VARCHAR, path VARCHAR, t1 BIGINT, t2 BIGINT, t3 BIGINT, t4 BIGINT, times VARCHAR)`,
   );
   await insertRows(
     engine,
     table,
-    ["channel", "segment", ...STEP_COLUMNS, "reached", "path"],
-    rows.map((r) => [r.channel, r.segment, ...r.steps, r.reached, r.path.join(PATH_SEPARATOR)]),
+    ["customer", "channel", "segment", ...STEP_COLUMNS, "reached", "path", ...TIME_COLUMNS, "times"],
+    rows.map((r, i) => [
+      i,
+      r.channel,
+      r.segment,
+      ...r.steps,
+      r.reached,
+      r.path.join(PATH_SEPARATOR),
+      ...r.steps.map((step) => (step === null ? null : Date.parse(r.times[r.path.indexOf(step)]))),
+      r.times.join(PATH_SEPARATOR),
+    ]),
   );
 }
 
