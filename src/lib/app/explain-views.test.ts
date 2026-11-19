@@ -1,5 +1,6 @@
 import { anchoredFlow } from "../charts/anchored";
 import type { Comparison } from "../charts/compare";
+import type { Timing } from "../charts/timing";
 import { describe, expect, it } from "vitest";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { TopPaths } from "../charts/crossfilter";
@@ -12,6 +13,7 @@ import {
   explainOutlook,
   explainAnchored,
   explainComparison,
+  explainTiming,
   explainPaths,
   explainPeriods,
   explainStalled,
@@ -339,6 +341,34 @@ describe("explainComparison", () => {
     const s = find(list, "Small groups");
     expect(s.value).toBe("30 people");
     expect(s.how).toContain("judgment");
+  });
+
+  it("keeps the words plain", () => clean(list));
+});
+
+describe("explainTiming", () => {
+  const step = (s: string, waiting: number, dropped: number) => ({
+    step: s, moved: 10, medianHours: 2, p10Hours: 1, p25Hours: 1.5, p75Hours: 3, p90Hours: 4, waiting, dropped,
+  });
+  const t: Timing = { asOf: "2026-10-15T00:00:00.000Z", windowHours: 168, steps: [step("Visit to Product", 2, 5), step("Product to Cart", 1, 3)] };
+  const list = explainTiming(t);
+
+  it("says how the spread is measured and that Cart to Purchase includes detours", () => {
+    const e = find(list, "Time between steps");
+    expect(e.how).toContain("reached both steps");
+    expect(e.how).toContain("Support detour");
+  });
+
+  it("adds up still waiting and dropped across steps, and states the window and the cutoff", () => {
+    const w = find(list, "Still waiting");
+    expect(w.value).toBe("3");
+    expect(w.how).toContain("7 day window");
+    expect(w.how).toContain("2026-10-15");
+    expect(find(list, "Dropped").value).toBe("8");
+  });
+
+  it("says the demo times are assumed, and where the assumptions are", () => {
+    expect(find(list, "Synthetic timing").how).toContain("twice as long");
   });
 
   it("keeps the words plain", () => clean(list));

@@ -1,5 +1,6 @@
 import type { AnchoredFlow } from "../charts/anchored";
 import { MIN_GROUP, type Comparison } from "../charts/compare";
+import type { Timing } from "../charts/timing";
 import type { TopPaths } from "../charts/crossfilter";
 import type { CohortRow, DwellHistogram, FunnelStage, Outlook, PeriodComparison, Stalled } from "../charts/pipeline";
 import type { StageCount, WhatIf } from "../charts/whatif";
@@ -304,6 +305,41 @@ export function explainComparison(c: Comparison): Explanation[] {
       how:
         `A group with fewer than ${MIN_GROUP} people is shown muted with a warning, not hidden. ` +
         `${MIN_GROUP} is a judgment, not a rule from statistics.`,
+    },
+  ];
+}
+
+export function explainTiming(t: Timing): Explanation[] {
+  const days = Math.round(t.windowHours / 24);
+  const waiting = t.steps.reduce((n, s) => n + s.waiting, 0);
+  const dropped = t.steps.reduce((n, s) => n + s.dropped, 0);
+  return [
+    {
+      label: "Time between steps",
+      value: "median and spread",
+      how:
+        "Measured only on people who reached both steps, from the moment they reached one to the moment they reached the " +
+        "next. Cart to Purchase includes any Support detour in between. The median, quartiles and the 10th and 90th " +
+        "percentiles are computed in SQL with linear interpolation.",
+    },
+    {
+      label: "Still waiting",
+      value: formatCount(waiting),
+      how:
+        `People who reached a step but not the next, whose ${days} day window, counted from entry into the journey, had ` +
+        `not closed at the data cutoff of ${t.asOf.slice(0, 10)}. They are shown apart, not counted as dropped.`,
+    },
+    {
+      label: "Dropped",
+      value: formatCount(dropped),
+      how: `People who reached a step but not the next, after their ${days} day window had closed.`,
+    },
+    {
+      label: "Synthetic timing",
+      value: "assumed",
+      how:
+        "The demo times come from assumptions written in the generator: entries over 28 days, gaps that are random with " +
+        "a stated typical length and capped at 14 days, and new customers planted to take twice as long to buy.",
     },
   ];
 }

@@ -4,11 +4,11 @@
  * explicitly. Apache-2.0, pinned in package.json.
  */
 import type { ComposeOption } from "echarts/core";
-import type { BarSeriesOption, SankeySeriesOption } from "echarts/charts";
+import type { BarSeriesOption, BoxplotSeriesOption, SankeySeriesOption } from "echarts/charts";
 import type { AriaComponentOption, GridComponentOption, TooltipComponentOption } from "echarts/components";
 
 export type ChartOption = ComposeOption<
-  BarSeriesOption | SankeySeriesOption | AriaComponentOption | GridComponentOption | TooltipComponentOption
+  BarSeriesOption | BoxplotSeriesOption | SankeySeriesOption | AriaComponentOption | GridComponentOption | TooltipComponentOption
 >;
 
 let loaded: Promise<typeof import("echarts/core")> | null = null;
@@ -17,10 +17,10 @@ export function loadEcharts(): Promise<typeof import("echarts/core")> {
   if (!loaded) {
     loaded = (async () => {
       const echarts = await import("echarts/core");
-      const { BarChart, SankeyChart } = await import("echarts/charts");
+      const { BarChart, BoxplotChart, SankeyChart } = await import("echarts/charts");
       const { AriaComponent, GridComponent, TitleComponent, TooltipComponent } = await import("echarts/components");
       const { CanvasRenderer } = await import("echarts/renderers");
-      echarts.use([BarChart, SankeyChart, AriaComponent, GridComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
+      echarts.use([BarChart, BoxplotChart, SankeyChart, AriaComponent, GridComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
       return echarts;
     })();
     loaded.catch(() => {

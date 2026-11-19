@@ -11,7 +11,7 @@ Paste the whole file into a new Claude chat, then ask for a review. Good questio
 Customer Insight Loom is a free tool for marketing teams, running entirely in the browser. It was called Evidence ledger until November 18, 2026. It does three jobs:
 
 - **Experiments.** A ledger for email experiments. A person records the bet before sending, assigns a holdout group by a keyed hash, and reads the result with its uncertainty. A result stays locked until the conversion window closes. It says plainly when a test is too small to tell.
-- **Journeys.** Linked charts of where customers drop off, on synthetic data, a view of what customers did before and after any one event, and a side by side comparison of two segments or two channels.
+- **Journeys.** Linked charts of where customers drop off, on synthetic data, a view of what customers did before and after any one event, a side by side comparison of two segments or two channels, and the time people take between steps.
 - **Pipeline.** Where deals wait, how long they sit in each stage, which have stalled, how a period compares with another, and an outlook for open deals.
 
 Two helper screens: a data check that matches two files on email and checks a time column against clock changes, and a methods page showing the checks that were run on generated data.
@@ -45,8 +45,8 @@ Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript stric
 
 | Check | Result |
 |---|---|
-| Unit tests, Vitest | 732 passed in 55 files |
-| Browser tests, Playwright in Edge | 62 passed in 15 files |
+| Unit tests, Vitest | 754 passed in 56 files |
+| Browser tests, Playwright in Edge | 64 passed in 16 files |
 | Static mirror test | 1 passed. It proves the site works under a project prefix with no request to another host |
 | Database tests, SQL on a Supabase test project | 6 files plus a seventh for the correction label. Not rerun on every change |
 | Type check and lint | Clean. Lint has one old warning |
@@ -74,7 +74,7 @@ A feature counts here only if a screen calls it.
 - **Power check.** Sample size and the smallest detectable lift.
 - **Demo.** Three synthetic entries whose outcomes are fixed by design, labeled synthetic.
 - **Data intake.** Load a CSV with DuckDB, map columns, and preview 20 rows. Columns that look like personal data are blocked by name and by value.
-- **Journeys.** 100,000 synthetic customers. Linked bar charts, a flow with drop off, top paths with rare routes merged into one labeled group, a what if that says what it assumes, an anchored view with up to three steps before and after one event, and a side by side comparison of two groups with each step rate and gap shown with its interval, the number of comparisons, a small group warning, and every result labeled exploratory.
+- **Journeys.** 100,000 synthetic customers. Linked bar charts, a flow with drop off, top paths with rare routes merged into one labeled group, a what if that says what it assumes, an anchored view with up to three steps before and after one event, and a side by side comparison of two groups with each step rate and gap shown with its interval, the number of comparisons, a small group warning, and every result labeled exploratory. Time between steps shows the median and spread of hours to the next step, with people still inside their window shown apart from those who dropped. The synthetic journeys have UTC timestamps from documented assumptions, with one planted timing fact: new customers take twice as long to buy.
 - **Pipeline.** Funnel, time in stage, stalled deals, a cohort ladder, a period comparison, and an outlook for open deals that learns win rates from closed deals and shows its uncertainty.
 - **Data check.** Email matching on the normalized address with masked lists, and a time column check that lists, by row, times that never happened or happened twice around clock changes.
 - **Methods page, privacy and terms pages, a 404 page, an icon.** A test fails if the app starts using storage, cookies, network calls or analytics.
@@ -89,7 +89,7 @@ A feature counts here only if a screen calls it.
 - **Time rules.** Only the local time reader is used, by the data check, which reports flagged rows and does not exclude them. The window and day functions in the time library are used only by tests.
 - **Supabase.** The schema has 8 migrations and row level security, on the test project only. The app has no client and no dependency on it.
 
-**Not built, with no code:** journey replay, the evidence chain, deck export, webhook ingestion, hosted AI features, and accounts or sign in.
+**Not built, with no code:** journey replay, a drill-through to the people behind a step, the evidence chain, deck export, webhook ingestion, hosted AI features, and accounts or sign in.
 
 ## 8. Problems found and fixed, in the order they came up
 

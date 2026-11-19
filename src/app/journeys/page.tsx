@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection, type TopPaths } from "@/lib/charts/crossfilter";
 import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
 import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
+import { formatDuration, timingSentence, type Timing } from "@/lib/charts/timing";
 import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
 import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
-import { explainAnchored, explainComparison, explainPaths, explainWhatIf } from "@/lib/app/explain-views";
+import { explainAnchored, explainComparison, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
@@ -25,6 +26,7 @@ const ROWS = 100_000;
 const RARITY = [0.01, 0.02, 0.05] as const;
 const CHANGES = [-10, 5, 10, 20] as const;
 const STEPS = [0, 1, 2, 3] as const;
+const WINDOWS = [168, 720] as const;
 const TOP_N = [3, 5, Infinity] as const;
 
 function messageOf(error: unknown): string {
@@ -148,6 +150,40 @@ function comparisonOption(c: Comparison, theme: ChartTheme): ChartOption {
   };
 }
 
+/**
+ * Time between steps as box plots on a log scale, because the gaps run from minutes to days. The box is the middle
+ * half, the line inside is the median, and the whiskers reach the 10th and 90th percentiles.
+ */
+function timingOption(t: Timing, theme: ChartTheme): ChartOption {
+  const shown = t.steps.filter((s) => s.medianHours !== null);
+  return {
+    aria: { enabled: true },
+    textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
+    tooltip: { trigger: "item" },
+    grid: { left: 64, right: 16, top: 24, bottom: 40 },
+    xAxis: {
+      type: "category",
+      data: shown.map((s) => s.step),
+      axisLine: { lineStyle: { color: theme.line } },
+      axisLabel: { color: theme.text, interval: 0 },
+    },
+    yAxis: {
+      type: "log",
+      name: "hours, log scale",
+      nameTextStyle: { color: theme.text },
+      axisLabel: { color: theme.text },
+      splitLine: { lineStyle: { color: theme.line } },
+    },
+    series: [
+      {
+        type: "boxplot",
+        itemStyle: { color: "#efe6d6", borderColor: theme.palette[0] },
+        data: shown.map((s) => [s.p10Hours!, s.p25Hours!, s.medianHours!, s.p75Hours!, s.p90Hours!]),
+      },
+    ],
+  };
+}
+
 function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
   return {
     aria: { enabled: true },
@@ -195,6 +231,8 @@ export default function JourneysPage() {
   const [cmpA, setCmpA] = useState("new");
   const [cmpB, setCmpB] = useState("returning");
   const [comparison, setComparison] = useState<Comparison | null>(null);
+  const [windowHours, setWindowHours] = useState<(typeof WINDOWS)[number]>(168);
+  const [timing, setTiming] = useState<Timing | null>(null);
   const [whatStep, setWhatStep] = useState(1);
   const [whatPoints, setWhatPoints] = useState<(typeof CHANGES)[number]>(10);
 
@@ -221,6 +259,21 @@ export default function JourneysPage() {
     setComparison(a === b ? null : await board_.compare(dim, a, b, sel));
   }, []);
 
+  const refreshTiming = useCallback(async (hours: number, sel: Selection) => {
+    const board_ = board.current;
+    if (!board_) return;
+    setTiming(await board_.timing(hours, sel));
+  }, []);
+
+  async function changeWindow(hours: (typeof WINDOWS)[number]) {
+    setWindowHours(hours);
+    try {
+      await refreshTiming(hours, selection);
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
+
   async function changeCompare(dim: CompareDimension, a: string, b: string) {
     setCmpDim(dim);
     setCmpA(a);
@@ -243,6 +296,7 @@ export default function JourneysPage() {
       setLoaded(true);
       await refresh({}, rarity);
       await refreshComparison(cmpDim, cmpA, cmpB, {});
+      await refreshTiming(windowHours, {});
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -258,6 +312,7 @@ export default function JourneysPage() {
     try {
       await refresh(next, rarity);
       await refreshComparison(cmpDim, cmpA, cmpB, next);
+      await refreshTiming(windowHours, next);
     } catch (e) {
       setError(messageOf(e));
     }
@@ -267,6 +322,7 @@ export default function JourneysPage() {
     setSelection({});
     await refresh({}, rarity);
     await refreshComparison(cmpDim, cmpA, cmpB, {});
+    await refreshTiming(windowHours, {});
   }
 
   async function pickRarity(value: (typeof RARITY)[number]) {
@@ -477,6 +533,67 @@ export default function JourneysPage() {
                 </ul>
                 <p>{comparison.note}</p>
                 <Explain summary="How this comparison was worked out" items={explainComparison(comparison)} />
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="h-timing">
+            <h2 id="h-timing">Time between steps</h2>
+            <p>
+              How long people took to move from one step to the next, as a spread and not only an average. People who
+              reached a step and did not move on are split into still waiting, while their window is open, and dropped,
+              once it has closed.
+            </p>
+            <p role="group" aria-label="Window from entry">
+              Window from entry:{" "}
+              {WINDOWS.map((h) => (
+                <button key={h} type="button" aria-pressed={windowHours === h} onClick={() => void changeWindow(h)}>
+                  {h / 24} days
+                </button>
+              ))}
+            </p>
+            {timing && (
+              <div>
+                <Chart label="Hours between steps, median, middle half and 10th to 90th percentile" option={timingOption(timing, CHART_THEME)} height={300} />
+                <table aria-label="Time between steps">
+                  <caption>
+                    {timing.windowHours / 24} day window from entry, data cutoff {timing.asOf.slice(0, 10)}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Step</th>
+                      <th scope="col">Moved on</th>
+                      <th scope="col">Median</th>
+                      <th scope="col">Middle half</th>
+                      <th scope="col">10th to 90th</th>
+                      <th scope="col">Still waiting</th>
+                      <th scope="col">Dropped</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timing.steps.map((s) => (
+                      <tr key={s.step}>
+                        <td>{s.step}</td>
+                        <td>{s.moved.toLocaleString("en-US")}</td>
+                        <td>{s.medianHours === null ? "none" : formatDuration(s.medianHours)}</td>
+                        <td>{s.p25Hours === null ? "none" : `${formatDuration(s.p25Hours)} to ${formatDuration(s.p75Hours!)}`}</td>
+                        <td>{s.p10Hours === null ? "none" : `${formatDuration(s.p10Hours)} to ${formatDuration(s.p90Hours!)}`}</td>
+                        <td>{s.waiting.toLocaleString("en-US")}</td>
+                        <td>{s.dropped.toLocaleString("en-US")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <ul>
+                  {timing.steps.map((s) => (
+                    <li key={s.step}>{timingSentence(s, timing.windowHours)}</li>
+                  ))}
+                </ul>
+                <p>
+                  The demo times are synthetic, from assumptions written in the generator. Every window in the demo has
+                  closed by the cutoff, so nobody is still waiting here.
+                </p>
+                <Explain summary="How time between steps was worked out" items={explainTiming(timing)} />
               </div>
             )}
           </section>

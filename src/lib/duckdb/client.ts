@@ -3,6 +3,7 @@ import type { verifyResults } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
 import { pathCounts, type PathCount } from "../charts/anchored";
 import { compareGroups, type CompareDimension, type Comparison } from "../charts/compare";
+import { timeInStep, type Timing } from "../charts/timing";
 import {
   countsBy,
   loadJourneys,
@@ -34,7 +35,7 @@ import {
   type PipelineSelection,
   type Stalled,
 } from "../charts/pipeline";
-import { syntheticJourneys } from "../demo/journeys";
+import { JOURNEYS_AS_OF, syntheticJourneys } from "../demo/journeys";
 import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
@@ -167,6 +168,7 @@ export type JourneyBoard = {
   paths(minShare: number, selection: Selection): Promise<TopPaths>;
   pathCounts(selection: Selection): Promise<PathCount[]>;
   compare(dimension: CompareDimension, a: string, b: string, selection: Selection): Promise<Comparison>;
+  timing(windowHours: number, selection: Selection): Promise<Timing>;
   close(): Promise<void>;
 };
 
@@ -182,6 +184,7 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     paths: (minShare, selection) => topPaths(engine, table, selection, { minShare }),
     pathCounts: (selection) => pathCounts(engine, table, selection),
     compare: (dimension, a, b, selection) => compareGroups(engine, table, { dimension, a, b, selection }),
+    timing: (windowHours, selection) => timeInStep(engine, table, selection, { asOf: JOURNEYS_AS_OF, windowHours }),
     close: async () => {
       await engine.exec(`DROP TABLE IF EXISTS ${table}`);
       await engine.close?.();

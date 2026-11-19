@@ -3,7 +3,7 @@ import { JOURNEY_STEPS, JOURNEYS_AS_OF, syntheticJourneys, type JourneyRow } fro
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
 import { loadJourneys } from "./crossfilter";
-import { timeInStep } from "./timing";
+import { formatDuration, timeInStep, timingSentence } from "./timing";
 
 const HOUR = 3_600_000;
 const T0 = Date.parse("2026-07-01T00:00:00.000Z");
@@ -67,6 +67,8 @@ describe("timeInStep on times worked out by hand", () => {
     expect(first.medianHours).toBeCloseTo(2.5, 9);
     expect(first.p25Hours).toBeCloseTo(1.75, 9);
     expect(first.p75Hours).toBeCloseTo(3.25, 9);
+    expect(first.p10Hours).toBeCloseTo(1.3, 9);
+    expect(first.p90Hours).toBeCloseTo(3.7, 9);
     const second = t.steps[1];
     expect(second.moved).toBe(2);
     expect(second.medianHours).toBeCloseTo(20, 9);
@@ -149,5 +151,53 @@ describe("timeInStep on the generator, counted a second way", () => {
     const ratio = slow.steps[2].medianHours! / fast.steps[2].medianHours!;
     expect(ratio).toBeGreaterThan(1.7);
     expect(ratio).toBeLessThan(2.3);
+  });
+});
+
+describe("formatDuration and timingSentence, the plain words next to each spread", () => {
+  it("shows minutes under an hour, hours under two days, and days after that", () => {
+    expect(formatDuration(0.25)).toBe("15 minutes");
+    expect(formatDuration(1)).toBe("1.0 hours");
+    expect(formatDuration(0.99)).toBe("59 minutes");
+    expect(formatDuration(1 / 60)).toBe("1 minute");
+    expect(formatDuration(1.5)).toBe("1.5 hours");
+    expect(formatDuration(47.9)).toBe("47.9 hours");
+    expect(formatDuration(72)).toBe("3.0 days");
+  });
+
+  it("says what half the people took, the middle half, the slow tail, and how many were measured", () => {
+    const s = timingSentence(
+      { step: "Cart to Purchase", moved: 1234, medianHours: 18, p10Hours: 2, p25Hours: 8, p75Hours: 36, p90Hours: 60, waiting: 0, dropped: 5 },
+      168,
+    );
+    expect(s).toBe(
+      "Of 1,234 people who went from Cart to Purchase, half took less than 18.0 hours. " +
+        "The middle half took 8.0 hours to 36.0 hours, and 1 in 10 took longer than 2.5 days.",
+    );
+  });
+
+  it("says how many are still inside their window, so they are not read as dropped", () => {
+    const s = timingSentence(
+      { step: "Visit to Product", moved: 4, medianHours: 2.5, p10Hours: 1.3, p25Hours: 1.75, p75Hours: 3.25, p90Hours: 3.7, waiting: 1, dropped: 1 },
+      168,
+    );
+    expect(s).toContain("1 person is still inside the 7 day window and is shown apart, not as dropped.");
+  });
+
+  it("says plainly when nobody moved, instead of showing an empty spread", () => {
+    const s = timingSentence(
+      { step: "Cart to Purchase", moved: 0, medianHours: null, p10Hours: null, p25Hours: null, p75Hours: null, p90Hours: null, waiting: 0, dropped: 3 },
+      168,
+    );
+    expect(s).toBe("Nobody went from Cart to Purchase in this selection, so there is no time to show.");
+  });
+
+  it("uses no em dash and no parentheses", () => {
+    const s = timingSentence(
+      { step: "Visit to Product", moved: 4, medianHours: 2.5, p10Hours: 1.3, p25Hours: 1.75, p75Hours: 3.25, p90Hours: 3.7, waiting: 2, dropped: 1 },
+      720,
+    );
+    expect(s).not.toMatch(/[\u2014()]/);
+    expect(s).toContain("2 people are still inside the 30 day window");
   });
 });

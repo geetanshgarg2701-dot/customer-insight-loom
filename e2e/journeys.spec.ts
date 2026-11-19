@@ -22,7 +22,7 @@ test("linked charts filter each other on 100,000 synthetic journeys, and the upd
   await expect(page.getByRole("figure", { name: /Segment, customers per value/ })).toBeVisible();
   await expect(page.getByRole("figure", { name: /Furthest step reached, customers per value/ })).toBeVisible();
   await expect(page.getByRole("figure", { name: /Flow of customers between steps/ })).toBeVisible();
-  await expect(page.locator("canvas")).toHaveCount(6);
+  await expect(page.locator("canvas")).toHaveCount(7);
 
   // Top paths: every customer is in exactly one row, the rare paths are merged and labeled, and detours show up.
   const pathsTable = page.getByRole("table", { name: "Top paths" });
