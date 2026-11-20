@@ -45,6 +45,7 @@ import { loadComments } from "../insights/mentions";
 import { prepareComments } from "../insights/prepare";
 import { whyAtStep, type Why } from "../insights/why";
 import { stepsOverTime, type StepsOverTime } from "../charts/over-time";
+import { exitRules, waitAfter, type ExitResult, type WaitResult } from "../charts/rules";
 import { deleteEverything, readUsage, type Usage } from "../usage/usage";
 import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
@@ -185,6 +186,8 @@ export type JourneyBoard = {
   why(stepIndex: number, selection: Selection): Promise<Why>;
   /** Each main step by day, for the scrubber and the ledger markers. */
   overTime(selection: Selection): Promise<StepsOverTime>;
+  /** The designed wait and exit rules on the canvas, counted from the data. */
+  rules(selection: Selection, options: { stepIndex: number; waitDays: number; inactiveDays: number }): Promise<{ wait: WaitResult; exit: ExitResult }>;
   close(): Promise<void>;
 };
 
@@ -215,6 +218,10 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     behind: (stepIndex, selection) => behindStep(engine, table, selection, stepIndex),
     replay: (reached, offset, selection) => exampleJourney(engine, table, selection, { reached, offset }),
     overTime: (selection) => stepsOverTime(engine, table, selection),
+    rules: async (selection, o) => ({
+      wait: await waitAfter(engine, table, selection, { stepIndex: o.stepIndex, days: o.waitDays, asOf: JOURNEYS_AS_OF }),
+      exit: await exitRules(engine, table, selection, { inactiveDays: o.inactiveDays, asOf: JOURNEYS_AS_OF }),
+    }),
     why: async (stepIndex, selection) => {
       await ensureComments();
       return whyAtStep(engine, { comments, journeys: table }, stepIndex, selection);

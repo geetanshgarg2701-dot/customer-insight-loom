@@ -6,8 +6,9 @@ import "@xyflow/react/dist/style.css";
 import type { PathCount } from "@/lib/charts/anchored";
 import { DESIGNED_JOURNEY, edgeCounts, stepStats, transitionsNotDesigned, wouldCreateCycle, type DesignedNode } from "@/lib/charts/designed";
 import { formatDuration, type Timing } from "@/lib/charts/timing";
+import { INACTIVE_CHOICES, WAIT_CHOICES, type ExitResult, type WaitResult } from "@/lib/charts/rules";
 import { formatPercent } from "@/lib/app/format";
-import { explainDesigned } from "@/lib/app/explain-views";
+import { explainDesigned, explainRules } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { CHART_THEME } from "./theme";
 
@@ -62,7 +63,81 @@ function StepNode({ data }: NodeProps<Node<StepData>>) {
   );
 }
 
-const nodeTypes = { step: StepNode };
+type RuleData = { title: string; lines: string[]; [key: string]: unknown };
+
+/** A designed rule, a wait or an exit, with its live counts as real text. Drawn dashed, since it is not an event in the data. */
+function RuleNode({ data }: NodeProps<Node<RuleData>>) {
+  return (
+    <div
+      style={{
+        width: 200,
+        padding: "8px 10px",
+        background: "#fffdf8",
+        color: CHART_THEME.text,
+        border: `1px dashed ${CHART_THEME.palette[2]}`,
+        fontFamily: CHART_THEME.fontFamily,
+        fontSize: 13,
+        lineHeight: 1.35,
+      }}
+    >
+      <Handle id="l" type="target" position={Position.Left} />
+      <Handle id="t" type="target" position={Position.Top} />
+      <strong style={{ fontSize: 15 }}>{data.title}</strong>
+      {data.lines.map((line) => (
+        <div key={line}>{line}</div>
+      ))}
+    </div>
+  );
+}
+
+const nodeTypes = { step: StepNode, rule: RuleNode };
+
+export type DesignedRules = { wait: WaitResult; exit: ExitResult };
+const MAIN_STEPS = DESIGNED_JOURNEY.nodes.filter((d) => d.mainIndex !== null);
+
+function ruleNodes(rules: DesignedRules | null): { nodes: Node<RuleData>[]; edges: Edge[] } {
+  if (!rules) return { nodes: [], edges: [] };
+  const { wait, exit } = rules;
+  const anchor = MAIN_STEPS[MAIN_STEPS.findIndex((d) => d.label === wait.step)];
+  const days = `${wait.days} ${wait.days === 1 ? "day" : "days"}`;
+  const waitLines = [
+    `${n(wait.within)} went on to ${wait.next} within it`,
+    `${n(wait.later)} went on later`,
+    `${n(wait.stillWaiting)} still waiting`,
+    `${n(wait.outlasted)} sat through it`,
+  ];
+  const exitLines = [
+    `${n(exit.goal)} reached the goal`,
+    `${n(exit.inactive)} inactive for ${exit.inactiveDays} days or more`,
+    `${n(exit.active)} still active`,
+  ];
+  const nodes: Node<RuleData>[] = [
+    {
+      id: "rule-wait",
+      type: "rule",
+      position: { x: anchor.x - 20, y: 410 },
+      data: { title: `Wait ${days} after ${wait.step}`, lines: waitLines },
+      width: 200,
+      height: 130,
+      ariaLabel: `Designed wait of ${days} after ${wait.step}. ${waitLines.join(", ")}.`,
+    },
+    {
+      id: "rule-exit",
+      type: "rule",
+      position: { x: 1020, y: 410 },
+      data: { title: "Exit conditions", lines: exitLines },
+      width: 200,
+      height: 110,
+      ariaLabel: `Designed exit conditions. ${exitLines.join(", ")}.`,
+    },
+  ];
+  const line = { stroke: CHART_THEME.palette[2], strokeDasharray: "4 4", strokeWidth: 1.5 };
+  const edges: Edge[] = [
+    { id: "rule-wait-edge", source: anchor.id, target: "rule-wait", sourceHandle: "bs", targetHandle: "t", style: line },
+    { id: "rule-exit-edge", source: "Purchase", target: "rule-exit", sourceHandle: "bs", targetHandle: "t", style: line },
+  ];
+  return { nodes, edges };
+}
 
 const ARIA_LABELS = {
   "node.a11yDescription.default": "Press Enter or Space to open who is behind this step. Detours have no drill through yet.",
@@ -80,10 +155,24 @@ export function JourneyCanvas({
   paths: livePaths,
   timing: liveTiming,
   onOpenStep,
+  rules,
+  waitStep,
+  waitDays,
+  inactiveDays,
+  onWaitStep,
+  onWaitDays,
+  onInactiveDays,
 }: {
   paths: PathCount[];
   timing: Timing | null;
   onOpenStep: (index: number) => void;
+  rules: DesignedRules | null;
+  waitStep: number;
+  waitDays: number;
+  inactiveDays: number;
+  onWaitStep: (index: number) => void;
+  onWaitDays: (days: number) => void;
+  onInactiveDays: (days: number) => void;
 }) {
   // The canvas is the heaviest thing on the page to redraw. Deferring its numbers lets the urgent updates, the charts and
   // the "Updated in" figure, finish first, and the canvas catches up right after.
@@ -102,6 +191,10 @@ export function JourneyCanvas({
 
   /** Opens the step a node stands for. A main step opens who is behind it, and a detour says it has no drill through yet. */
   function openNode(id: string) {
+    if (id === "rule-wait" || id === "rule-exit") {
+      setOpened(`${id === "rule-wait" ? "The wait" : "The exit conditions"} can be changed in the choices below the canvas.`);
+      return;
+    }
     const d = DESIGNED_JOURNEY.nodes.find((x) => x.id === id);
     if (!d) return;
     if (d.mainIndex === null) {
@@ -139,6 +232,8 @@ export function JourneyCanvas({
         : `${d.label}. Nobody reached this step.`,
     };
   }), [stats, timing]);
+
+  const designedRules = useMemo(() => ruleNodes(rules), [rules]);
 
   const designedEdges: Edge[] = useMemo(() => DESIGNED_JOURNEY.edges.map((e) => {
     const c = counts.get(e.id) ?? 0;
@@ -190,7 +285,7 @@ export function JourneyCanvas({
   return (
     <div>
       <div
-        style={{ height: 380, border: `1px solid ${CHART_THEME.line}`, background: "#faf8f4" }}
+        style={{ height: 560, border: `1px solid ${CHART_THEME.line}`, background: "#faf8f4" }}
         onKeyDown={(e) => {
           // React Flow selects a focused node on Enter or Space but sends no click, so a keyboard user would never open it.
           if (e.key !== "Enter" && e.key !== " ") return;
@@ -200,8 +295,10 @@ export function JourneyCanvas({
         }}
       >
         <ReactFlow
-          nodes={nodes}
-          edges={[...designedEdges, ...sketchEdges]}
+          // The view fits the nodes when it starts, and the rule nodes arrive a moment later, so it starts again once they have.
+          key={rules ? "with-rules" : "without-rules"}
+          nodes={[...nodes, ...designedRules.nodes] as Node[]}
+          edges={[...designedEdges, ...designedRules.edges, ...sketchEdges]}
           nodeTypes={nodeTypes}
           nodesDraggable={false}
           nodesConnectable={false}
@@ -249,6 +346,43 @@ export function JourneyCanvas({
       </p>
       {message && <p role={message.warn ? "alert" : "status"}>{message.text}</p>}
 
+      <p>
+        <label>
+          Designed wait after{" "}
+          <select aria-label="Wait after step" value={waitStep} onChange={(e) => onWaitStep(Number(e.target.value))}>
+            {MAIN_STEPS.slice(0, -1).map((d, i) => (
+              <option key={d.id} value={i}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </label>{" "}
+        <label>
+          for{" "}
+          <select aria-label="Wait length" value={waitDays} onChange={(e) => onWaitDays(Number(e.target.value))}>
+            {WAIT_CHOICES.map((d) => (
+              <option key={d} value={d}>
+                {d} {d === 1 ? "day" : "days"}
+              </option>
+            ))}
+          </select>
+        </label>{" "}
+        <label>
+          Exit when inactive for{" "}
+          <select aria-label="Inactivity rule" value={inactiveDays} onChange={(e) => onInactiveDays(Number(e.target.value))}>
+            {INACTIVE_CHOICES.map((d) => (
+              <option key={d} value={d}>
+                {d} days
+              </option>
+            ))}
+          </select>
+        </label>
+      </p>
+      <p>
+        The wait and the exit conditions are designed rules. The counts on them come from the data and follow the filters,
+        and a rule does not send anything.
+      </p>
+
       <details>
         <summary>Show as table</summary>
         <table aria-label="Designed journey steps">
@@ -275,6 +409,34 @@ export function JourneyCanvas({
             ))}
           </tbody>
         </table>
+        {rules && (
+          <table aria-label="Designed rules">
+            <thead>
+              <tr>
+                <th scope="col">Rule</th>
+                <th scope="col">Group</th>
+                <th scope="col">People</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                [`Wait ${rules.wait.days} ${rules.wait.days === 1 ? "day" : "days"} after ${rules.wait.step}`, `Went on to ${rules.wait.next} within the wait`, rules.wait.within],
+                [`Wait ${rules.wait.days} ${rules.wait.days === 1 ? "day" : "days"} after ${rules.wait.step}`, "Went on later", rules.wait.later],
+                [`Wait ${rules.wait.days} ${rules.wait.days === 1 ? "day" : "days"} after ${rules.wait.step}`, "Still waiting at the cutoff", rules.wait.stillWaiting],
+                [`Wait ${rules.wait.days} ${rules.wait.days === 1 ? "day" : "days"} after ${rules.wait.step}`, "Sat through the whole wait", rules.wait.outlasted],
+                ["Exit conditions", "Reached the goal", rules.exit.goal],
+                ["Exit conditions", `Inactive for ${rules.exit.inactiveDays} days or more`, rules.exit.inactive],
+                ["Exit conditions", "Still active", rules.exit.active],
+              ].map(([rule, group, count]) => (
+                <tr key={`${rule}-${group}`}>
+                  <td>{rule}</td>
+                  <td>{group}</td>
+                  <td>{n(count as number)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         <table aria-label="Designed journey connections">
           <thead>
             <tr>
@@ -295,6 +457,7 @@ export function JourneyCanvas({
         </table>
       </details>
       <Explain summary="How the designed journey was worked out" items={explainDesigned(stats, missing, timing !== null)} />
+      {rules && <Explain summary="How the wait and exit conditions were worked out" items={explainRules(rules.wait, rules.exit)} />}
     </div>
   );
 }

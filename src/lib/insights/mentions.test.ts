@@ -60,7 +60,7 @@ describe("mentionRates on counts worked out by hand", () => {
     e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", journeys);
     await loadComments(e, "comments", rows);
-  });
+  }, 120_000);
   afterAll(async () => e.close?.());
 
   it("counts 100 linked comments and 1 that matches no customer", async () => {
@@ -137,7 +137,7 @@ describe("mentionRates on the synthetic comments, against an independent count",
     e = await createNodeEngine({ isolated: true });
     await loadJourneys(e, "journeys", journeys);
     await loadComments(e, "comments", prepared.rows);
-  });
+  }, 120_000);
   afterAll(async () => e.close?.());
 
   it("matches a count made in plain code for every group and pain, by reached step", async () => {

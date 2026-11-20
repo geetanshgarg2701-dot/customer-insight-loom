@@ -22,7 +22,7 @@ import { explainWhy, explainAnchored, explainBehind, explainComparison, explainR
 import { Explain } from "../explain";
 import { Nav } from "../nav";
 import { Chart } from "./chart";
-import { JourneyCanvas } from "./canvas";
+import { JourneyCanvas, type DesignedRules } from "./canvas";
 import { CHART_THEME, GROUP_COLOR, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
@@ -284,6 +284,13 @@ export default function JourneysPage() {
   const [windowHours, setWindowHours] = useState<(typeof WINDOWS)[number]>(168);
   const [timing, setTiming] = useState<Timing | null>(null);
   const [overTime, setOverTime] = useState<StepsOverTime | null>(null);
+  const [rules, setRules] = useState<DesignedRules | null>(null);
+  const [waitStep, setWaitStep] = useState(2);
+  const [waitDays, setWaitDays] = useState(3);
+  const [inactiveDays, setInactiveDays] = useState(14);
+  // The latest choices, read when the rules are counted. The first load can still be running when someone changes a
+  // choice, and it must not write its older choices over the new ones.
+  const ruleChoice = useRef({ stepIndex: 2, waitDays: 3, inactiveDays: 14 });
   const [scrubIndex, setScrubIndex] = useState(0);
   const [launches, setLaunches] = useState<{ id: string; title: string; launchedAt: string | null }[]>([]);
   const [behindIndex, setBehindIndex] = useState(2);
@@ -329,6 +336,15 @@ export default function JourneysPage() {
     const board_ = board.current;
     if (!board_) return;
     setTiming(await board_.timing(hours, sel));
+  }, []);
+
+  const refreshRules = useCallback(async (sel: Selection) => {
+    const board_ = board.current;
+    if (!board_) return;
+    const choice = ruleChoice.current;
+    const next = await board_.rules(sel, choice);
+    // A choice changed while this was counting, so a newer count is on its way and this one is out of date.
+    if (choice === ruleChoice.current) setRules(next);
   }, []);
 
   /** The days stay the same under any filter, so the scrubber keeps its day. The first load starts on the last day. */
@@ -457,6 +473,7 @@ export default function JourneysPage() {
       () => refreshComparison(v?.compare?.dim ?? cmpDim, v?.compare?.a ?? cmpA, v?.compare?.b ?? cmpB, sel),
       () => refreshTiming(v?.windowHours ?? windowHours, sel),
       () => refreshOverTime(sel),
+      () => refreshRules(sel),
       () => refreshBehind(v?.behindIndex ?? behindIndex, sel),
       () => refreshWhy(v?.behindIndex ?? behindIndex, sel),
       () => refreshReplay(v?.replayReached ?? replayReached, replayAt, sel),
@@ -662,7 +679,32 @@ export default function JourneysPage() {
               a main step to open who is behind it. The two detours, Search and Support, are branches off the main steps.
               The numbers follow the filters above.
             </p>
-            {allPaths.length > 0 && <JourneyCanvas paths={allPaths} timing={timing} onOpenStep={(i) => void pickBehind(i)} />}
+            {allPaths.length > 0 && (
+              <JourneyCanvas
+                paths={allPaths}
+                timing={timing}
+                onOpenStep={(i) => void pickBehind(i)}
+                rules={rules}
+                waitStep={waitStep}
+                waitDays={waitDays}
+                inactiveDays={inactiveDays}
+                onWaitStep={(i) => {
+                  setWaitStep(i);
+                  ruleChoice.current = { ...ruleChoice.current, stepIndex: i };
+                  void refreshRules(selection).catch((e: unknown) => setError(messageOf(e)));
+                }}
+                onWaitDays={(d) => {
+                  setWaitDays(d);
+                  ruleChoice.current = { ...ruleChoice.current, waitDays: d };
+                  void refreshRules(selection).catch((e: unknown) => setError(messageOf(e)));
+                }}
+                onInactiveDays={(d) => {
+                  setInactiveDays(d);
+                  ruleChoice.current = { ...ruleChoice.current, inactiveDays: d };
+                  void refreshRules(selection).catch((e: unknown) => setError(messageOf(e)));
+                }}
+              />
+            )}
           </section>
 
           <section aria-labelledby="h-flow">

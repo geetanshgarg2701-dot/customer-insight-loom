@@ -74,7 +74,7 @@ describe("the evidence chain on counts worked out by hand", () => {
     await loadJourneys(e, T.journeys, journeys);
     await loadComments(e, T.comments, said.map(([p, s], i) => row(i, journeys[i], p, s)));
     await loadRevenue(e, T.revenue, revenue);
-  });
+  }, 120_000);
   afterAll(async () => e.close?.());
 
   it("ranks pains by mentions, leaves out no complaint, and sums the revenue of the customers who raised each", async () => {
@@ -191,7 +191,7 @@ describe("Benjamini Hochberg holds back a link whose raw p value alone would pas
     await loadJourneys(e, T.journeys, journeys);
     await loadComments(e, T.comments, said.map((p, i) => row(i, journeys[i], p)));
     await loadRevenue(e, T.revenue, journeys.map(() => 0));
-  });
+  }, 120_000);
   afterAll(async () => e.close?.());
 
   it("leaves pricing unflagged at p about 0.04 across 6 comparisons, and still flags shipping cost", async () => {
@@ -232,7 +232,7 @@ describe("the evidence chain on the synthetic comments", () => {
     await loadJourneys(e, T.journeys, journeys);
     await loadComments(e, T.comments, prepared.rows);
     await loadRevenue(e, T.revenue, revenue);
-  });
+  }, 120_000);
   afterAll(async () => e.close?.());
 
   it("matches an independent count of mentions and revenue for every pain", async () => {

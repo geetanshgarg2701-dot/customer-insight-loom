@@ -10,6 +10,7 @@ import type { StageCount, WhatIf } from "../charts/whatif";
 import { PAIN_LABELS } from "../insights/comments";
 import type { MentionRates } from "../insights/mentions";
 import type { Why } from "../insights/why";
+import type { ExitResult, WaitResult } from "../charts/rules";
 import { formatCount, formatPercent, formatSignedPoints } from "./format";
 import type { Explanation } from "./explain";
 
@@ -571,6 +572,34 @@ export function explainWhy(w: Why): Explanation[] {
       how:
         "A listed item goes with more people leaving here. It does not show that it made them leave. Themes and segments overlap, " +
         "so one listed item can be the same customers as another. Only a ledger test with a holdout can support a causal reading.",
+    },
+  ];
+}
+
+export function explainRules(wait: WaitResult, exit: ExitResult): Explanation[] {
+  return [
+    {
+      label: `Wait of ${wait.days} ${wait.days === 1 ? "day" : "days"} after ${wait.step}`,
+      value: `${n(wait.reached)} people reached ${wait.step}`,
+      how:
+        `Each person who reached ${wait.step} is in one of four groups: ${n(wait.within)} went on to ${wait.next} within ${wait.days} ` +
+        `${wait.days === 1 ? "day" : "days"}, ${n(wait.later)} went on later, ${n(wait.stillWaiting)} have not and the wait was not over at the ` +
+        `data cutoff, and ${n(wait.outlasted)} have not and the wait was over. Together that is ${n(wait.within + wait.later + wait.stillWaiting + wait.outlasted)}. ` +
+        `A move exactly at the wait counts as within it. The time to ${wait.next} includes any detour in between.`,
+    },
+    {
+      label: "Exit conditions",
+      value: `${n(exit.total)} people`,
+      how:
+        `${n(exit.goal)} reached the goal, the last step. Of the rest, ${n(exit.inactive)} had no event for at least ${exit.inactiveDays} days ` +
+        `before the data cutoff, so they count as having left, and ${n(exit.active)} had an event more recently and are still active. ` +
+        `A last event exactly ${exit.inactiveDays} days before the cutoff counts as inactive. The threshold changes the number, which is why it is shown beside it. ` +
+        "In the demo the cutoff is long after the last event, so a short threshold leaves almost nobody active.",
+    },
+    {
+      label: "What these are",
+      value: "designed rules",
+      how: "The wait and the exit rule are designed on the canvas, and the numbers on them are counted from the data. A rule here does not send anything or change a journey. It shows how the data fits the rule.",
     },
   ];
 }

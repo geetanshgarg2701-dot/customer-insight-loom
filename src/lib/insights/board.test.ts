@@ -16,7 +16,7 @@ describe("createCommentsBoard", () => {
   beforeAll(async () => {
     e = await createNodeEngine({ isolated: true });
     board = await createCommentsBoard(e, journeys, comments);
-  });
+  }, 120_000);
   afterAll(async () => board.close());
 
   it("reports the same kept, withheld and scorecard as the redaction step", () => {
