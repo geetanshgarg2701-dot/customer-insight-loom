@@ -54,7 +54,7 @@ export default function PrivacyPage() {
             Theme coding on the comments screen uses a small language model that runs in your browser. Only when you ask
             for it, the page downloads the model files, about 51 MB, from this same site. The app refuses to load them from
             anywhere else, does not keep them, and sends no comment text anywhere. Text you type there is redacted before
-            the model sees it.
+            the model sees it. Questions you type to the assistant on that screen are matched in your browser too, and go nowhere.
           </li>
           <li>It has no analytics, no error reporting, no advertising and no outside fonts or scripts.</li>
           <li>

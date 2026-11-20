@@ -105,11 +105,15 @@ export type Coder = { code(text: string): Promise<Coded>; codeMany(texts: readon
 
 /**
  * A coder for one embedding model. `threshold` is the similarity below which the answer is uncertain. It is chosen on
- * the tuning set only.
+ * the tuning set only. `descriptions` are the themes' descriptions, the comment ones unless the caller has its own.
  */
-export async function createCoder(embed: Embed, threshold: number): Promise<Coder> {
+export async function createCoder(
+  embed: Embed,
+  threshold: number,
+  descriptions: Readonly<Record<Pain, readonly string[]>> = THEME_DESCRIPTIONS,
+): Promise<Coder> {
   if (!(threshold > -1 && threshold < 1)) throw new RangeError("The threshold must be between -1 and 1.");
-  const themes = THEME_ORDER.flatMap((t) => THEME_DESCRIPTIONS[t].map((d) => ({ t, d })));
+  const themes = THEME_ORDER.flatMap((t) => descriptions[t].map((d) => ({ t, d })));
   const protoVectors = await embed(themes.map((x) => x.d));
 
   function decide(text: string, sentences: Quote[], vectors: Float32Array[]): Coded {

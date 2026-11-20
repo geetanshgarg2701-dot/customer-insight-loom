@@ -15,8 +15,10 @@ import { exportDeck } from "../deck-export";
 import { ChainGraph } from "./chain-graph";
 import { checkNames } from "@/lib/redaction/name-check";
 import { Nav } from "../nav";
+import { answerQuestion, QUESTION_TOPICS, type Answer, type AssistantData, type Deps } from "@/lib/ai/assistant";
 import { createCoder, type Coder } from "@/lib/ai/coder";
-import { MEASURED } from "@/lib/ai/measured";
+import { createIntentMatcher } from "@/lib/ai/intent";
+import { MEASURED, MEASURED_ASSISTANT } from "@/lib/ai/measured";
 import { MODEL_DOWNLOAD_BYTES } from "@/lib/ai/model-id";
 import { redactQuote } from "@/lib/redaction/quote";
 import { COMMENT_COLUMN } from "@/lib/insights/prepare";
@@ -116,6 +118,9 @@ export default function InsightsPage() {
     uncertain: number;
     rows: { customer: number; text: string; pain: Pain; theme: Pain | null; quote: string | null }[];
   } | null>(null);
+  const [assistant, setAssistant] = useState<Deps | null>(null);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState<Answer | null>(null);
   const [ownText, setOwnText] = useState("");
   const [ownResult, setOwnResult] = useState<{ text: string; theme: Pain | null; quote: string | null; score: number } | null>(null);
 
@@ -124,7 +129,13 @@ export default function InsightsPage() {
     setError(null);
     try {
       const { loadBrowserEmbed } = await import("@/lib/ai/model");
-      setCoder(await createCoder(await loadBrowserEmbed(), MEASURED.threshold));
+      const embed = await loadBrowserEmbed();
+      setCoder(await createCoder(embed, MEASURED.threshold));
+      setAssistant({
+        matcher: await createIntentMatcher(embed, { guard: MEASURED_ASSISTANT.cuts.guard, fallback: MEASURED_ASSISTANT.cuts.fallback }),
+        coder: await createCoder(embed, -0.99, QUESTION_TOPICS),
+        painThreshold: MEASURED_ASSISTANT.cuts.painThreshold,
+      });
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -146,6 +157,25 @@ export default function InsightsPage() {
         uncertain: rows.filter((r) => r.theme === null).length,
         rows,
       });
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setModelBusy(false);
+    }
+  }
+
+  async function onAsk() {
+    if (!assistant || !board.current || !summary || !ranking || !drops) return;
+    setModelBusy(true);
+    setError(null);
+    try {
+      // The facts are what this screen already shows, plus the first few stored comments for each complaint.
+      const quotes: AssistantData["quotes"] = {};
+      for (const p of PAINS.filter((x) => x !== "no_issue")) {
+        quotes[p] = (await board.current.quotes(p, 0)).rows.slice(0, 3).map((r) => ({ customer: r.customer, text: r.text }));
+      }
+      const data: AssistantData = { kept: summary.kept, withheld: summary.withheld, ranking, drops, carriers, scorecard: summary.card, quotes };
+      setAnswer(await answerQuestion(question, data, assistant));
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -556,6 +586,74 @@ export default function InsightsPage() {
                         : "Uncertain. No pain matched well enough to call."}{" "}
                       Similarity {ownResult.score.toFixed(3)}, cut {MEASURED.threshold}.
                     </p>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          <section aria-labelledby="h-ask">
+            <h2 id="h-ask">Ask your data</h2>
+            <p>
+              Ask a question about the comments on this screen. Every number in an answer comes from a number already shown
+              here, and each answer lists where its numbers came from. A fixed set of rules builds the answer. The model only
+              helps pick which kind of question it is and which complaint you mean, and it writes nothing. A question it
+              does not understand or that this screen cannot answer is refused, and text inside a comment is never treated
+              as an instruction.
+            </p>
+            <p>
+              How well it picks: on {MEASURED_ASSISTANT.heldOut.n} questions it had never seen, it handled{" "}
+              {MEASURED_ASSISTANT.heldOut.typeRight} as a person would. It gave {MEASURED_ASSISTANT.heldOut.wrongAnswers} wrong
+              answers, refused {MEASURED_ASSISTANT.heldOut.overRefused} valid question, and refused{" "}
+              {MEASURED_ASSISTANT.heldOut.trapsRefused} of {MEASURED_ASSISTANT.heldOut.trapsTotal} questions it should not
+              answer. It named the right complaint, or asked for one, on {MEASURED_ASSISTANT.heldOut.painRight} of{" "}
+              {MEASURED_ASSISTANT.heldOut.painNeeded}. Check an answer against the tables above. The same person wrote the test
+              questions and the rules, so real questions will likely go worse. Earlier versions did worse, and the numbers
+              for each are in the build status document.
+            </p>
+            {!assistant ? (
+              <p>Load the model above, under Theme coding, to ask questions.</p>
+            ) : (
+              <>
+                <p>
+                  <label>
+                    Your question
+                    <input type="text" value={question} maxLength={500} onChange={(e) => setQuestion(e.target.value)} style={{ width: "100%" }} />
+                  </label>
+                </p>
+                <p>
+                  <button type="button" disabled={modelBusy || question.trim() === ""} onClick={() => void onAsk()}>
+                    Ask
+                  </button>
+                </p>
+                <p>
+                  Things it can answer: how many comments mention a complaint, the most common complaints, the revenue of the
+                  customers who raised one, whether one goes with customers stopping at a step, which groups raise it, how
+                  severe the comments are, examples, redaction, and how many comments were left out. For example: How many
+                  comments mention shipping costs?
+                </p>
+                {answer && (
+                  <div role="status" aria-label="Answer">
+                    <p>
+                      <strong>{answer.kind === "answer" ? "Answer" : "Not answered"}.</strong> {answer.text}
+                    </p>
+                    {answer.quotes.map((q) => (
+                      <blockquote key={q.customer}>
+                        {q.text} <small>Customer {q.customer}</small>
+                      </blockquote>
+                    ))}
+                    {answer.citations.length > 0 && (
+                      <>
+                        <p>Where each number came from:</p>
+                        <ul>
+                          {answer.citations.map((c, i) => (
+                            <li key={`${c.label}-${i}`}>
+                              {c.label}: {c.shown}. {c.source}.
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                   </div>
                 )}
               </>

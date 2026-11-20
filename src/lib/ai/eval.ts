@@ -69,3 +69,34 @@ export function chooseThreshold(tune: readonly { score: number; right: boolean }
   }
   return bestCut;
 }
+
+/** What a person would make of the matcher's handling of one question, as points. A wrong answer costs more than a refusal. */
+export function handlingPoints(got: string | null, expected: string | null): number {
+  if (expected === null) return got === null ? 1 : -2;
+  if (got === null) return -0.5;
+  return got === expected ? 1 : -2;
+}
+
+/**
+ * The two cuts of the intent matcher, chosen on the tuning questions only by the points above. A tie goes to the higher
+ * cuts, which refuse more. `decide` is passed in so this file does not depend on the matcher.
+ */
+export function chooseCuts<A>(
+  rows: readonly { analysis: A; expected: string | null }[],
+  decide: (a: A, cuts: { guard: number; fallback: number }) => string | null,
+): { guard: number; fallback: number } {
+  if (rows.length === 0) throw new RangeError("The tuning set is empty.");
+  const grid = (from: number, to: number) => Array.from({ length: Math.round((to - from) / 0.02) + 1 }, (_, i) => Number((from + i * 0.02).toFixed(2)));
+  let best = { guard: 0.2, fallback: 0.5 };
+  let bestPoints = -Infinity;
+  for (const guard of grid(0.2, 0.8)) {
+    for (const fallback of grid(0.5, 0.96)) {
+      const points = rows.reduce((n, r) => n + handlingPoints(decide(r.analysis, { guard, fallback }), r.expected), 0);
+      if (points >= bestPoints) {
+        bestPoints = points;
+        best = { guard, fallback };
+      }
+    }
+  }
+  return best;
+}
