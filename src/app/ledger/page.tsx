@@ -81,7 +81,7 @@ export default function LedgerPage() {
     try {
       await seedBrowserDemo();
       await refresh();
-      setNotice("Loaded 3 synthetic demo entries.");
+      setNotice("Loaded 4 synthetic demo entries.");
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -215,8 +215,9 @@ export default function LedgerPage() {
               <button type="button" disabled={busy} onClick={() => void onLoadDemo()}>
                 Load demo data
               </button>{" "}
-              Adds three synthetic entries, each labeled synthetic: one confirmatory with a result, one
-              exploratory, and one still running that you can read out yourself.
+              Adds four synthetic entries, each labeled synthetic: one confirmatory with a result, one
+              exploratory, one still running that you can read out yourself, and one launched in July 2026 that the
+              Journeys screen marks on its timeline.
             </p>
             <p>
               The demo outcomes are set so every visitor sees the planted result: a 4 point lift reads as significant and a

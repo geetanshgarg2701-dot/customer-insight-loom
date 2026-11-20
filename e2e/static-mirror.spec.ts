@@ -25,8 +25,8 @@ test("the static mirror loads DuckDB from its own prefix and runs the demo with 
   await page.goto("ledger/");
   await expect(page.getByRole("link", { name: "Methods" })).toHaveAttribute("href", `/${PREFIX}/methods/`);
   await page.getByRole("button", { name: "Load demo data" }).click();
-  await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByRole("table", { name: "Ledger entries" }).getByRole("row")).toHaveCount(4);
+  await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByRole("table", { name: "Ledger entries" }).getByRole("row")).toHaveCount(5);
 
   // Moving between pages by clicking works without the prefetch files.
   await page.getByRole("link", { name: "Methods" }).click();

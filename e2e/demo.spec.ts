@@ -17,11 +17,11 @@ test("loads the synthetic demo and reads out the running entry from a demo resul
 
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
-  await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
 
   const list = page.getByRole("table", { name: "Ledger entries" });
   const rows = list.getByRole("row");
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(5);
   for (const row of await rows.all().then((r) => r.slice(1))) {
     await expect(row).toContainText("Synthetic demo data");
   }
@@ -29,6 +29,7 @@ test("loads the synthetic demo and reads out the running entry from a demo resul
   await expect(rows.nth(1)).toContainText("Confirmatory");
   await expect(rows.nth(2)).toContainText("Exploratory");
   await expect(rows.nth(3)).toContainText("running");
+  await expect(rows.nth(4)).toContainText("launched in July");
 
   // The demo audience a visitor can download is synthetic and reserved.
   const [audience] = await Promise.all([
@@ -98,7 +99,7 @@ test("the ledger export says no correction was applied, for every demo result", 
   test.setTimeout(180_000);
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
-  await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export as CSV" }).click(),

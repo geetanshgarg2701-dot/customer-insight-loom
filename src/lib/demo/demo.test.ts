@@ -6,7 +6,9 @@ import { resultRecord } from "../assignment/record";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
 import { SYNTHETIC_ACTOR, createLedger, dropLedgerTables, type Ledger } from "../ledger/ledger";
-import { seedDemoLedger } from "./seed";
+import { JOURNEY_START, ENTRY_DAYS } from "./journeys";
+import { THEME_IDS } from "../insights/evidence";
+import { JULY_LAUNCH, seedDemoLedger } from "./seed";
 import {
   DEMO_DOMAIN,
   DEMO_POOL_SIZE,
@@ -113,10 +115,10 @@ describe("demo results for an entry", () => {
 });
 
 describe("seedDemoLedger, plan 6.1 guided first run", () => {
-  it("creates one confirmatory readable entry, one exploratory and one running, all synthetic", { timeout: 60_000 }, async () => {
+  it("creates one confirmatory readable entry, one exploratory, one running and one launched in July, all synthetic", { timeout: 60_000 }, async () => {
     await seedDemoLedger({ engine, ledger });
     const entries = await ledger.listEntries();
-    expect(entries).toHaveLength(3);
+    expect(entries).toHaveLength(4);
     for (const e of entries) expect(e.synthetic).toBe(true);
 
     const [confirmatory, exploratory, running] = entries;
@@ -185,6 +187,33 @@ describe("seedDemoLedger, plan 6.1 guided first run", () => {
     const text = JSON.stringify(await ledger.exportFile());
     expect(text).not.toContain("@");
     expect(text).not.toContain(DEMO_DOMAIN);
+  });
+
+  it("launches the fourth entry inside the demo journeys' dates, with a full week of journeys on each side", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    const july = (await ledger.listEntries())[3];
+    const DAY = 86_400_000;
+    const start = Date.parse(JOURNEY_START);
+    expect(july.launchedAt).toBe(JULY_LAUNCH);
+    expect(Date.parse(july.launchedAt!)).toBeGreaterThanOrEqual(start + 7 * DAY);
+    expect(Date.parse(july.launchedAt!)).toBeLessThanOrEqual(start + (ENTRY_DAYS - 7) * DAY);
+    expect(july.title).toMatch(/^Synthetic: /);
+    expect(july.synthetic).toBe(true);
+  });
+
+  it("makes the July entry a confirmatory test on the shipping cost theme, read out with a planted lift of zero", { timeout: 60_000 }, async () => {
+    await seedDemoLedger({ engine, ledger });
+    const july = (await ledger.listEntries())[3];
+    expect(july.themeId).toBe(THEME_IDS.shipping_cost);
+    expect(july.entryType).toBe("confirmatory");
+    expect((july.design as { syntheticTrueLift: number }).syntheticTrueLift).toBe(0);
+    const actions = (await ledger.listAudit(july.id)).map((a) => a.action);
+    expect(actions.indexOf("compliance_passed")).toBeLessThan(actions.indexOf("launched"));
+    // A readout, when the mismatch check lets one through, lands near zero. About 1 time in 1,000 it holds the entry back.
+    if (july.result !== null) {
+      expect(Math.abs((july.result as { lift: number }).lift)).toBeLessThan(0.07);
+      expect(Date.parse((july.result as { computed_at: string }).computed_at)).toBeGreaterThan(Date.parse(JULY_LAUNCH) + 7 * 86_400_000);
+    }
   });
 
   it("refuses to seed a ledger that already has entries", async () => {

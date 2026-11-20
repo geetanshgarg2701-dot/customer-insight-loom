@@ -59,7 +59,7 @@ test("the ledger and an entry have none, with the demo loaded and an explanation
   test.setTimeout(240_000);
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
-  await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
   await scan(page, "/ledger with entries");
   await page.getByRole("table", { name: "Ledger entries" }).getByRole("link").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });

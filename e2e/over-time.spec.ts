@@ -52,15 +52,25 @@ test("the funnel by day matches the generator, follows the scrubber and the filt
   await expect(section.getByRole("table", { name: "People who had reached each step, by day" }).getByRole("row", { name: new RegExp(`^${mid}`) })).toBeVisible();
 });
 
-test("launched ledger tests outside the data's dates are listed and not marked", async ({ page }) => {
+test("the July demo test is marked on its day with a before and after count, and the others are listed outside", async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
-  await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Journeys" }).click();
   const section = await load(page);
   await expect(section.getByText(/^3 ledger tests launched outside these dates/)).toBeVisible();
-  await expect(section.getByRole("list", { name: "Ledger tests launched during these days" })).toHaveCount(0);
+  const marked = section.getByRole("list", { name: "Ledger tests launched during these days" }).getByRole("listitem");
+  await expect(marked).toHaveCount(1);
+  await expect(marked).toContainText("Synthetic: free shipping banner at the cart, launched in July, launched 2026-07-15.");
+
+  // Purchases a day over the 7 days before and the 7 days from launch, counted from the generator.
+  const purchasesOn = (day: string) => rows.filter((r) => r.steps[3] !== null && r.times[r.path.indexOf("Purchase")].slice(0, 10) === day).length;
+  const dayAt = (offset: number) => new Date(Date.parse("2026-07-15T00:00:00Z") + offset * 86_400_000).toISOString().slice(0, 10);
+  const before = [-7, -6, -5, -4, -3, -2, -1].reduce((t, d) => t + purchasesOn(dayAt(d)), 0) / 7;
+  const after = [0, 1, 2, 3, 4, 5, 6].reduce((t, d) => t + purchasesOn(dayAt(d)), 0) / 7;
+  await expect(marked).toContainText(`Purchases a day: ${before.toFixed(1)} over the 7 days before, and ${after.toFixed(1)} over the 7 days from launch.`);
+  await expect(marked).toContainText("not the test’s measured lift");
 });
 
 test("the journey over time section has no axe violations and fits a phone", async ({ page }) => {

@@ -1,6 +1,8 @@
 /**
- * The guided first run, plan section 6.1: three synthetic entries, one
- * confirmatory with a readable result, one exploratory, one running. Every
+ * The guided first run, plan section 6.1: four synthetic entries, one
+ * confirmatory with a readable result, one exploratory, one running, and one
+ * launched in July 2026 inside the demo journeys' dates, so the journeys screen
+ * can mark a launch on its timeline. Every
  * step goes through the same ledger, assignment and readout code a person
  * uses, so the demo shows the real engine. Each entry stores the true lift it
  * was generated with, so the screen can say where the readout should land.
@@ -10,6 +12,7 @@
  * bypassed. The shared ledger keeps using real time.
  */
 import { SYNTHETIC_EMAIL } from "../compliance/example";
+import { THEME_IDS } from "../insights/evidence";
 import { assignAudience, verifyResults } from "../assignment/assign";
 import { resultRecord } from "../assignment/record";
 import type { SqlEngine } from "../intake/types";
@@ -19,6 +22,11 @@ import { powerCheck } from "../stats/power";
 import { DEMO_POOL_SIZE, demoEmail, demoResultRows } from "./synthetic";
 
 export const DEMO_WINDOW_HOURS = 168;
+/**
+ * When the July entry launched: two weeks into the demo journeys, which take in new customers for 28 days from
+ * July 1, 2026, so there is a full week of journeys on each side of the marker. A fixed date, unlike the other three.
+ */
+export const JULY_LAUNCH = "2026-07-15T09:00:00.000Z";
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -32,9 +40,10 @@ type DemoPlan = {
   treatmentShare: number;
   trueLift: number;
   seed: number;
+  themeId?: string;
 };
 
-const PLANS: Record<"confirmatory" | "exploratory" | "running", DemoPlan> = {
+const PLANS: Record<"confirmatory" | "exploratory" | "running" | "july", DemoPlan> = {
   confirmatory: {
     title: "Synthetic: win back email with a 10 percent offer",
     hypothesis: "Lapsed customers who get a 10 percent offer repurchase within 30 days more often than a holdout.",
@@ -65,6 +74,19 @@ const PLANS: Record<"confirmatory" | "exploratory" | "running", DemoPlan> = {
     trueLift: 0.04,
     seed: 61103,
   },
+  // The demo journeys hold no planted change, so this test's planted lift is zero too: its marker on the journeys
+  // timeline shows no shift, and its readout lands near zero. The two agree, which is the point of showing both.
+  july: {
+    title: "Synthetic: free shipping banner at the cart, launched in July",
+    hypothesis: "A free shipping banner at the cart lifts 7 day purchases against a holdout. The planted lift is zero.",
+    frameworkTag: "PAS",
+    baselineRate: 0.1,
+    minDetectableLift: 0.04,
+    treatmentShare: 0.5,
+    trueLift: 0,
+    seed: 61104,
+    themeId: THEME_IDS.shipping_cost,
+  },
 };
 
 /** Audience 20 percent above what the power check asks for, inside the demo pool. */
@@ -85,7 +107,7 @@ function sized(plan: DemoPlan) {
 async function draftAndAssign(ledger: Ledger, plan: DemoPlan) {
   const { design, power, audienceSize } = sized(plan);
   const entry = await ledger.createDraft(
-    { title: plan.title, hypothesis: plan.hypothesis, frameworkTag: plan.frameworkTag, design },
+    { title: plan.title, hypothesis: plan.hypothesis, frameworkTag: plan.frameworkTag, design, themeId: plan.themeId ?? null },
     SYNTHETIC_ACTOR,
   );
   return { entry, power, audienceSize };
@@ -123,7 +145,7 @@ async function readAndRecord(engine: SqlEngine, ledger: Ledger, entryId: string,
   );
 }
 
-/** Seeds an empty ledger with the three demo entries and returns their ids in order. */
+/** Seeds an empty ledger with the four demo entries and returns their ids in order. */
 export async function seedDemoLedger(input: { engine: SqlEngine; ledger: Ledger }): Promise<string[]> {
   const { engine, ledger } = input;
   if ((await ledger.listEntries()).length > 0) {
@@ -177,5 +199,20 @@ export async function seedDemoLedger(input: { engine: SqlEngine; ledger: Ledger 
   await sl.recordComplianceCheck(third.entry.id, SYNTHETIC_EMAIL, SYNTHETIC_ACTOR);
   await sl.launch(third.entry.id, SYNTHETIC_ACTOR);
 
-  return [first.entry.id, second.entry.id, third.entry.id];
+  // July: registered, assigned and launched on fixed dates inside the demo journeys, then read out after its window.
+  const j = PLANS.july;
+  const launch = Date.parse(JULY_LAUNCH);
+  if (present < launch + 14 * DAY_MS) throw new Error("The July demo entry needs its readout date to be in the past.");
+  t = launch - 2 * DAY_MS;
+  const fourth = await draftAndAssign(sl, j);
+  t = launch - DAY_MS;
+  await sl.register(fourth.entry.id, SYNTHETIC_ACTOR, { powerResult: fourth.power });
+  await assign(sl, fourth.entry.id, j, fourth.audienceSize);
+  await sl.recordComplianceCheck(fourth.entry.id, SYNTHETIC_EMAIL, SYNTHETIC_ACTOR);
+  t = launch;
+  await sl.launch(fourth.entry.id, SYNTHETIC_ACTOR);
+  t = launch + 14 * DAY_MS;
+  await readAndRecord(engine, sl, fourth.entry.id, j, true);
+
+  return [first.entry.id, second.entry.id, third.entry.id, fourth.entry.id];
 }

@@ -145,7 +145,7 @@ export async function importBrowserLedger(file: unknown): Promise<Ledger> {
   return ledger;
 }
 
-/** Fills an empty shared ledger with the three synthetic demo entries, plan 6.1. */
+/** Fills an empty shared ledger with the four synthetic demo entries, plan 6.1. */
 export async function seedBrowserDemo(): Promise<void> {
   const ledger = await getBrowserLedger();
   const engine = await createBrowserEngine();

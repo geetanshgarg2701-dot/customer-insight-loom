@@ -29,7 +29,7 @@ test.describe("phone width", () => {
     test.setTimeout(180_000);
     await page.goto("/ledger");
     await page.getByRole("button", { name: "Load demo data" }).click();
-    await expect(page.getByText("Loaded 3 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
     await expectFits(page, "/ledger with entries");
     const entryLink = page.getByRole("table", { name: "Ledger entries" }).getByRole("link").first();
     await entryLink.click();
