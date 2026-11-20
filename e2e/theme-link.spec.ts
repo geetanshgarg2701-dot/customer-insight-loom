@@ -4,6 +4,8 @@ import { expect, test } from "@playwright/test";
 test("an entry that names a theme shows up as the test link in that theme's evidence chain, and can be retargeted while a draft", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/ledger");
+  // The in-browser ledger starts its database first. Under a full parallel run that can take a while.
+  await expect(page.getByText("No entries yet.", { exact: false })).toBeVisible({ timeout: 60_000 });
   await page.getByLabel("Title").fill("Free shipping over 50 dollars");
   await page.getByLabel("Hypothesis").fill("Free shipping over 50 dollars lifts Cart to Purchase against a holdout.");
   await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption({ label: "Shipping costs too much" });

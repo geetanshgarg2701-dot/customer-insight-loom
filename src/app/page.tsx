@@ -39,6 +39,10 @@ export default function Home() {
             scorecard and a step to correct a comment, on synthetic data.
           </li>
           <li>
+            <Link href="/compliance">Email check</Link>. Check a marketing email against US email law and the Gmail and
+            Yahoo sender rules before it goes out, with the source of each rule.
+          </li>
+          <li>
             <Link href="/check">Data check</Link>. Match two files on email and check a time column against clock
             changes, in the browser.
           </li>
