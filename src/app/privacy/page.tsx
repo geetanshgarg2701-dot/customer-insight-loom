@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PILOT } from "@/lib/pilot/enabled";
 import { Nav } from "../nav";
 
 export const metadata: Metadata = {
@@ -68,6 +69,20 @@ export default function PrivacyPage() {
           network feature.
         </p>
       </section>
+
+      {PILOT && (
+        <section aria-labelledby="pilot">
+          <h2 id="pilot">Pilot accounts (this build only)</h2>
+          <p>
+            This build has pilot accounts switched on. If you make an account, your email address and a password hash are
+            kept by the pilot&rsquo;s database service, and the ledger export files you choose to save are stored there,
+            visible only to your account. A saved file holds ledger entries, results and customer hashes, never an email
+            address or a customer file, and the database refuses a file that holds something shaped like an email address.
+            The app talks to that one service and nowhere else, keeps your sign in in this tab&rsquo;s memory only, and
+            you can delete your saved projects on the Account screen. The pilot organiser removes the account itself on request.
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="host">
         <h2 id="host">What the website host can see</h2>

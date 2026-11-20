@@ -14,11 +14,13 @@
     "build:static": "node scripts/build-static.mjs",
     "check:site": "node scripts/check-site.mjs",
     "test:static": "playwright test -c playwright.static.config.ts",
+    "test:pilot": "playwright test -c playwright.pilot.config.ts",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.32.0",
     "@huggingface/transformers": "4.3.2",
+    "@supabase/supabase-js": "2.119.2",
     "@xyflow/react": "13.0.2",
     "echarts": "6.1.0",
     "next": "16.4.6",

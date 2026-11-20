@@ -52,17 +52,29 @@ describe("what the privacy page claims", () => {
     expect(hits).toEqual([]);
   });
 
-  it("makes requests in exactly one file, the model loader, which may only reach this site", async () => {
+  it("makes requests in exactly two files, the model loader and the pilot client, each limited to one origin", async () => {
     // Any use of fetch, called or passed along, counts. The model loader is the one exception, approved on 2026-11-20,
     // and it hands the model library a fetch that refuses every other origin.
     const hits = sources.filter((s) => /\bfetch\b/.test(s.text)).map((s) => s.path.slice(ROOT.length).replace(/\\/g, "/"));
-    expect(hits).toEqual(["/lib/ai/model.ts"]);
+    // The pilot client was approved on 2026-11-20 as a second narrow exception. It is off unless the build had a project
+    // address, hands the library a fetch that refuses every other origin, and keeps the sign in in memory only.
+    expect(hits).toEqual(["/lib/ai/model.ts", "/lib/pilot/client.ts"]);
     const { assertSameSite } = await import("../ai/model");
     const page = "https://loom.example.com/customer-insight-loom/insights/";
     expect(assertSameSite("/customer-insight-loom/models/x.onnx", page).href).toBe("https://loom.example.com/customer-insight-loom/models/x.onnx");
     expect(() => assertSameSite("https://huggingface.co/Xenova/x", page)).toThrow(/Blocked/);
     expect(() => assertSameSite("//cdn.example.org/ort.wasm", page)).toThrow(/Blocked/);
     expect(() => assertSameSite(new URL("http://loom.example.com/models/"), page)).toThrow(/Blocked/);
+  });
+
+  it("keeps the cloud library and its build settings in the pilot files only", () => {
+    const lib = sources.filter((s) => /@supabase\//.test(s.text)).map((s) => s.path.slice(ROOT.length).replace(/\\/g, "/"));
+    expect(lib).toEqual(["/lib/pilot/client.ts"]);
+    const env = sources.filter((s) => /NEXT_PUBLIC_SUPABASE/.test(s.text)).map((s) => s.path.slice(ROOT.length).replace(/\\/g, "/"));
+    expect(env).toEqual(["/lib/pilot/client.ts", "/lib/pilot/enabled.ts"]);
+    const client = readFileSync(join(ROOT, "lib", "pilot", "client.ts"), "utf8");
+    expect(client).toMatch(/persistSession: false/);
+    expect(client).toMatch(/assertProjectOrigin/);
   });
 
   it("starts exactly one worker, the self hosted database", () => {
