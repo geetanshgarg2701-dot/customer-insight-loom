@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import { expect, test } from "@playwright/test";
+import JSZip from "jszip";
 
 const PREFIX = process.env.MIRROR_PREFIX ?? "evidence-ledger";
 
@@ -27,6 +29,18 @@ test("the static mirror loads DuckDB from its own prefix and runs the demo with 
   await page.getByRole("button", { name: "Load demo data" }).click();
   await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("table", { name: "Ledger entries" }).getByRole("row")).toHaveCount(5);
+
+  // A decision deck is built in the page on the static site too, and asks for nothing outside it.
+  await page.getByRole("link", { name: "Synthetic: win back email with a 10 percent offer" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const [deck] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export the decision deck" }).click(),
+  ]);
+  expect(deck.suggestedFilename()).toMatch(/^decision-deck-.*\.pptx$/);
+  const zip = await JSZip.loadAsync(fs.readFileSync((await deck.path())!));
+  expect(Object.keys(zip.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))).toHaveLength(5);
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ledger" }).click();
 
   // Moving between pages by clicking works without the prefetch files.
   await page.getByRole("link", { name: "Methods" }).click();

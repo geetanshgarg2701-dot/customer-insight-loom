@@ -5,12 +5,13 @@ import Link from "next/link";
 import { formatCount, formatPercent } from "@/lib/app/format";
 import { explainMentions } from "@/lib/app/explain-views";
 import { createBrowserCommentsBoard, getBrowserLedger } from "@/lib/duckdb/client";
-import { assembleChain, CARRIER_SHARE, THEMES, type Carrier, type ChainEntry, type DropLinks, type RankRow } from "@/lib/insights/evidence";
+import { assembleChain, CARRIER_SHARE, THEMES, type Carrier, type ChainEntry, type ChainStep, type DropLinks, type RankRow } from "@/lib/insights/evidence";
 import { QUOTE_PAGE, type CommentsBoard, type QuotePage } from "@/lib/insights/board";
 import { PAIN_LABELS, PAINS, type Pain } from "@/lib/insights/comments";
 import type { MentionDimension, MentionRates } from "@/lib/insights/mentions";
 import type { Scorecard } from "@/lib/insights/prepare";
 import { Explain } from "../explain";
+import { exportDeck } from "../deck-export";
 import { ChainGraph } from "./chain-graph";
 import { checkNames } from "@/lib/redaction/name-check";
 import { Nav } from "../nav";
@@ -83,6 +84,19 @@ export default function InsightsPage() {
       setError(messageOf(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  const [deckNote, setDeckNote] = useState<string | null>(null);
+  async function onDeck(entryId: string, steps: ChainStep[]) {
+    setError(null);
+    setDeckNote(null);
+    try {
+      const entry = await (await getBrowserLedger()).getEntry(entryId);
+      const name = await exportDeck(entry, { steps, title: PAIN_LABELS[chainPain] });
+      setDeckNote(`Saved ${name}. It was built in this browser and nothing was uploaded.`);
+    } catch (e) {
+      setError(messageOf(e));
     }
   }
 
@@ -342,6 +356,23 @@ export default function InsightsPage() {
                   </li>
                 ))}
               </ol>
+            )}
+            {chain && (
+              <>
+                <p>
+                  <button
+                    type="button"
+                    disabled={!chain[4].entryId}
+                    onClick={() => void onDeck(chain[4].entryId!, chain)}
+                  >
+                    Export the decision deck for this chain
+                  </button>{" "}
+                  {chain[4].entryId
+                    ? "A PowerPoint file with this chain and the linked test."
+                    : "Needs a ledger entry that names this theme, so there is a test to put in the deck."}
+                </p>
+                {deckNote && <p role="status">{deckNote}</p>}
+              </>
             )}
             {drops && (
               <Explain

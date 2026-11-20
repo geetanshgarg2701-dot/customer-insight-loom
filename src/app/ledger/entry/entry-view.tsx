@@ -15,6 +15,7 @@ import { THEME_IDS, THEMES, themeOf } from "@/lib/insights/evidence";
 import { Nav } from "../../nav";
 import { AssignmentSection } from "./assignment-section";
 import { DesignSection } from "./design-section";
+import { exportDeck } from "../../deck-export";
 import { ResultsSection } from "./results-section";
 
 function messageOf(error: unknown): string {
@@ -103,6 +104,21 @@ export function EntryView() {
     try {
       await loaded.ledger.recordComplianceCheck(loaded.entry.id, email.input, "user");
       await load();
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const [deckNote, setDeckNote] = useState<string | null>(null);
+  async function onDeck() {
+    if (!loaded) return;
+    setBusy(true);
+    setDeckNote(null);
+    try {
+      const name = await exportDeck(loaded.entry);
+      setDeckNote(`Saved ${name}. It was built in this browser and nothing was uploaded.`);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -248,6 +264,20 @@ export function EntryView() {
       </section>
 
       {entry.launchedAt && <ResultsSection key={`results-${entry.id}`} entry={entry} ledger={ledger} onChange={load} />}
+
+      <section aria-labelledby="deck-h">
+        <h2 id="deck-h">Decision deck</h2>
+        <p>
+          A PowerPoint file for this test: the question, the design, the result with a chart, and what to keep in mind.
+          Every number comes from this entry.
+        </p>
+        <p>
+          <button type="button" disabled={busy} onClick={() => void onDeck()}>
+            Export the decision deck
+          </button>
+        </p>
+        {deckNote && <p role="status">{deckNote}</p>}
+      </section>
 
       <section aria-labelledby="history-h">
         <h2 id="history-h">History</h2>

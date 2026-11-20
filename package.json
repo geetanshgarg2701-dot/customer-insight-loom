@@ -21,6 +21,7 @@
     "@xyflow/react": "13.0.2",
     "echarts": "6.1.0",
     "next": "16.4.6",
+    "pptxgenjs": "4.0.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
@@ -36,5 +37,8 @@
     "tailwindcss": "4.3.3",
     "typescript": "^5",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "image-size": "2.0.4"
   }
 }
