@@ -123,6 +123,7 @@ describe("IPv4 address", () => {
       address: 0,
       ssn: 1,
       ip: 1,
+      name: 0,
     });
   });
 });
@@ -223,8 +224,8 @@ describe("redactQuote refuses what it cannot make safe", () => {
   });
 
   it("stamps the new rule version", () => {
-    expect(RULE_VERSION).toBe("2");
-    expect(redactQuote({ text: "hello", sourceColumn: "comment" }).stamp.ruleVersion).toBe("2");
+    expect(RULE_VERSION).toBe("3");
+    expect(redactQuote({ text: "hello", sourceColumn: "comment" }).stamp.ruleVersion).toBe("3");
   });
 
   it("redacts the new types inside a quote", () => {

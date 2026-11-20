@@ -84,7 +84,8 @@ export default function PrivacyPage() {
         <h2 id="limits">What this app does not do</h2>
         <ul>
           <li>
-            It does not remove personal names from text. Do not load free text that contains names you are not allowed to
+            It does not reliably remove personal names from text. It catches names after cues such as a sign-off and
+            common first names, and misses others. Do not load free text that contains names you are not allowed to
             process.
           </li>
           <li>

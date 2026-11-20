@@ -7,7 +7,7 @@ test("the privacy and terms pages exist, say what the app does, and are linked f
   await expect(page.getByText("Your files stay in your browser.").first()).toBeVisible();
   await expect(page.getByText(/does not use cookies, local storage/)).toBeVisible();
   // Honest about what it cannot do.
-  await expect(page.getByText(/does not remove personal names/)).toBeVisible();
+  await expect(page.getByText(/does not reliably remove personal names/)).toBeVisible();
   await expect(page.getByText(/What the website host can see/)).toBeVisible();
 
   await page.goto("/terms");

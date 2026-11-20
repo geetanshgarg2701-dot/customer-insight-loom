@@ -740,7 +740,7 @@ export default function JourneysPage() {
                                     </blockquote>
                                   ))}
                                   <p>
-                                    More on the <Link href="/insights">Comments</Link> screen. Names are not removed from comment text.
+                                    More on the <Link href="/insights">Comments</Link> screen. Names are only partly removed from comment text.
                                   </p>
                                 </details>
                               )}

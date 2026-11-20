@@ -141,7 +141,7 @@ export const METHOD_NOTES: readonly { name: string; text: string }[] = [
 ];
 
 export const REDACTION_LIMITS: readonly string[] = [
-  "Names are not covered. The rules do not detect personal names, so redacted text is not anonymous.",
+  "Names are only partly covered. Names after a cue and common first names are caught. Lowercase names, a surname alone and unusual names with no cue are not, so redacted text is not anonymous. The planted name set result is on the comments screen.",
   "Formats a simple rule set cannot catch are kept in the planted set on purpose, so the misses are real and are not tuned away.",
   "Phone and address matching is centered on the United States.",
   "The street rule can over match some ordinary phrases. False positives are not measured.",

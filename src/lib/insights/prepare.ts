@@ -24,8 +24,8 @@ export type Scorecard = Record<Kind, ScoreLine>;
 export type Prepared = { rows: CommentRow[]; withheld: number; scorecard: Scorecard };
 
 const KINDS: readonly Kind[] = ["email", "phone", "card", "address", "name"];
-/** The rules cover these. Personal names are not covered, and the scorecard says so. */
-const COVERED: Readonly<Record<Kind, boolean>> = { email: true, phone: true, card: true, address: true, name: false };
+/** The rules cover these. Names are covered only partly: the generator's sign-offs are an easy form, see names.ts. */
+const COVERED: Readonly<Record<Kind, boolean>> = { email: true, phone: true, card: true, address: true, name: true };
 
 export function prepareComments(comments: readonly SyntheticComment[]): Prepared {
   const rows: CommentRow[] = [];
@@ -37,7 +37,7 @@ export function prepareComments(comments: readonly SyntheticComment[]): Prepared
     const quote = redactQuote({ text: c.text, sourceColumn: COMMENT_COLUMN });
     for (const k of KINDS) {
       planted[k] += c.planted[k];
-      if (k !== "name") caught[k] += quote.stamp.counts[k];
+      caught[k] += quote.stamp.counts[k];
     }
     if (!c.consent) {
       withheld += 1;

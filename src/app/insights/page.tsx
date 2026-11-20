@@ -12,6 +12,7 @@ import type { MentionDimension, MentionRates } from "@/lib/insights/mentions";
 import type { Scorecard } from "@/lib/insights/prepare";
 import { Explain } from "../explain";
 import { ChainGraph } from "./chain-graph";
+import { checkNames } from "@/lib/redaction/name-check";
 import { Nav } from "../nav";
 
 const GROUPINGS: { value: MentionDimension; label: string }[] = [
@@ -108,6 +109,7 @@ export default function InsightsPage() {
   }, []);
 
   const card = summary?.card;
+  const nameCheck = useMemo(() => checkNames(), []);
   const chain = useMemo(
     () => (ranking && drops ? assembleChain(chainPain, ranking, drops, carriers, entries) : null),
     [chainPain, ranking, drops, carriers, entries],
@@ -125,9 +127,10 @@ export default function InsightsPage() {
         shown, and comments without consent are left out.
       </p>
       <p>
-        <strong>Names are not removed.</strong> The redaction rules catch emails, phone numbers, card numbers, street
-        addresses, social security numbers and IP addresses. They do not catch personal names, and the scorecard below
-        shows how many names got through.
+        <strong>Names are only partly removed.</strong> The redaction rules catch emails, phone numbers, card
+        numbers, street addresses, social security numbers and IP addresses. They catch a name after a cue such as
+        &ldquo;Thanks,&rdquo; or &ldquo;my name is&rdquo;, and a common first name anywhere. Names typed in lowercase, a
+        surname alone, and unusual names with no cue get through, so redacted text is not anonymous.
       </p>
 
       {!loaded && (
@@ -170,6 +173,12 @@ export default function InsightsPage() {
                 ))}
               </tbody>
             </table>
+            <p>
+              The names the generator plants all follow a sign-off, the easiest form, so catching all of them says little.
+              On a separate set of {nameCheck.total} planted names written to include hard forms, the rules caught{" "}
+              {nameCheck.caught}, and they marked {nameCheck.falseAlarms} of {nameCheck.clean} clean sentences as holding a
+              name. The same person wrote that set and the rules, so real comments will likely do worse.
+            </p>
             {card.name.missed > 0 && (
               <p>
                 {formatCount(card.name.missed)} planted names are still in the stored text. Read quotes with that in

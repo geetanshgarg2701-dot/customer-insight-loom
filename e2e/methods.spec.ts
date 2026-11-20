@@ -41,7 +41,7 @@ test("shows the honesty and redaction counts, the same as the code computes in N
   expect(all).toEqual([String(expected.redaction.total), String(expected.redaction.caught), String(expected.redaction.missed)]);
   await expect(page.getByRole("list", { name: "Missed items" }).getByRole("listitem")).toHaveCount(expected.redaction.missed);
 
-  await expect(page.getByText(/Names are not covered/)).toBeVisible();
+  await expect(page.getByText(/Names are only partly covered/)).toBeVisible();
   for (const note of METHOD_NOTES) await expect(page.getByText(note.name, { exact: true })).toBeVisible();
 
   // A reload gives the same numbers, and the page makes no outside request.

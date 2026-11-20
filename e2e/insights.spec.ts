@@ -26,8 +26,9 @@ test("the scorecard, the shares and the quotes match the generator, and no plant
   await expect(emails.nth(0)).toHaveText(n(prepared.scorecard.email.planted));
   await expect(emails.nth(2)).toHaveText("0");
   const names = card.getByRole("row", { name: /^Personal names/ }).getByRole("cell");
-  await expect(names.nth(1)).toHaveText("Not covered by the rules");
-  await expect(names.nth(2)).toHaveText(n(prepared.scorecard.name.planted));
+  await expect(names.nth(1)).toHaveText(n(prepared.scorecard.name.planted));
+  await expect(names.nth(2)).toHaveText("0");
+  await expect(page.getByText(/On a separate set of 60 planted names written to include hard forms, the rules caught 49/)).toBeVisible();
   await expect(page.getByText(`${n(prepared.rows.length)} comments were kept and ${n(prepared.withheld)} were withheld`, { exact: false })).toBeVisible();
 
   // Shipping cost among customers who left at the Cart, counted here in plain code.

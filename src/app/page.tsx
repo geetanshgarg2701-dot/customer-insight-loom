@@ -50,8 +50,8 @@ export default function Home() {
       </section>
 
       <p>
-        This is an early version. It has not been tried on real customer data, and names are not removed from text
-        yet. Use the demo data to see how it works.
+        This is an early version. It has not been tried on real customer data, and names are only partly removed from
+        text. Use the demo data to see how it works.
       </p>
     </main>
   );

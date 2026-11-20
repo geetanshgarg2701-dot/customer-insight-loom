@@ -42,7 +42,7 @@ Date of birth, seven digit phones, city and ZIP code, non-US postcodes and stree
 
 ## Other limits
 
-- **Names are not covered.** The rules do not detect personal names. A test confirms that "My name is Jane Doe" passes through unchanged. Redacted output is not anonymous.
+- **Names are only partly covered, since rule version 3 on 2026-11-19.** Names after a cue and common first names are caught. On a separate planted set of 60 names, 49 were caught and 0 of 30 clean sentences were wrongly marked. Lowercase names, a surname alone, unusual names with no cue, nicknames and first names that are also words get through, and the same person wrote the set and the rules. Redacted output is not anonymous. See `src/lib/redaction/names.ts`.
 - **Phone and address matching is US-centric.** Phones are North American plus a basic plus-sign international form.
 - **The street rule is case-insensitive.** It can over-match phrases like "2 big dogs on the Drive". That is the safe direction, but it will over-redact some ordinary text.
 - **False positives are not measured.** The planted set only measures misses.

@@ -13,7 +13,7 @@ import { RULE_VERSION, type RedactionCounts } from "./types";
  * cast, a spread copy or a JSON round trip is not in the registry and is
  * rejected.
  *
- * Redaction here does not cover personal names. See redact.ts.
+ * Redaction here only partly covers personal names. See redact.ts and names.ts.
  */
 
 export type UnredactedQuote = { text: string; sourceColumn: string };

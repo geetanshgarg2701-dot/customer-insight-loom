@@ -1,3 +1,4 @@
+import { detectNames } from "./names";
 import type { Finding, RedactionType } from "./types";
 
 type Span = { start: number; end: number };
@@ -201,6 +202,8 @@ export const DETECTORS: ReadonlyArray<{
   { type: "ip", detect: detectIps },
   { type: "phone", detect: detectPhones },
   { type: "address", detect: detectAddresses },
+  // Last, so a name inside an email address or a street name is redacted as that type.
+  { type: "name", detect: detectNames },
 ];
 
 export function detectAll(text: string): Finding[] {

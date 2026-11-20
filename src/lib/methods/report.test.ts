@@ -88,8 +88,8 @@ describe("METHOD_NOTES", () => {
     }
   });
 
-  it("states the redaction limits, including that names are not covered", () => {
-    expect(REDACTION_LIMITS.join(" ")).toMatch(/names are not covered/i);
+  it("states the redaction limits, including that names are only partly covered", () => {
+    expect(REDACTION_LIMITS.join(" ")).toMatch(/names are only partly covered/i);
     for (const line of REDACTION_LIMITS) expect(line.includes("—")).toBe(false);
   });
 });

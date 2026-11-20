@@ -39,12 +39,15 @@ describe("prepareComments, the redaction scorecard", () => {
     }
   });
 
-  it("reports names as planted and all missed, because the rules do not cover names", () => {
+  it("catches every planted name in the generator, which only uses the easy sign-off form", () => {
     expect(prepared.scorecard.name.planted).toBe(sum("name"));
-    expect(prepared.scorecard.name.caught).toBe(0);
-    expect(prepared.scorecard.name.missed).toBe(sum("name"));
-    expect(prepared.scorecard.name.coveredByRules).toBe(false);
-    expect(prepared.scorecard.email.coveredByRules).toBe(true);
+    expect(prepared.scorecard.name.caught).toBe(sum("name"));
+    expect(prepared.scorecard.name.missed).toBe(0);
+    expect(prepared.scorecard.name.coveredByRules).toBe(true);
+  });
+
+  it("leaves no planted name in any stored text", () => {
+    for (const r of prepared.rows) expect(r.quote.text).not.toMatch(/Thanks, [A-Z][a-z]+ [A-Z][a-z]+/);
   });
 
   it("leaves no planted detail in any stored text", () => {

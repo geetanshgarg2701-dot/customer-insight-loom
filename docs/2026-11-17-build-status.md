@@ -45,7 +45,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 |---|---|---|
 | CSV intake in the browser, column mapping, blocked columns | BUILT | `src/lib/intake`, DuckDB-Wasm in a worker, self hosted |
 | Redaction for email, phone, card, social security number, IPv4, street address | BUILT | `src/lib/redaction`, version 2, limits in `2026-11-12-redaction-known-limits.md` |
-| Name redaction | NOT STARTED | Names are not covered. Researched on 2026-11-17, see `2026-11-17-name-redaction-findings.md`: possible with a 29 MB model, but no screen reads free text yet and the best small model still misses about 1 name in 5, so it is deferred. |
+| Name redaction | PARTIAL | Rule based, no model and no dependency, rule version 3. A name is caught after a cue, such as a sign-off, my name is, a title, a role or a greeting, and when a common first name from a built-in list appears, with its surname. First names that are also ordinary words, such as Will, Grace and May, are left off the list. On a planted set of 60 names written before the rules, 49 were caught, and 0 of 30 clean sentences were wrongly marked. Misses: 4 unusual names with no cue, 3 lowercase names, 1 surname alone, 1 nickname and 2 word names. The same person wrote the set and the rules, so this is likely better than real text, INFERRED. The generator's names are all caught, but they are the easy sign-off form, so the Comments screen shows the planted set result next to it. A unit test fails if a name is lost or a false alarm appears. The model route in `2026-11-17-name-redaction-findings.md` is still open and needs a dependency approval. |
 | Quote storage that refuses unredacted text | PARTIAL | In memory only, and no screen saves quotes. The database checks only that a stamp exists. |
 | Compliance check with consent and suppression | NOT STARTED | Part C calls it must have. |
 | Delete all control | NOT STARTED | |
@@ -81,7 +81,7 @@ Words: BUILT means code and tests exist and run. PARTIAL means some of it exists
 
 ## Tests today
 
-On 2026-11-19: 923 unit tests, 92 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
+On 2026-11-19: 934 unit tests, 92 browser tests in Edge, 1 static mirror test, and the database tests that run on the test project. The type check, lint and build pass. Lint has one warning, an unused type parameter in `src/lib/redaction/testdata/planted.ts`.
 
 ## Work remaining, in hours
 

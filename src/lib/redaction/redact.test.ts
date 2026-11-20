@@ -109,7 +109,7 @@ describe("redact: general behavior", () => {
 
   it("counts findings per type", () => {
     const r = redact("a@example.com b@example.com 202-555-0143");
-    expect(r.counts).toEqual({ email: 2, phone: 1, card: 0, address: 0, ssn: 0, ip: 0 });
+    expect(r.counts).toEqual({ email: 2, phone: 1, card: 0, address: 0, ssn: 0, ip: 0, name: 0 });
   });
 
   it("a card number is not also reported as a phone", () => {
@@ -128,13 +128,13 @@ describe("redact: general behavior", () => {
     expect(redact("")).toEqual({
       text: "",
       findings: [],
-      counts: { email: 0, phone: 0, card: 0, address: 0, ssn: 0, ip: 0 },
+      counts: { email: 0, phone: 0, card: 0, address: 0, ssn: 0, ip: 0, name: 0 },
     });
   });
 
-  it("does NOT cover names (documented limit of the rule set)", () => {
-    expect(redact("My name is Jane Doe and I live nearby.").text).toBe(
-      "My name is Jane Doe and I live nearby.",
-    );
+  it("covers names only partly: a cued name goes, a lowercase or unlisted uncued name stays (documented limit)", () => {
+    expect(redact("My name is Jane Doe and I live nearby.").text).toBe("My name is [NAME] and I live nearby.");
+    expect(redact("my name is jane doe").text).toBe("my name is jane doe");
+    expect(redact("Zebulon fixed it.").text).toBe("Zebulon fixed it.");
   });
 });
