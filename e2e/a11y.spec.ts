@@ -25,7 +25,7 @@ async function scan(page: Page, where: string) {
 }
 
 test.describe("static screens", () => {
-  for (const path of ["/", "/intake", "/ledger", "/journeys", "/pipeline", "/insights", "/compliance", "/data", "/check", "/methods", "/privacy", "/terms", "/no-such-page"]) {
+  for (const path of ["/", "/intake", "/ledger", "/journeys", "/pipeline", "/insights", "/compliance", "/ingest", "/data", "/check", "/methods", "/privacy", "/terms", "/no-such-page"]) {
     test(`${path} has no confirmed axe violations`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole("main")).toBeVisible();
