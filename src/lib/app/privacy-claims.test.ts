@@ -23,7 +23,6 @@ const FORBIDDEN: [string, RegExp][] = [
   ["sessionStorage", /\bsessionStorage\b/],
   ["indexedDB", /\bindexedDB\b/],
   ["a cookie", /document\.cookie|cookies\(\)/],
-  ["fetch", /\bfetch\s*\(/],
   ["XMLHttpRequest", /\bXMLHttpRequest\b/],
   ["a beacon", /sendBeacon/],
   ["a web socket", /\bWebSocket\b|\bEventSource\b/],
@@ -51,6 +50,19 @@ describe("what the privacy page claims", () => {
   it.each(FORBIDDEN)("no app code uses %s", (_label, pattern) => {
     const hits = sources.filter((s) => pattern.test(s.text)).map((s) => s.path.slice(ROOT.length));
     expect(hits).toEqual([]);
+  });
+
+  it("makes requests in exactly one file, the model loader, which may only reach this site", async () => {
+    // Any use of fetch, called or passed along, counts. The model loader is the one exception, approved on 2026-11-20,
+    // and it hands the model library a fetch that refuses every other origin.
+    const hits = sources.filter((s) => /\bfetch\b/.test(s.text)).map((s) => s.path.slice(ROOT.length).replace(/\\/g, "/"));
+    expect(hits).toEqual(["/lib/ai/model.ts"]);
+    const { assertSameSite } = await import("../ai/model");
+    const page = "https://loom.example.com/customer-insight-loom/insights/";
+    expect(assertSameSite("/customer-insight-loom/models/x.onnx", page).href).toBe("https://loom.example.com/customer-insight-loom/models/x.onnx");
+    expect(() => assertSameSite("https://huggingface.co/Xenova/x", page)).toThrow(/Blocked/);
+    expect(() => assertSameSite("//cdn.example.org/ort.wasm", page)).toThrow(/Blocked/);
+    expect(() => assertSameSite(new URL("http://loom.example.com/models/"), page)).toThrow(/Blocked/);
   });
 
   it("starts exactly one worker, the self hosted database", () => {

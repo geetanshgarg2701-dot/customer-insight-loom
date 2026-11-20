@@ -12,6 +12,8 @@ const root = fileURLToPath(new URL("../out/", import.meta.url));
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  // The model runtime is an ES module. A browser refuses to import one sent as anything but JavaScript.
+  ".mjs": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json",
   ".txt": "text/plain; charset=utf-8",

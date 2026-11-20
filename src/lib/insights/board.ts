@@ -34,6 +34,8 @@ export type CommentsBoard = {
   ranking(): Promise<RankRow[]>;
   drops(): Promise<DropLinks>;
   carriers(threshold?: number): Promise<Carrier[]>;
+  /** The first stored comments by customer, redacted text only, for theme coding. */
+  sample(n: number): Promise<{ customer: number; pain: Pain; text: string }[]>;
   close(): Promise<void>;
 };
 
@@ -103,6 +105,11 @@ export async function createCommentsBoard(
     ranking: () => painRanking(engine, TABLES),
     drops: () => dropOffLinks(engine, TABLES),
     carriers: (threshold = CARRIER_SHARE) => segmentCarriers(engine, TABLES, threshold),
+    async sample(n) {
+      if (!Number.isInteger(n) || n < 1 || n > 1000) throw new RangeError("Ask for 1 to 1,000 comments.");
+      const rows = (await engine.query(`SELECT customer, pain, quote FROM ${TABLES.comments} ORDER BY customer LIMIT ?`, [n])).map(toPlainRow);
+      return rows.map((r) => ({ customer: Number(r.customer), pain: String(r.pain) as Pain, text: String(r.quote) }));
+    },
     async close() {
       await engine.exec(`DROP TABLE IF EXISTS ${TABLES.comments}`);
       await engine.exec(`DROP TABLE IF EXISTS ${TABLES.journeys}`);

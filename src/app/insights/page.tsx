@@ -15,6 +15,11 @@ import { exportDeck } from "../deck-export";
 import { ChainGraph } from "./chain-graph";
 import { checkNames } from "@/lib/redaction/name-check";
 import { Nav } from "../nav";
+import { createCoder, type Coder } from "@/lib/ai/coder";
+import { MEASURED } from "@/lib/ai/measured";
+import { MODEL_DOWNLOAD_BYTES } from "@/lib/ai/model-id";
+import { redactQuote } from "@/lib/redaction/quote";
+import { COMMENT_COLUMN } from "@/lib/insights/prepare";
 
 const GROUPINGS: { value: MentionDimension; label: string }[] = [
   { value: "reached", label: "Furthest step reached" },
@@ -29,6 +34,9 @@ const KINDS = ["email", "phone", "card", "address", "name"] as const;
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
+
+/** How many stored comments the sample codes. Enough to see agreement, few enough to finish in seconds. */
+const SAMPLE = 100;
 
 export default function InsightsPage() {
   const board = useRef<CommentsBoard | null>(null);
@@ -97,6 +105,67 @@ export default function InsightsPage() {
       setDeckNote(`Saved ${name}. It was built in this browser and nothing was uploaded.`);
     } catch (e) {
       setError(messageOf(e));
+    }
+  }
+
+  const [coder, setCoder] = useState<Coder | null>(null);
+  const [modelBusy, setModelBusy] = useState(false);
+  const [sampleResult, setSampleResult] = useState<{
+    n: number;
+    agreed: number;
+    uncertain: number;
+    rows: { customer: number; text: string; pain: Pain; theme: Pain | null; quote: string | null }[];
+  } | null>(null);
+  const [ownText, setOwnText] = useState("");
+  const [ownResult, setOwnResult] = useState<{ text: string; theme: Pain | null; quote: string | null; score: number } | null>(null);
+
+  async function onLoadModel() {
+    setModelBusy(true);
+    setError(null);
+    try {
+      const { loadBrowserEmbed } = await import("@/lib/ai/model");
+      setCoder(await createCoder(await loadBrowserEmbed(), MEASURED.threshold));
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setModelBusy(false);
+    }
+  }
+
+  async function onCodeSample() {
+    if (!coder || !board.current) return;
+    setModelBusy(true);
+    setError(null);
+    try {
+      const sample = await board.current.sample(SAMPLE);
+      const coded = await coder.codeMany(sample.map((s) => s.text));
+      const rows = sample.map((s, i) => ({ ...s, theme: coded[i].theme, quote: coded[i].quote?.text ?? null }));
+      setSampleResult({
+        n: rows.length,
+        agreed: rows.filter((r) => r.theme === r.pain).length,
+        uncertain: rows.filter((r) => r.theme === null).length,
+        rows,
+      });
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setModelBusy(false);
+    }
+  }
+
+  async function onCodeOwn() {
+    if (!coder) return;
+    setModelBusy(true);
+    setError(null);
+    try {
+      // Redacted before the model sees it, the same way every stored comment is.
+      const text = redactQuote({ text: ownText, sourceColumn: COMMENT_COLUMN }).text;
+      const c = await coder.code(text);
+      setOwnResult({ text, theme: c.theme, quote: c.quote?.text ?? null, score: c.score });
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setModelBusy(false);
     }
   }
 
@@ -402,6 +471,94 @@ export default function InsightsPage() {
                   },
                 ]}
               />
+            )}
+          </section>
+
+          <section aria-labelledby="h-coding">
+            <h2 id="h-coding">Theme coding by the in-browser model</h2>
+            <p>
+              A small language model, all-MiniLM-L6-v2, codes each comment into a pain and quotes the sentence that shows it.
+              The quote is always the customer&rsquo;s own words, checked in code. When the match is weak it says uncertain
+              instead of guessing. It runs in this tab: the files, about {Math.round(MODEL_DOWNLOAD_BYTES / 1e6)} MB, come
+              from this site, nothing is sent anywhere, and nothing is stored, so a reload loads them again.
+            </p>
+            <p>
+              How well it codes: on {MEASURED.heldOut.n} test comments it never tuned on, it agreed with a person on{" "}
+              {MEASURED.heldOut.correct}, got {MEASURED.heldOut.wrong} wrong and was uncertain on {MEASURED.heldOut.uncertain}.
+              On {MEASURED.generator.n} comments from the demo generator it agreed on {MEASURED.generator.correct}. The same
+              person wrote the test comments and the theme descriptions, so real comments will likely do worse. Treat its
+              codes as a first pass for a person to check.
+            </p>
+            {!coder ? (
+              <p>
+                <button type="button" disabled={modelBusy} onClick={() => void onLoadModel()}>
+                  {modelBusy ? "Loading the model" : `Load the model, about ${Math.round(MODEL_DOWNLOAD_BYTES / 1e6)} MB`}
+                </button>
+              </p>
+            ) : (
+              <>
+                <p role="status">The model is loaded in this tab.</p>
+                <p>
+                  <button type="button" disabled={modelBusy} onClick={() => void onCodeSample()}>
+                    Code {SAMPLE} comments
+                  </button>{" "}
+                  The comments&rsquo; own pains stand in for a person&rsquo;s coding.
+                </p>
+                {sampleResult && (
+                  <>
+                    <p role="status">
+                      The model agreed with the coded pain on {sampleResult.agreed} of {sampleResult.n} comments, and was
+                      uncertain on {sampleResult.uncertain}.
+                    </p>
+                    <div style={{ overflowX: "auto" }}>
+                      <table>
+                        <caption>The first ten comments, as the model coded them</caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Comment</th>
+                            <th scope="col">Coded pain</th>
+                            <th scope="col">Model</th>
+                            <th scope="col">Quote it used</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sampleResult.rows.slice(0, 10).map((r) => (
+                            <tr key={r.customer}>
+                              <td>{r.text}</td>
+                              <td>{PAIN_LABELS[r.pain]}</td>
+                              <td>{r.theme ? PAIN_LABELS[r.theme] : "Uncertain"}</td>
+                              <td>{r.quote ?? "None"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+                <p>
+                  <label>
+                    A comment to code
+                    <textarea value={ownText} onChange={(e) => setOwnText(e.target.value)} rows={3} style={{ width: "100%" }} />
+                  </label>
+                </p>
+                <p>
+                  <button type="button" disabled={modelBusy || ownText.trim() === ""} onClick={() => void onCodeOwn()}>
+                    Redact and code it
+                  </button>{" "}
+                  It is redacted first, then coded in this tab. Nothing is saved.
+                </p>
+                {ownResult && (
+                  <div role="status">
+                    <p>Redacted text: {ownResult.text}</p>
+                    <p>
+                      {ownResult.theme
+                        ? `Pain: ${PAIN_LABELS[ownResult.theme]}. Quote: ${ownResult.quote}`
+                        : "Uncertain. No pain matched well enough to call."}{" "}
+                      Similarity {ownResult.score.toFixed(3)}, cut {MEASURED.threshold}.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </section>
 

@@ -29,6 +29,9 @@ next-env.d.ts
 # Self-hosted DuckDB-Wasm files, copied from node_modules on postinstall
 /public/duckdb/
 
+# Self-hosted model and its runtime files, fetched or copied on postinstall, approved by the owner on 2026-11-20
+/public/models/
+
 # Static export for a host with no server, see docs/2026-11-17-static-mirror.md
 /out/
 
