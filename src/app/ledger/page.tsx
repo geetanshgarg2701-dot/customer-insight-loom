@@ -7,6 +7,7 @@ import { downloadText } from "@/lib/app/download";
 import { noteExport } from "@/lib/usage/usage";
 import { demoAudienceCsv } from "@/lib/demo/synthetic";
 import { familywiseLine } from "@/lib/ledger/familywise";
+import { FrameworkSection } from "./framework-section";
 import { ledgerCsv } from "@/lib/ledger/csv";
 import { NO_FILTER, filterEntries, type EntryFilter } from "@/lib/ledger/filter";
 import { STATUSES, FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
@@ -312,6 +313,8 @@ export default function LedgerPage() {
         )}
         {family && <p>{family.text}</p>}
       </section>
+
+      {entries && entries.length > 0 && <FrameworkSection entries={entries} />}
 
       <section aria-labelledby="demo">
         <h2 id="demo">Demo audience</h2>

@@ -171,3 +171,86 @@ export function binomialCentralRange(
   }
   return { low, high };
 }
+
+/** Continued fraction for the incomplete beta, modified Lentz method (Numerical Recipes betacf). */
+function betaContinuedFraction(x: number, a: number, b: number): number {
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - (qab * x) / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= MAX_ITER; m++) {
+    const m2 = 2 * m;
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c;
+    if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    h *= d * c;
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c;
+    if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < EPS) return h;
+  }
+  throw new Error("regularizedBeta did not converge.");
+}
+
+/** Regularized incomplete beta function I_x(a, b), for x in [0, 1] and a, b > 0. */
+export function regularizedBeta(x: number, a: number, b: number): number {
+  if (!(a > 0 && b > 0)) throw new RangeError("regularizedBeta needs a > 0 and b > 0.");
+  if (!(x >= 0 && x <= 1)) throw new RangeError("regularizedBeta needs x between 0 and 1.");
+  if (x === 0) return 0;
+  if (x === 1) return 1;
+  const front = Math.exp(lnGamma(a + b) - lnGamma(a) - lnGamma(b) + a * Math.log(x) + b * Math.log1p(-x));
+  // The continued fraction converges fast on this side of the mean; use the symmetry I_x(a,b) = 1 - I_{1-x}(b,a) otherwise.
+  if (x < (a + 1) / (a + b + 2)) return (front * betaContinuedFraction(x, a, b)) / a;
+  return 1 - (front * betaContinuedFraction(1 - x, b, a)) / b;
+}
+
+/** Student t CDF with df degrees of freedom, from the incomplete beta. */
+export function studentTCdf(t: number, df: number): number {
+  if (!(df > 0)) throw new RangeError("studentTCdf needs df > 0.");
+  if (Number.isNaN(t)) return Number.NaN;
+  if (t === 0) return 0.5;
+  const tail = 0.5 * regularizedBeta(df / (df + t * t), df / 2, 0.5);
+  return t > 0 ? 1 - tail : tail;
+}
+
+function studentTPdf(t: number, df: number): number {
+  return Math.exp(lnGamma((df + 1) / 2) - lnGamma(df / 2) - 0.5 * Math.log(df * Math.PI) - ((df + 1) / 2) * Math.log1p((t * t) / df));
+}
+
+/** Inverse of the Student t CDF, for p strictly between 0 and 1. Newton steps from the normal quantile, with a bisection fallback. */
+export function studentTQuantile(p: number, df: number): number {
+  if (!(p > 0 && p < 1)) throw new RangeError("studentTQuantile needs p strictly between 0 and 1.");
+  if (!(df > 0)) throw new RangeError("studentTQuantile needs df > 0.");
+  if (p === 0.5) return 0;
+  if (p < 0.5) return -studentTQuantile(1 - p, df);
+  let x = normalQuantile(p);
+  for (let i = 0; i < 100; i++) {
+    const step = (studentTCdf(x, df) - p) / studentTPdf(x, df);
+    if (!Number.isFinite(step)) break;
+    const next = x - step;
+    // Newton can overshoot below zero for heavy tails. Halve toward the current point instead.
+    x = next > 0 ? next : x / 2;
+    if (Math.abs(step) <= 1e-13 * Math.max(1, Math.abs(x))) return x;
+  }
+  let lo = 0;
+  let hi = 1;
+  while (studentTCdf(hi, df) < p) hi *= 2;
+  for (let i = 0; i < 300 && hi - lo > 1e-13 * hi; i++) {
+    const mid = (lo + hi) / 2;
+    if (studentTCdf(mid, df) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
