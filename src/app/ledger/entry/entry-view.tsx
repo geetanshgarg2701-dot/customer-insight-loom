@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import type { EmailCheck, EmailCheckInput } from "@/lib/compliance/rules";
+import { COMPLIANCE_PASSED } from "@/lib/ledger/ledger";
+import { EmailCheckForm } from "../../compliance/email-check-form";
 import { formatPoints } from "@/lib/app/format";
 import { getBrowserLedger } from "@/lib/duckdb/client";
 import { readoutOpensAt } from "@/lib/ledger/window";
@@ -90,6 +93,23 @@ export function EntryView() {
     }
   }
 
+  const [email, setEmail] = useState<{ input: EmailCheckInput; result: EmailCheck | null } | null>(null);
+  const onEmail = useCallback((input: EmailCheckInput, result: EmailCheck | null) => setEmail({ input, result }), []);
+
+  /** The ledger runs the check again on this exact email, so the pass it records is its own, not the screen's. */
+  async function onRecordCheck() {
+    if (!loaded || !email) return;
+    setBusy(true);
+    try {
+      await loaded.ledger.recordComplianceCheck(loaded.entry.id, email.input, "user");
+      await load();
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onLaunch() {
     if (!loaded) return;
     setBusy(true);
@@ -121,7 +141,8 @@ export function EntryView() {
   }
 
   const { ledger, entry, audit, assigned } = loaded;
-  const canLaunch = (entry.status === "draft" || entry.status === "registered") && assigned > 0;
+  const passedAt = audit.find((a) => a.action === COMPLIANCE_PASSED)?.at ?? null;
+  const canLaunch = (entry.status === "draft" || entry.status === "registered") && assigned > 0 && passedAt !== null;
 
   return (
     <main>
@@ -185,6 +206,31 @@ export function EntryView() {
           Launching a registered entry labels it confirmatory. Launching without registering labels it
           exploratory. Send from your own tool, using the assignment file, then launch here.
         </p>
+        {!entry.launchedAt && (entry.status === "draft" || entry.status === "registered") && (
+          <div>
+            <h3>Email check</h3>
+            {passedAt !== null ? (
+              <p>The email for this entry passed the email check at {passedAt}. The pass is in the history below.</p>
+            ) : (
+              <>
+                <p>
+                  Check the email this entry will send. A pass is recorded in the history, without the email text, and
+                  launch stays closed until there is one. The same check is on the{" "}
+                  <Link href="/compliance">Email check</Link> screen.
+                </p>
+                <details>
+                  <summary>Run the email check for this entry</summary>
+                  <EmailCheckForm onChange={onEmail} />
+                </details>
+                <p>
+                  <button type="button" disabled={busy || !email?.result?.approved} onClick={() => void onRecordCheck()}>
+                    Record the pass on this entry
+                  </button>
+                </p>
+              </>
+            )}
+          </div>
+        )}
         {entry.launchedAt ? (
           <p>
             Launched at {entry.launchedAt}.
@@ -198,6 +244,7 @@ export function EntryView() {
           </p>
         )}
         {!entry.launchedAt && assigned === 0 && <p>Assign the audience first.</p>}
+        {!entry.launchedAt && passedAt === null && <p>Pass the email check below first.</p>}
       </section>
 
       {entry.launchedAt && <ResultsSection key={`results-${entry.id}`} entry={entry} ledger={ledger} onChange={load} />}

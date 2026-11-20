@@ -1,3 +1,4 @@
+import { SYNTHETIC_EMAIL } from "../compliance/example";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
@@ -67,6 +68,7 @@ describe("entries", () => {
     const e = await ledger.createDraft(DRAFT, "u");
     await ledger.register(e.id, "u");
     clock.tick();
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     const launched = await ledger.launch(e.id, "u");
     expect(launched.entryType).toBe("confirmatory");
     expect(launched.status).toBe("running");
@@ -74,6 +76,7 @@ describe("entries", () => {
 
   it("is exploratory when launched before it was registered", async () => {
     const e = await ledger.createDraft(DRAFT, "u");
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await ledger.launch(e.id, "u");
     clock.tick();
     const late = await ledger.register(e.id, "u");
@@ -83,6 +86,7 @@ describe("entries", () => {
   it("is exploratory when registered and launched in the same instant", async () => {
     const e = await ledger.createDraft(DRAFT, "u");
     await ledger.register(e.id, "u");
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     const launched = await ledger.launch(e.id, "u");
     expect(launched.entryType).toBe("exploratory");
   });
@@ -124,6 +128,7 @@ describe("entries", () => {
     const e = await ledger.createDraft(DRAFT, "u");
     await ledger.register(e.id, "u");
     await expect(ledger.register(e.id, "u")).rejects.toBeInstanceOf(LedgerLockError);
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await ledger.launch(e.id, "u");
     await expect(ledger.launch(e.id, "u")).rejects.toBeInstanceOf(LedgerLockError);
   });
@@ -143,6 +148,7 @@ describe("entries", () => {
     ).rejects.toBeInstanceOf(LedgerStateError);
     await ledger.register(e.id, "u");
     clock.tick();
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await ledger.launch(e.id, "u");
     // The readout stays locked until the conversion window closes.
     clock.tick(WINDOW_HOURS * 3600 + 1);
@@ -156,13 +162,14 @@ describe("entries", () => {
     expect(closed.status).toBe("closed");
     await expect(ledger.close(e.id, "u")).rejects.toBeInstanceOf(LedgerStateError);
     const actions = (await ledger.listAudit(e.id)).map((a) => a.action);
-    expect(actions).toEqual(["created", "registered", "launched", "result_recorded", "closed"]);
+    expect(actions).toEqual(["created", "registered", "compliance_passed", "launched", "result_recorded", "closed"]);
   });
 
   it("validates enums and numbers", async () => {
     await expect(ledger.createDraft({ ...DRAFT, frameworkTag: "XYZ" as never }, "u")).rejects.toThrow(RangeError);
     await expect(ledger.createDraft({ ...DRAFT, title: "  " }, "u")).rejects.toThrow(RangeError);
     const e = await ledger.createDraft(DRAFT, "u");
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await ledger.launch(e.id, "u");
     await expect(
       ledger.recordResult(e.id, { result: {}, comparisonsCount: -1, correctionMethod: "benjamini_hochberg" }, "u"),
@@ -247,6 +254,7 @@ describe("the not_applied correction label", () => {
     const l = await createLedger(await createNodeEngine({ isolated: true }), { now: () => new Date((clock2.t += 1000)) });
     const e = await l.createDraft({ title: "T", hypothesis: "H", design: { conversionWindowHours: 168 } }, "u");
     await l.register(e.id, "u");
+    await l.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await l.launch(e.id, "u");
     clock2.t += 169 * 3_600_000;
     const readable = await l.recordResult(e.id, { result: { lift: 0.02 }, comparisonsCount: 1, correctionMethod: "not_applied" }, "u");
@@ -257,9 +265,51 @@ describe("the not_applied correction label", () => {
 
   it("is still not a way to smuggle in an unknown label", async () => {
     const e = await ledger.createDraft(DRAFT, "u");
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await ledger.launch(e.id, "u");
     await expect(
       ledger.recordResult(e.id, { result: {}, comparisonsCount: 1, correctionMethod: "none" as never }, "u"),
     ).rejects.toThrow(RangeError);
+  });
+});
+
+describe("the email check gate on launch", () => {
+  it("refuses to launch an entry that has not passed the email check", async () => {
+    const e = await ledger.createDraft(DRAFT, "u");
+    await expect(ledger.launch(e.id, "u")).rejects.toBeInstanceOf(LedgerStateError);
+    await expect(ledger.launch(e.id, "u")).rejects.toThrow(/email check/i);
+    expect((await ledger.getEntry(e.id)).launchedAt).toBeNull();
+  });
+
+  it("runs the check itself, refuses a failing email, names the failing rules and records nothing", async () => {
+    const e = await ledger.createDraft(DRAFT, "u");
+    const noAddress = { ...SYNTHETIC_EMAIL, body: "Advertisement. Unsubscribe any time." };
+    await expect(ledger.recordComplianceCheck(e.id, noAddress, "u")).rejects.toThrow(/postal-address/);
+    expect((await ledger.listAudit(e.id)).map((a) => a.action)).toEqual(["created"]);
+    await expect(ledger.launch(e.id, "u")).rejects.toThrow(/email check/i);
+  });
+
+  it("records a pass in the audit log without the email text, and then allows launch", async () => {
+    const e = await ledger.createDraft(DRAFT, "u");
+    const check = await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
+    expect(check.approved).toBe(true);
+    const audit = await ledger.listAudit(e.id);
+    expect(audit.map((a) => a.action)).toEqual(["created", "compliance_passed"]);
+    expect(JSON.stringify(audit)).not.toContain("Harbor");
+    expect((await ledger.launch(e.id, "u")).status).toBe("running");
+  });
+
+  it("counts a pass only for its own entry", async () => {
+    const a = await ledger.createDraft(DRAFT, "u");
+    const b = await ledger.createDraft({ ...DRAFT, title: "Other" }, "u");
+    await ledger.recordComplianceCheck(a.id, SYNTHETIC_EMAIL, "u");
+    await expect(ledger.launch(b.id, "u")).rejects.toThrow(/email check/i);
+  });
+
+  it("does not take a check for an entry that is already launched or closed", async () => {
+    const e = await ledger.createDraft(DRAFT, "u");
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
+    await ledger.launch(e.id, "u");
+    await expect(ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u")).rejects.toBeInstanceOf(LedgerLockError);
   });
 });

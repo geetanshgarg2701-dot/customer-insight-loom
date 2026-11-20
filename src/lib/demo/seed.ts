@@ -9,6 +9,7 @@
  * conversion window has really closed and the fixed horizon rule is not
  * bypassed. The shared ledger keeps using real time.
  */
+import { SYNTHETIC_EMAIL } from "../compliance/example";
 import { assignAudience, verifyResults } from "../assignment/assign";
 import { resultRecord } from "../assignment/record";
 import type { SqlEngine } from "../intake/types";
@@ -145,6 +146,7 @@ export async function seedDemoLedger(input: { engine: SqlEngine; ledger: Ledger 
   await sl.register(first.entry.id, SYNTHETIC_ACTOR, { powerResult: first.power });
   await assign(sl, first.entry.id, c, first.audienceSize);
   at(29);
+  await sl.recordComplianceCheck(first.entry.id, SYNTHETIC_EMAIL, SYNTHETIC_ACTOR);
   const launched = await sl.launch(first.entry.id, SYNTHETIC_ACTOR);
   if (launched.entryType !== "confirmatory") throw new Error("The demo confirmatory entry was not registered first.");
   at(21);
@@ -156,6 +158,7 @@ export async function seedDemoLedger(input: { engine: SqlEngine; ledger: Ledger 
   const second = await draftAndAssign(sl, x);
   await assign(sl, second.entry.id, x, second.audienceSize);
   at(27);
+  await sl.recordComplianceCheck(second.entry.id, SYNTHETIC_EMAIL, SYNTHETIC_ACTOR);
   await sl.launch(second.entry.id, SYNTHETIC_ACTOR);
   at(26);
   await sl.register(second.entry.id, SYNTHETIC_ACTOR, { powerResult: second.power });
@@ -171,6 +174,7 @@ export async function seedDemoLedger(input: { engine: SqlEngine; ledger: Ledger 
   await sl.register(third.entry.id, SYNTHETIC_ACTOR, { powerResult: third.power });
   await assign(sl, third.entry.id, r, third.audienceSize);
   at(11);
+  await sl.recordComplianceCheck(third.entry.id, SYNTHETIC_EMAIL, SYNTHETIC_ACTOR);
   await sl.launch(third.entry.id, SYNTHETIC_ACTOR);
 
   return [first.entry.id, second.entry.id, third.entry.id];

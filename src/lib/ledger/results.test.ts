@@ -1,3 +1,4 @@
+import { SYNTHETIC_EMAIL } from "../compliance/example";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assignAudience } from "../assignment/assign";
 import { verifyResultsWhenOpen } from "../assignment/gated";
@@ -46,6 +47,7 @@ async function launchedEntry(hours = 168) {
     "u",
   );
   clock.set(Date.parse(START) + 1000);
+  await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
   await ledger.launch(e.id, "u");
   return ledger.getEntry(e.id);
 }
@@ -137,7 +139,7 @@ describe("results are append only versions", () => {
     clock.set(clock.at() + HOUR);
     await ledger.recordResult(e.id, { ...RESULT, reason: "Recomputed after late events" }, "u");
     const actions = (await ledger.listAudit(e.id)).map((a) => a.action);
-    expect(actions).toEqual(["created", "launched", "result_recorded", "result_version_recorded"]);
+    expect(actions).toEqual(["created", "compliance_passed", "launched", "result_recorded", "result_version_recorded"]);
   });
 
   it("does not add a version to a closed entry", async () => {
@@ -220,6 +222,7 @@ describe("peeking is refused, which is review finding R1-1", () => {
     const emails = Array.from({ length: 400 }, (_, i) => `p${i}@example.com`);
     const assigned = await assignAudience({ ledger, entryId: e.id, emails, treatmentShare: 0.5 });
     clock.set(Date.parse(START) + 1000);
+    await ledger.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await ledger.launch(e.id, "u");
     const launchedAt = Date.parse((await ledger.getEntry(e.id)).launchedAt!);
     const rows = assigned.rows.map((r, i) => ({ email: r.email, group: r.arm, converted: i % 10 === 0 ? "1" : "0" }));

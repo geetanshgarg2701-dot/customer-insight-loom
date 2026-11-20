@@ -4,6 +4,7 @@
  * Mirrors supabase/migrations, including the registration lock. Every value
  * from a person or a file goes through bound parameters.
  */
+import { checkEmail, type EmailCheck, type EmailCheckInput } from "../compliance/rules";
 import { toPlainRow } from "../duckdb/normalize";
 import type { SqlEngine, SqlParam } from "../intake/types";
 import { assertReadoutOpen, conversionWindowHours } from "./window";
@@ -135,6 +136,8 @@ const EDITABLE = new Set(["title", "hypothesis", "frameworkTag", "design", "them
 /** The theme is locked too, so a test cannot be relabeled after the fact to fit an evidence chain. */
 const LOCKED_ONCE_REGISTERED = new Set(["hypothesis", "design", "frameworkTag", "themeId"]);
 const INSERT_CHUNK = 500;
+/** The audit action that records a passed email check. Launch looks for it. */
+export const COMPLIANCE_PASSED = "compliance_passed";
 
 export const SCHEMA_SQL = [
   `CREATE TABLE IF NOT EXISTS ledger_meta (workspace_id VARCHAR NOT NULL, workspace_secret VARCHAR NOT NULL)`,
@@ -292,6 +295,11 @@ export interface Ledger {
   update(id: string, patch: EntryPatch, actor: string): Promise<LedgerEntry>;
   register(id: string, actor: string, extras?: { powerResult?: Json }): Promise<LedgerEntry>;
   /** Needs a conversion window in the design, so the readout knows when it may open. */
+  /**
+   * Runs the email check on the email this entry will send and records a pass in the audit log. A failing email is
+   * refused and nothing is recorded. The email text itself is never stored.
+   */
+  recordComplianceCheck(id: string, email: EmailCheckInput, actor: string): Promise<EmailCheck>;
   launch(id: string, actor: string): Promise<LedgerEntry>;
   /**
    * Refused until the conversion window closes. The first call records the result.
@@ -348,6 +356,13 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
   }
 
   const stamp = () => now().toISOString();
+
+  async function hasPassedCheck(entryId: string): Promise<boolean> {
+    const rows = (
+      await engine.query("SELECT count(*) AS n FROM ledger_audit WHERE entry_id = ? AND action = ?", [entryId, COMPLIANCE_PASSED])
+    ).map(toPlainRow);
+    return Number(rows[0].n) > 0;
+  }
 
   async function audit(entryId: string, actor: string, action: string): Promise<void> {
     const [next] = (await engine.all("SELECT coalesce(max(id), 0) + 1 AS n FROM ledger_audit")).map(toPlainRow);
@@ -467,6 +482,22 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
       return getEntry(id);
     },
 
+    async recordComplianceCheck(id, email, actor) {
+      checkActor(actor);
+      const e = await getEntry(id);
+      if (e.launchedAt !== null) throw new LedgerLockError("This entry is already launched, so it is past the email check.");
+      if (e.status !== "draft" && e.status !== "registered") {
+        throw new LedgerStateError("Only a draft or registered entry takes an email check.");
+      }
+      // The ledger runs the check itself, so a caller cannot record a pass by claiming one.
+      const check = checkEmail(email);
+      if (!check.approved) {
+        throw new LedgerStateError(`The email check did not pass. Rules to fix: ${check.blocking.join(", ")}.`);
+      }
+      await audit(id, actor, COMPLIANCE_PASSED);
+      return check;
+    },
+
     async launch(id, actor) {
       checkActor(actor);
       const e = await getEntry(id);
@@ -478,6 +509,9 @@ export async function createLedger(engine: SqlEngine, options: LedgerOptions = {
         throw new LedgerStateError(
           "Set a conversion window in the design before launching, so the readout knows when it may open.",
         );
+      }
+      if (!(await hasPassedCheck(id))) {
+        throw new LedgerStateError("Pass the email check for this entry before launching.");
       }
       await setColumns(id, { launched_at: stamp(), status: "running" });
       await audit(id, actor, "launched");

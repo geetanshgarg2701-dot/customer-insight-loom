@@ -1,3 +1,4 @@
+import { SYNTHETIC_EMAIL } from "../compliance/example";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createNodeEngine } from "../intake/testing/node-engine";
 import type { SqlEngine } from "../intake/types";
@@ -40,6 +41,7 @@ async function seeded(): Promise<Ledger> {
     "user_1",
   );
   await ledger.register(a.id, "user_1");
+  await ledger.recordComplianceCheck(a.id, SYNTHETIC_EMAIL, "user_1");
   await ledger.launch(a.id, "user_1");
   now.jump(WINDOW_HOURS + 1);
   await ledger.recordResult(
@@ -51,6 +53,7 @@ async function seeded(): Promise<Ledger> {
     { title: "Exploratory", hypothesis: "H2", design: { conversionWindowHours: WINDOW_HOURS } },
     "user_1",
   );
+  await ledger.recordComplianceCheck(b.id, SYNTHETIC_EMAIL, "user_1");
   await ledger.launch(b.id, "user_1");
   await ledger.register(b.id, "user_1");
   const c = await ledger.createDraft({ title: "Draft", hypothesis: "H3" }, "ai");
@@ -152,6 +155,7 @@ describe("import validation", { timeout: 30_000 }, () => {
       "u",
     );
     await source.register(a.id, "u");
+    await source.recordComplianceCheck(a.id, SYNTHETIC_EMAIL, "u");
     await source.launch(a.id, "u");
     now.jump(WINDOW_HOURS + 1);
     await source.recordResult(
@@ -261,6 +265,7 @@ describe("the not_applied label in an export", () => {
     const l = await createLedger(await freshEngine(), { now });
     const e = await l.createDraft({ title: "C", hypothesis: "H", design: { conversionWindowHours: WINDOW_HOURS } }, "u");
     await l.register(e.id, "u");
+    await l.recordComplianceCheck(e.id, SYNTHETIC_EMAIL, "u");
     await l.launch(e.id, "u");
     now.jump(WINDOW_HOURS + 1);
     await l.recordResult(e.id, { result: { lift: 0.02 }, comparisonsCount: 1, correctionMethod: label }, "u");

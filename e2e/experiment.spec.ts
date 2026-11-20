@@ -72,7 +72,20 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   // The page never shows an email address.
   expect(await page.locator("body").innerText()).not.toContain("@example.com");
 
-  await page.getByRole("button", { name: "Mark as launched" }).click();
+  // Launch stays closed until the email for this entry passes the check, and the pass lands in the history.
+  const launch = page.getByRole("button", { name: "Mark as launched" });
+  await expect(launch).toBeDisabled();
+  await expect(page.getByText("Pass the email check below first.")).toBeVisible();
+  await page.getByText("Run the email check for this entry").click();
+  const record = page.getByRole("button", { name: "Record the pass on this entry" });
+  await expect(record).toBeDisabled();
+  await page.getByRole("button", { name: "Fill with a synthetic example" }).click();
+  await record.click();
+  await expect(page.getByText(/passed the email check at/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "History" })).toContainText("compliance_passed");
+  await expect(page.getByRole("region", { name: "History" })).not.toContainText("Harbor");
+
+  await launch.click();
   await expect(page.getByText("Status: running")).toBeVisible();
   await expect(page.getByText("Type: Confirmatory")).toBeVisible();
 
