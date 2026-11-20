@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Why } from "@/lib/insights/why";
+import { beforeAfter, placeMarkers, type Marker, type StepsOverTime } from "@/lib/charts/over-time";
 import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge, type Selection, type TopPaths } from "@/lib/charts/crossfilter";
 import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
 import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
@@ -14,7 +15,7 @@ import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import type { ChartOption } from "@/lib/charts/echarts";
-import { createBrowserJourneyBoard, type JourneyBoard } from "@/lib/duckdb/client";
+import { createBrowserJourneyBoard, getBrowserLedger, type JourneyBoard } from "@/lib/duckdb/client";
 import { createCycle, runWhileCurrent } from "@/lib/app/latest";
 import { decodeJourneyView, encodeJourneyView, type JourneyView } from "@/lib/app/view-state";
 import { explainWhy, explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
@@ -225,6 +226,39 @@ function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
   };
 }
 
+/** The cumulative count of each step by day, one line per step, with ledger launches and the scrubber's day marked. */
+function overTimeOption(s: StepsOverTime, launches: Marker[], scrubIndex: number, theme: ChartTheme): ChartOption {
+  return {
+    aria: { enabled: true },
+    color: theme.palette,
+    textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
+    tooltip: { trigger: "axis" },
+    legend: { top: 0, textStyle: { color: theme.text, fontFamily: theme.fontFamily } },
+    grid: { left: 64, right: 24, top: 36, bottom: 40 },
+    xAxis: { type: "category", data: s.days, axisLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
+    yAxis: { type: "value", splitLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
+    series: JOURNEY_STEPS.map((step, k) => ({
+      type: "line",
+      name: step,
+      data: s.cumulative[k],
+      showSymbol: false,
+      ...(k === 0
+        ? {
+            markLine: {
+              symbol: "none",
+              label: { formatter: "{b}", position: "insideEndTop", color: theme.text, fontFamily: theme.fontFamily },
+              lineStyle: { color: theme.text },
+              data: [
+                ...launches.map((m) => ({ name: m.title, xAxis: m.day })),
+                { name: "Scrubber", xAxis: s.days[scrubIndex], label: { show: false }, lineStyle: { type: "dashed", color: theme.line } },
+              ],
+            },
+          }
+        : {}),
+    })),
+  };
+}
+
 export default function JourneysPage() {
   const board = useRef<JourneyBoard | null>(null);
   const openedFromLink = useRef(false);
@@ -249,6 +283,9 @@ export default function JourneysPage() {
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [windowHours, setWindowHours] = useState<(typeof WINDOWS)[number]>(168);
   const [timing, setTiming] = useState<Timing | null>(null);
+  const [overTime, setOverTime] = useState<StepsOverTime | null>(null);
+  const [scrubIndex, setScrubIndex] = useState(0);
+  const [launches, setLaunches] = useState<{ id: string; title: string; launchedAt: string | null }[]>([]);
   const [behindIndex, setBehindIndex] = useState(2);
   const [behind, setBehind] = useState<BehindStep | null>(null);
   const [why, setWhy] = useState<Why | null>(null);
@@ -292,6 +329,17 @@ export default function JourneysPage() {
     const board_ = board.current;
     if (!board_) return;
     setTiming(await board_.timing(hours, sel));
+  }, []);
+
+  /** The days stay the same under any filter, so the scrubber keeps its day. The first load starts on the last day. */
+  const refreshOverTime = useCallback(async (sel: Selection) => {
+    const board_ = board.current;
+    if (!board_) return;
+    const next = await board_.overTime(sel);
+    setOverTime((prev) => {
+      if (!prev || prev.days.length !== next.days.length) setScrubIndex(Math.max(0, next.days.length - 1));
+      return next;
+    });
   }, []);
 
   const refreshBehind = useCallback(async (index: number, sel: Selection) => {
@@ -400,6 +448,7 @@ export default function JourneysPage() {
   }
 
   const choices = useMemo(() => anchorChoices(allPaths), [allPaths]);
+  const markers = useMemo(() => placeMarkers(launches, overTime?.days ?? []), [launches, overTime]);
   const around = useMemo(() => anchoredFlow(allPaths, { anchor, before, after, topN }), [allPaths, anchor, before, after, topN]);
 
   /** The lower sections, one after another, stopping as soon as a newer click has started its own cycle. */
@@ -407,6 +456,7 @@ export default function JourneysPage() {
     await runWhileCurrent(cycle, id, [
       () => refreshComparison(v?.compare?.dim ?? cmpDim, v?.compare?.a ?? cmpA, v?.compare?.b ?? cmpB, sel),
       () => refreshTiming(v?.windowHours ?? windowHours, sel),
+      () => refreshOverTime(sel),
       () => refreshBehind(v?.behindIndex ?? behindIndex, sel),
       () => refreshWhy(v?.behindIndex ?? behindIndex, sel),
       () => refreshReplay(v?.replayReached ?? replayReached, replayAt, sel),
@@ -435,6 +485,13 @@ export default function JourneysPage() {
     }
     try {
       board.current = await createBrowserJourneyBoard(ROWS);
+      // Launch dates for the markers. The ledger lives in this tab, and an empty one simply has none.
+      try {
+        const entries = await (await getBrowserLedger()).listEntries();
+        setLaunches(entries.map((x) => ({ id: x.id, title: x.title, launchedAt: x.launchedAt })));
+      } catch {
+        setLaunches([]);
+      }
       setLoaded(true);
       const id = cycle.start();
       await refresh(sel, rarity);
@@ -918,6 +975,119 @@ export default function JourneysPage() {
                 </p>
                 <Explain summary="How time between steps was worked out" items={explainTiming(timing)} />
               </div>
+            )}
+          </section>
+
+          <section aria-labelledby="h-over-time">
+            <h2 id="h-over-time">Journey over time</h2>
+            <p>
+              How many people had reached each step by the end of each day, with the filters above. Move the scrubber to
+              read the funnel as of any day. Tests launched from the ledger are marked on the day they launched.
+            </p>
+            {overTime && overTime.days.length > 0 && (
+              <>
+                <Chart
+                  label="People who had reached each step, by day, with ledger launches marked"
+                  option={overTimeOption(overTime, markers.inRange, scrubIndex, CHART_THEME)}
+                  height={300}
+                  onSelect={(name) => {
+                    const i = overTime.days.indexOf(name);
+                    if (i >= 0) setScrubIndex(i);
+                  }}
+                />
+                <p role="group" aria-label="Day to read">
+                  <button type="button" disabled={scrubIndex <= 0} onClick={() => setScrubIndex(scrubIndex - 1)}>
+                    Day before
+                  </button>{" "}
+                  <button type="button" disabled={scrubIndex >= overTime.days.length - 1} onClick={() => setScrubIndex(scrubIndex + 1)}>
+                    Day after
+                  </button>{" "}
+                  <button type="button" onClick={() => setScrubIndex(overTime.days.length - 1)}>
+                    Last day
+                  </button>
+                </p>
+                <p>
+                  <label>
+                    Day{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={overTime.days.length - 1}
+                      value={scrubIndex}
+                      onChange={(e) => setScrubIndex(Number(e.target.value))}
+                      aria-valuetext={overTime.days[scrubIndex]}
+                    />
+                  </label>{" "}
+                  {overTime.days[scrubIndex]}
+                </p>
+                <p role="status">
+                  By the end of {overTime.days[scrubIndex]}:{" "}
+                  {JOURNEY_STEPS.map((s, k) => `${overTime.cumulative[k][scrubIndex].toLocaleString("en-US")} ${k === 0 ? "had entered" : `reached ${s}`}`).join(", ")}.
+                  {overTime.cumulative[0][scrubIndex] > 0 &&
+                    ` ${formatPercent(overTime.cumulative[3][scrubIndex] / overTime.cumulative[0][scrubIndex], 1)} of those who had entered had bought by then.`}
+                </p>
+                <p>
+                  People who entered near that day may still be on their way, so a share read early in the period runs
+                  low. It is a count of what had happened by that day, not a rate any customer had.
+                </p>
+                <h3>Ledger tests on this timeline</h3>
+                {markers.inRange.length === 0 && markers.outside.length === 0 && (
+                  <p>No ledger test has launched yet. A launched test is marked here on the day it launched.</p>
+                )}
+                {markers.inRange.length > 0 && (
+                  <ul aria-label="Ledger tests launched during these days">
+                    {markers.inRange.map((m) => {
+                      const ba = beforeAfter(overTime.daily, 3, m.index, 7);
+                      return (
+                        <li key={m.id}>
+                          <strong>{m.title}</strong>, launched {m.day}.{" "}
+                          {ba
+                            ? `Purchases a day: ${ba.before.perDay.toFixed(1)} over the ${ba.before.days} days before, and ${ba.after.perDay.toFixed(1)} over the ${ba.after.days} days from launch.`
+                            : "There are not enough days on both sides to compare."}{" "}
+                          This is a before and after count, not the test&rsquo;s measured lift. Other things changed over
+                          the same days, and only the ledger readout against its holdout measures the test.{" "}
+                          <Link href={`/ledger/entry?id=${m.id}`}>Open the entry</Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {markers.outside.length > 0 && (
+                  <p>
+                    {markers.outside.length === 1 ? "One ledger test launched" : `${markers.outside.length} ledger tests launched`} outside
+                    these dates, {overTime.days[0]} to {overTime.days[overTime.days.length - 1]}, so{" "}
+                    {markers.outside.length === 1 ? "it is" : "they are"} not marked:{" "}
+                    {markers.outside.map((m) => `${m.title}, ${m.day}`).join("; ")}.
+                  </p>
+                )}
+                <details>
+                  <summary>Show as table</summary>
+                  <div style={{ overflowX: "auto" }}>
+                    <table aria-label="People who had reached each step, by day">
+                      <thead>
+                        <tr>
+                          <th scope="col">Day</th>
+                          {JOURNEY_STEPS.map((s) => (
+                            <th scope="col" key={s}>
+                              {s}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {overTime.days.map((d, i) => (
+                          <tr key={d}>
+                            <th scope="row">{d}</th>
+                            {JOURNEY_STEPS.map((s, k) => (
+                              <td key={s}>{overTime.cumulative[k][i].toLocaleString("en-US")}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              </>
             )}
           </section>
 

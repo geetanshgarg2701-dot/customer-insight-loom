@@ -4,11 +4,25 @@
  * explicitly. Apache-2.0, pinned in package.json.
  */
 import type { ComposeOption } from "echarts/core";
-import type { BarSeriesOption, BoxplotSeriesOption, SankeySeriesOption } from "echarts/charts";
-import type { AriaComponentOption, GridComponentOption, TooltipComponentOption } from "echarts/components";
+import type { BarSeriesOption, BoxplotSeriesOption, LineSeriesOption, SankeySeriesOption } from "echarts/charts";
+import type {
+  AriaComponentOption,
+  GridComponentOption,
+  LegendComponentOption,
+  MarkLineComponentOption,
+  TooltipComponentOption,
+} from "echarts/components";
 
 export type ChartOption = ComposeOption<
-  BarSeriesOption | BoxplotSeriesOption | SankeySeriesOption | AriaComponentOption | GridComponentOption | TooltipComponentOption
+  | BarSeriesOption
+  | BoxplotSeriesOption
+  | LineSeriesOption
+  | SankeySeriesOption
+  | AriaComponentOption
+  | GridComponentOption
+  | LegendComponentOption
+  | MarkLineComponentOption
+  | TooltipComponentOption
 >;
 
 let loaded: Promise<typeof import("echarts/core")> | null = null;
@@ -17,10 +31,24 @@ export function loadEcharts(): Promise<typeof import("echarts/core")> {
   if (!loaded) {
     loaded = (async () => {
       const echarts = await import("echarts/core");
-      const { BarChart, BoxplotChart, SankeyChart } = await import("echarts/charts");
-      const { AriaComponent, GridComponent, TitleComponent, TooltipComponent } = await import("echarts/components");
+      const { BarChart, BoxplotChart, LineChart, SankeyChart } = await import("echarts/charts");
+      const { AriaComponent, GridComponent, LegendComponent, MarkLineComponent, TitleComponent, TooltipComponent } = await import(
+        "echarts/components"
+      );
       const { CanvasRenderer } = await import("echarts/renderers");
-      echarts.use([BarChart, BoxplotChart, SankeyChart, AriaComponent, GridComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
+      echarts.use([
+        BarChart,
+        BoxplotChart,
+        LineChart,
+        SankeyChart,
+        AriaComponent,
+        GridComponent,
+        LegendComponent,
+        MarkLineComponent,
+        TitleComponent,
+        TooltipComponent,
+        CanvasRenderer,
+      ]);
       return echarts;
     })();
     loaded.catch(() => {

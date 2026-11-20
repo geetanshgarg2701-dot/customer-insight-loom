@@ -44,6 +44,7 @@ import { syntheticComments } from "../insights/comments";
 import { loadComments } from "../insights/mentions";
 import { prepareComments } from "../insights/prepare";
 import { whyAtStep, type Why } from "../insights/why";
+import { stepsOverTime, type StepsOverTime } from "../charts/over-time";
 import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
@@ -181,6 +182,8 @@ export type JourneyBoard = {
   replay(reached: string, offset: number, selection: Selection): Promise<ExampleJourney>;
   /** Loads the synthetic comments the first time it is asked, then reuses them. */
   why(stepIndex: number, selection: Selection): Promise<Why>;
+  /** Each main step by day, for the scrubber and the ledger markers. */
+  overTime(selection: Selection): Promise<StepsOverTime>;
   close(): Promise<void>;
 };
 
@@ -210,6 +213,7 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     timing: (windowHours, selection) => timeInStep(engine, table, selection, { asOf: JOURNEYS_AS_OF, windowHours }),
     behind: (stepIndex, selection) => behindStep(engine, table, selection, stepIndex),
     replay: (reached, offset, selection) => exampleJourney(engine, table, selection, { reached, offset }),
+    overTime: (selection) => stepsOverTime(engine, table, selection),
     why: async (stepIndex, selection) => {
       await ensureComments();
       return whyAtStep(engine, { comments, journeys: table }, stepIndex, selection);

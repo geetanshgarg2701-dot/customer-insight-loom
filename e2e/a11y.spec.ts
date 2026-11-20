@@ -147,8 +147,10 @@ test("every chart has the same information as text, so nothing depends on seeing
   expect(await page.getByRole("table", { name: "Flow between steps" }).getByRole("row").count()).toBeGreaterThan(3);
   // The lower sections fill in just after the main refresh, so these wait and retry instead of counting once.
   await expect.poll(() => page.getByRole("table", { name: "Around one event" }).getByRole("row").count()).toBeGreaterThan(3);
+  // The journey over time line chart is matched by a table, folded away under Show as table, one row per day.
+  await expect.poll(() => page.locator('table[aria-label="People who had reached each step, by day"] tbody tr').count()).toBeGreaterThan(20);
   // The canvas itself is named by its figure, so a screen reader announces what it is.
-  await expect(page.getByRole("figure")).toHaveCount(7);
+  await expect(page.getByRole("figure")).toHaveCount(8);
 });
 
 test("charts draw at once when the system asks to reduce motion, and follow the setting live", async ({ page }) => {
@@ -158,7 +160,7 @@ test("charts draw at once when the system asks to reduce motion, and follow the 
   await page.getByRole("button", { name: "Load synthetic journeys" }).click();
   await expect(page.getByText(/Showing 100,000 of 100,000 customers/)).toBeVisible({ timeout: 180_000 });
   const figures = page.getByRole("figure");
-  await expect(figures).toHaveCount(7);
+  await expect(figures).toHaveCount(8);
   for (const figure of await figures.all()) await expect(figure).toHaveAttribute("data-motion", "off");
   // Changing the system setting takes effect without a reload.
   await page.emulateMedia({ reducedMotion: "no-preference" });
