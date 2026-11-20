@@ -47,6 +47,10 @@ export default function Home() {
             changes, in the browser.
           </li>
           <li>
+            <Link href="/data">Your data</Link>. What this tab holds, its memory use against the database&apos;s own
+            limit, an export reminder, and a delete everything control.
+          </li>
+          <li>
             <Link href="/methods">Methods</Link>. The checks that ran on generated data to test the calculator, with
             the counts.
           </li>

@@ -45,6 +45,7 @@ import { loadComments } from "../insights/mentions";
 import { prepareComments } from "../insights/prepare";
 import { whyAtStep, type Why } from "../insights/why";
 import { stepsOverTime, type StepsOverTime } from "../charts/over-time";
+import { deleteEverything, readUsage, type Usage } from "../usage/usage";
 import { PIPELINE_AS_OF, syntheticPipeline } from "../demo/pipeline";
 import { seedDemoLedger } from "../demo/seed";
 import { createIntake } from "../intake/intake";
@@ -275,4 +276,24 @@ export async function createBrowserCommentsBoard(customers = 20_000, count = 3_0
   const engine = await createBrowserEngine();
   const journeys = syntheticJourneys(customers, 11);
   return createCommentsBoard(engine, journeys, syntheticComments(journeys, count, seed));
+}
+
+/** What the in-browser database holds and how much memory it uses against its limit. */
+export async function readBrowserUsage(): Promise<Usage> {
+  const engine = await createBrowserEngine();
+  try {
+    return await readUsage(engine);
+  } finally {
+    await engine.close?.();
+  }
+}
+
+/** Drops every table and view in the in-browser database. The caller reloads the page afterward, so no screen keeps a stale view. */
+export async function deleteBrowserData(): Promise<{ tables: number; views: number; rows: number }> {
+  const engine = await createBrowserEngine();
+  try {
+    return await deleteEverything(engine);
+  } finally {
+    await engine.close?.();
+  }
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { getBrowserLedger, importBrowserLedger, seedBrowserDemo } from "@/lib/duckdb/client";
 import { downloadText } from "@/lib/app/download";
+import { noteExport } from "@/lib/usage/usage";
 import { demoAudienceCsv } from "@/lib/demo/synthetic";
 import { familywiseLine } from "@/lib/ledger/familywise";
 import { ledgerCsv } from "@/lib/ledger/csv";
@@ -99,6 +100,7 @@ export default function LedgerPage() {
         "application/json",
         JSON.stringify(file, null, 2),
       );
+      noteExport(Date.now());
     } catch (e) {
       setError(messageOf(e));
     }
