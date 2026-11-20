@@ -40,8 +40,15 @@ function parseCount(raw: string, allowEmpty: boolean): number | null | undefined
  * The email check form and its result, shared by the email check screen and a ledger entry. It reports every change, so
  * the entry can record a pass of exactly the email that is on screen.
  */
-export function EmailCheckForm({ onChange }: { onChange?: (input: EmailCheckInput, result: EmailCheck | null) => void }) {
-  const [input, setInput] = useState<EmailCheckInput>(EMPTY);
+export function EmailCheckForm({
+  onChange,
+  initial,
+}: {
+  onChange?: (input: EmailCheckInput, result: EmailCheck | null) => void;
+  /** Fields to start with, such as a draft's subject and body. */
+  initial?: Partial<EmailCheckInput>;
+}) {
+  const [input, setInput] = useState<EmailCheckInput>({ ...EMPTY, ...initial });
   const [raw, setRaw] = useState({ daily: "0", days: "", spam: "", sends: "1", cap: String(DEFAULT_CAP) });
   const [problem, setProblem] = useState<string | null>(null);
 
