@@ -1,0 +1,4 @@
+:HL["/customer-insight-loom/_next/static/chunks/3w5m3ayk2fh8s.css","style"]
+2:[["children",{"s":"__PAGE__","h":160}]]
+1:[["children",{"s":"compliance","h":96,"c":"$Q2"}]]
+0:{"b":"JCIscrs1eUyGgwqKbyPw8","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
