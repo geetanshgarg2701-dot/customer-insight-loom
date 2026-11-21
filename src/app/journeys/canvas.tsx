@@ -1,5 +1,6 @@
 "use client";
 
+import type { DetourStep } from "@/lib/charts/behind";
 import { useDeferredValue, useMemo, useState } from "react";
 import { Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -140,21 +141,22 @@ function ruleNodes(rules: DesignedRules | null): { nodes: Node<RuleData>[]; edge
 }
 
 const ARIA_LABELS = {
-  "node.a11yDescription.default": "Press Enter or Space to open who is behind this step. Detours have no drill through yet.",
+  "node.a11yDescription.default": "Press Enter or Space to open who is behind this step.",
   "node.a11yDescription.keyboardDisabled": "Press Enter or Space to open who is behind this step.",
 };
 
 type Sketch = { from: string; to: string; loop: boolean };
 
 /**
- * The journey as the marketer drew it, with live numbers on every step and a count on every connection. Selecting a main
- * step opens who is behind it. New connections can be sketched to see whether they would make a loop, and a sketch is
+ * The journey as the marketer drew it, with live numbers on every step and a count on every connection. Selecting a step
+ * or a detour opens who is behind it. New connections can be sketched to see whether they would make a loop, and a sketch is
  * never saved and carries no customer numbers.
  */
 export function JourneyCanvas({
   paths: livePaths,
   timing: liveTiming,
   onOpenStep,
+  onOpenDetour,
   rules,
   waitStep,
   waitDays,
@@ -166,6 +168,7 @@ export function JourneyCanvas({
   paths: PathCount[];
   timing: Timing | null;
   onOpenStep: (index: number) => void;
+  onOpenDetour: (step: DetourStep) => void;
   rules: DesignedRules | null;
   waitStep: number;
   waitDays: number;
@@ -189,7 +192,7 @@ export function JourneyCanvas({
 
   const stepIds = DESIGNED_JOURNEY.nodes.map((x) => x.id);
 
-  /** Opens the step a node stands for. A main step opens who is behind it, and a detour says it has no drill through yet. */
+  /** Opens who is behind the step a node stands for, a main step or a detour. */
   function openNode(id: string) {
     if (id === "rule-wait" || id === "rule-exit") {
       setOpened(`${id === "rule-wait" ? "The wait" : "The exit conditions"} can be changed in the choices below the canvas.`);
@@ -198,7 +201,8 @@ export function JourneyCanvas({
     const d = DESIGNED_JOURNEY.nodes.find((x) => x.id === id);
     if (!d) return;
     if (d.mainIndex === null) {
-      setOpened(`${d.label} is a detour. Who is behind a detour is not built yet.`);
+      onOpenDetour(d.id as DetourStep);
+      setOpened(`Opened who is behind the ${d.label} detour, below under Behind a step.`);
     } else {
       onOpenStep(d.mainIndex);
       setOpened(`Opened who is behind ${d.label}, below under Behind a step.`);

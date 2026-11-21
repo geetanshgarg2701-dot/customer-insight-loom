@@ -4,7 +4,7 @@ import { verifyResultsWhenOpen } from "../assignment/gated";
 import { pathCounts, type PathCount } from "../charts/anchored";
 import { compareGroups, type CompareDimension, type Comparison } from "../charts/compare";
 import { timeInStep, type Timing } from "../charts/timing";
-import { behindStep, type BehindStep } from "../charts/behind";
+import { behindDetour, behindStep, type BehindStep, type DetourStep } from "../charts/behind";
 import { exampleJourney, type ExampleJourney } from "../charts/replay";
 import { firstEntry, pipelineSeries, stageRecords, type PipelineAt, type StageRecords } from "../charts/pipeline-drill";
 import {
@@ -181,6 +181,8 @@ export type JourneyBoard = {
   compare(dimension: CompareDimension, a: string, b: string, selection: Selection): Promise<Comparison>;
   timing(windowHours: number, selection: Selection): Promise<Timing>;
   behind(stepIndex: number, selection: Selection): Promise<BehindStep>;
+  /** Who used a detour, Search or Support, read from the full path. */
+  behindDetour(step: DetourStep, selection: Selection): Promise<BehindStep>;
   replay(reached: string, offset: number, selection: Selection): Promise<ExampleJourney>;
   /** Loads the synthetic comments the first time it is asked, then reuses them. */
   why(stepIndex: number, selection: Selection): Promise<Why>;
@@ -216,6 +218,7 @@ export async function createBrowserJourneyBoard(rows = 100_000, seed = 11): Prom
     compare: (dimension, a, b, selection) => compareGroups(engine, table, { dimension, a, b, selection }),
     timing: (windowHours, selection) => timeInStep(engine, table, selection, { asOf: JOURNEYS_AS_OF, windowHours }),
     behind: (stepIndex, selection) => behindStep(engine, table, selection, stepIndex),
+    behindDetour: (step, selection) => behindDetour(engine, table, selection, step),
     replay: (reached, offset, selection) => exampleJourney(engine, table, selection, { reached, offset }),
     overTime: (selection) => stepsOverTime(engine, table, selection),
     rules: async (selection, o) => ({

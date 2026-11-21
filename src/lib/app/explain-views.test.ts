@@ -389,9 +389,23 @@ describe("explainTiming", () => {
   it("keeps the words plain", () => clean(list));
 });
 
+describe("explainBehind for a detour", () => {
+  const d: BehindStep = {
+    step: "Support", next: "Purchase", reached: 46, movedOn: 30, left: 13, minGroup: 30, elsewhere: 3, detour: true, groups: [],
+  };
+  const list = explainBehind(d);
+  it("says the counts come from the full path, and names the undesigned moves", () => {
+    const how = list.find((x) => x.label === "People at this step")!.how;
+    expect(how).toContain("full path");
+    expect(how).toContain("3 went somewhere the design does not show");
+    expect(how).toContain("first visit");
+  });
+  it("keeps the words plain", () => clean(list));
+});
+
 describe("explainBehind", () => {
   const b: BehindStep = {
-    step: "Cart", next: "Purchase", reached: 175, movedOn: 114, left: 61, minGroup: 30,
+    step: "Cart", next: "Purchase", reached: 175, movedOn: 114, left: 61, minGroup: 30, elsewhere: 0, detour: false,
     groups: [
       { label: "new, ads", segment: "new", channel: "ads", reached: 100, movedOn: 60, left: 40, rate: 0.6, low: 0.5, high: 0.7, merged: false, mergedGroups: 0, hidden: false },
       { label: "2 smaller groups, merged", segment: null, channel: null, reached: null, movedOn: null, left: null, rate: null, low: null, high: null, merged: true, mergedGroups: 2, hidden: true },

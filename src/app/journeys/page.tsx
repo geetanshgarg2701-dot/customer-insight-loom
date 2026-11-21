@@ -8,7 +8,7 @@ import { JOURNEY_DIMENSIONS, type Count, type JourneyDimension, type SankeyEdge,
 import { anchorChoices, anchoredFlow, type AnchoredFlow, type PathCount } from "@/lib/charts/anchored";
 import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Comparison } from "@/lib/charts/compare";
 import { formatDuration, timingSentence, type Timing } from "@/lib/charts/timing";
-import type { BehindStep } from "@/lib/charts/behind";
+import { DETOURS, type BehindStep, type DetourStep } from "@/lib/charts/behind";
 import type { ExampleJourney } from "@/lib/charts/replay";
 import { JOURNEY_STEPS } from "@/lib/demo/journeys";
 import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
@@ -295,6 +295,10 @@ export default function JourneysPage() {
   const [launches, setLaunches] = useState<{ id: string; title: string; launchedAt: string | null }[]>([]);
   const [behindIndex, setBehindIndex] = useState(2);
   const [behind, setBehind] = useState<BehindStep | null>(null);
+  // A detour open in Behind a step, or null for a main step. The ref is what a filter change reads, so a refresh that
+  // was already running cannot put back a main step after a detour was opened.
+  const [detour, setDetour] = useState<DetourStep | null>(null);
+  const detourRef = useRef<DetourStep | null>(null);
   const [why, setWhy] = useState<Why | null>(null);
   const [whyOn, setWhyOn] = useState(false);
   const [whyBusy, setWhyBusy] = useState(false);
@@ -361,7 +365,8 @@ export default function JourneysPage() {
   const refreshBehind = useCallback(async (index: number, sel: Selection) => {
     const board_ = board.current;
     if (!board_) return;
-    setBehind(await board_.behind(index, sel));
+    const d = detourRef.current;
+    setBehind(d ? await board_.behindDetour(d, sel) : await board_.behind(index, sel));
   }, []);
 
   /** The why panel only queries once it has been opened, so filter clicks stay as fast as before until then. */
@@ -403,7 +408,19 @@ export default function JourneysPage() {
     }
   }
 
+  async function pickDetour(step: DetourStep) {
+    detourRef.current = step;
+    setDetour(step);
+    try {
+      await refreshBehind(behindIndex, selection);
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  }
+
   async function pickBehind(index: number) {
+    detourRef.current = null;
+    setDetour(null);
     setBehindIndex(index);
     try {
       await refreshBehind(index, selection);
@@ -676,7 +693,7 @@ export default function JourneysPage() {
             <h2 id="h-designed">Designed journey</h2>
             <p>
               The journey as it was designed, with the live numbers on every step and a count on every connection. Select
-              a main step to open who is behind it. The two detours, Search and Support, are branches off the main steps.
+              a step to open who is behind it. The two detours, Search and Support, are branches off the main steps, and open the same way.
               The numbers follow the filters above.
             </p>
             {allPaths.length > 0 && (
@@ -684,6 +701,7 @@ export default function JourneysPage() {
                 paths={allPaths}
                 timing={timing}
                 onOpenStep={(i) => void pickBehind(i)}
+                onOpenDetour={(s) => void pickDetour(s)}
                 rules={rules}
                 waitStep={waitStep}
                 waitDays={waitDays}
@@ -740,8 +758,14 @@ export default function JourneysPage() {
             <p role="group" aria-label="Step to look behind">
               Step:{" "}
               {JOURNEY_STEPS.map((s, i) => (
-                <button key={s} type="button" aria-pressed={behindIndex === i} onClick={() => void pickBehind(i)}>
+                <button key={s} type="button" aria-pressed={detour === null && behindIndex === i} onClick={() => void pickBehind(i)}>
                   {s}
+                </button>
+              ))}{" "}
+              Detour:{" "}
+              {DETOURS.map((d) => (
+                <button key={d.step} type="button" aria-pressed={detour === d.step} onClick={() => void pickDetour(d.step)}>
+                  {d.step}
                 </button>
               ))}
             </p>
@@ -752,6 +776,9 @@ export default function JourneysPage() {
                   {behind.next !== null && behind.movedOn !== null
                     ? ` ${behind.movedOn.toLocaleString("en-US")} went on to ${behind.next} and ${(behind.left ?? 0).toLocaleString("en-US")} left at ${behind.step}.`
                     : ` It is the last step, so nobody goes on from here.`}
+                  {behind.detour && behind.elsewhere > 0
+                    ? ` ${behind.elsewhere.toLocaleString("en-US")} went somewhere the design does not show.`
+                    : ""}
                 </p>
                 <table aria-label="Behind a step">
                   <thead>
@@ -793,6 +820,12 @@ export default function JourneysPage() {
               Themes from customer comments and segments that go with more people leaving at the step chosen in Behind a
               step, with the filters above. Every item is an association.
             </p>
+            {detour && (
+              <p>
+                This panel covers the four main steps, so it still shows {JOURNEY_STEPS[behindIndex]} while the {detour} detour is
+                open above.
+              </p>
+            )}
             {!whyOn ? (
               <p>
                 <button type="button" onClick={() => void showWhy()} disabled={whyBusy}>

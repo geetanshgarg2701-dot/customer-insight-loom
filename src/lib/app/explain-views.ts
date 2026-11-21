@@ -365,11 +365,17 @@ export function explainBehind(b: BehindStep): Explanation[] {
     b.next === null || b.movedOn === null
       ? `${b.step} is the last step, so there is no next step to go on to.`
       : `${formatCount(b.movedOn)} went on to ${b.next} and ${formatCount(b.left ?? 0)} left at ${b.step}.`;
+  const detour = b.detour
+    ? ` ${b.step} is a detour, so this is read from each person's full path, not from the four main steps. Went on means ` +
+      `their very next event was ${b.next}, and left means ${b.step} was their last event. ` +
+      (b.elsewhere > 0 ? `${formatCount(b.elsewhere)} went somewhere the design does not show, and are counted apart. ` : "") +
+      `For someone who used ${b.step} more than once, their first visit is the one read.`
+    : "";
   return [
     {
       label: "People at this step",
       value: formatCount(b.reached),
-      how: `Everyone in the current selection who reached ${b.step}. Of them, ${flow} Every person counts once.`,
+      how: `Everyone in the current selection who reached ${b.step}. Of them, ${flow} Every person counts once.${detour}`,
     },
     {
       label: "Rate of going on",

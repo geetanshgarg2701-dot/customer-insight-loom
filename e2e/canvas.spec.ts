@@ -40,9 +40,10 @@ test("the designed journey shows the generator's live numbers on every step, ope
   const atCart = rows.filter((r) => r.steps[2] !== null).length;
   await expect(page.getByRole("region", { name: "Behind a step" }).getByText(new RegExp(`^${n(atCart)} people reached Cart\.`))).toBeVisible();
 
-  // A detour has no drill through, and says so.
+  // A detour opens who is behind it too, counted from the full path.
   await search.click();
-  await expect(section.getByText(/Search is a detour\. Who is behind a detour is not built yet\./)).toBeVisible();
+  await expect(section.getByText("Opened who is behind the Search detour, below under Behind a step.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Behind a step" }).getByText(new RegExp(`^${n(entered("Search"))} people reached Search\.`))).toBeVisible();
 
   // A sketched connection that makes a loop is flagged, a harmless one is not.
   await section.getByRole("combobox", { name: "From step" }).selectOption("Cart");
