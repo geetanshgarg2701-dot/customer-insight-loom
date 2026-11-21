@@ -1,70 +1,88 @@
 import Link from "next/link";
-import { Nav } from "./nav";
+import { PILOT } from "@/lib/pilot/enabled";
+
+type Screen = { href: string; name: string; what: string };
+
+const GROUPS: { id: string; title: string; intro: string; screens: Screen[] }[] = [
+  {
+    id: "experiments",
+    title: "Experiments",
+    intro: "Write the bet down before you send, and read the result once.",
+    screens: [
+      { href: "/ledger", name: "Ledger", what: "Record a hypothesis, check the audience is large enough, hold back a control group and read out the result." },
+      { href: "/compliance", name: "Email check", what: "Check an email against US email law and the Gmail and Yahoo sender rules, with the source of each rule." },
+      { href: "/drafts", name: "Email drafts", what: "Draft an email for a segment and a complaint in PAS, FAB or AIDA, then approve it in a sandbox." },
+    ],
+  },
+  {
+    id: "customers",
+    title: "Customers",
+    intro: "Where people drop off, where deals wait, and what customers say about it.",
+    screens: [
+      { href: "/journeys", name: "Journeys", what: "Linked charts of 100,000 synthetic customers, the designed journey and who is behind each step." },
+      { href: "/pipeline", name: "Pipeline", what: "How long deals sit in each stage, which have stalled, and the pipeline on any past date." },
+      { href: "/insights", name: "Comments", what: "Themes in customer comments, with names removed, and the evidence chain from a complaint to revenue." },
+    ],
+  },
+  {
+    id: "data",
+    title: "Your data",
+    intro: "Bring files in, check them, and see what this tab holds.",
+    screens: [
+      { href: "/intake", name: "Data intake", what: "Load a CSV and map its columns. Columns that look like names, emails or phone numbers are blocked." },
+      { href: "/check", name: "Data check", what: "Match two files on email and check a time column against clock changes." },
+      { href: "/ingest", name: "Webhooks", what: "Try the receiver for events from other tools, with signing, limits and step names to map." },
+      { href: "/data", name: "Your data", what: "What this tab holds, how much memory it uses, and a control to delete everything." },
+    ],
+  },
+];
 
 export default function Home() {
   return (
     <main>
-      <Nav />
       <h1>Customer Insight Loom</h1>
-      <p>
-        Customer journeys, pipelines and email experiments, woven into one picture with the evidence kept and the
-        uncertainty shown. It is free. The ledger records each experiment: you write down the bet before you send,
-        hold back a control group, and read the result once, after the conversion window closes. When a result is too
-        small to tell, it says so plainly.
-      </p>
-      <p>
-        Your files stay in your browser. There is no account, and nothing you load is sent to a server. See <Link href="/privacy">Privacy</Link> for the details.
+      <p className="home-lead">
+        Customer journeys, pipelines and email experiments in one picture, with the evidence kept and the uncertainty
+        shown. When a result is too small to tell, it says so plainly.
       </p>
 
-      <section aria-labelledby="today">
-        <h2 id="today">What works today</h2>
-        <ul>
-          <li>
-            <Link href="/ledger">Ledger</Link>. Write down a hypothesis, check that your audience is large enough,
-            assign a holdout, and read out the result. The demo data on that page shows the whole path.
-          </li>
-          <li>
-            <Link href="/intake">Data intake</Link>. Load a CSV, map its columns, and preview 20 rows. Columns that
-            look like names, emails or phone numbers are blocked.
-          </li>
-          <li>
-            <Link href="/journeys">Journeys</Link>. Linked charts of where customers drop off, on synthetic data.
-          </li>
-          <li>
-            <Link href="/pipeline">Pipeline</Link>. Where deals wait, how long they sit in each stage, and which ones
-            have stalled, on synthetic data.
-          </li>
-          <li>
-            <Link href="/insights">Comments</Link>. What customers say, read next to what they did, with a redaction
-            scorecard and a step to correct a comment, on synthetic data.
-          </li>
-          <li>
-            <Link href="/compliance">Email check</Link>. Check a marketing email against US email law and the Gmail and
-            Yahoo sender rules before it goes out, with the source of each rule.
-          </li>
-          <li>
-            <Link href="/check">Data check</Link>. Match two files on email and check a time column against clock
-            changes, in the browser.
-          </li>
-          <li>
-            <Link href="/ingest">Webhooks</Link>. A sandbox for the webhook receiver: signed requests, limits, duplicates,
-            late events and a review list. The receiver is built and tested but not deployed.
-          </li>
-          <li>
-            <Link href="/data">Your data</Link>. What this tab holds, its memory use against the database&apos;s own
-            limit, an export reminder, and a delete everything control.
-          </li>
-          <li>
-            <Link href="/methods">Methods</Link>. The checks that ran on generated data to test the calculator, with
-            the counts.
-          </li>
-        </ul>
+      <div className="home-groups">
+        {GROUPS.map((g) => (
+          <section key={g.id} aria-labelledby={`h-${g.id}`}>
+            <h2 id={`h-${g.id}`}>{g.title}</h2>
+            <p>{g.intro}</p>
+            <ul>
+              {g.screens.map((s) => (
+                <li key={s.href}>
+                  <Link href={s.href}>{s.name}</Link>
+                  <p>{s.what}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      <section aria-labelledby="h-privacy">
+        <h2 id="h-privacy">Where your data goes</h2>
+        {PILOT ? (
+          <p>
+            Files you load stay in this browser tab. This build has pilot accounts: if you sign in on the Account screen,
+            ledger files you choose to save are stored with the pilot&rsquo;s database service, and nothing else leaves the
+            tab. See <Link href="/privacy">Privacy</Link>.
+          </p>
+        ) : (
+          <p>
+            Your files stay in your browser. There is no account, and nothing you load is sent to a server. See{" "}
+            <Link href="/privacy">Privacy</Link> for the details.
+          </p>
+        )}
+        <p>
+          This is an early version. It has not been tried on real customer data, and names are only partly removed from
+          text. The <Link href="/ledger">Ledger</Link> has demo data that shows the whole path, and{" "}
+          <Link href="/methods">Methods</Link> lists the checks run on the statistics.
+        </p>
       </section>
-
-      <p>
-        This is an early version. It has not been tried on real customer data, and names are only partly removed from
-        text. Use the demo data to see how it works.
-      </p>
     </main>
   );
 }

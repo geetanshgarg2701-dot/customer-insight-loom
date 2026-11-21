@@ -14,7 +14,6 @@ import { Explain } from "../explain";
 import { exportDeck } from "../deck-export";
 import { ChainGraph } from "./chain-graph";
 import { checkNames } from "@/lib/redaction/name-check";
-import { Nav } from "../nav";
 import { answerQuestion, QUESTION_TOPICS, type Answer, type AssistantData, type Deps } from "@/lib/ai/assistant";
 import { createCoder, type Coder } from "@/lib/ai/coder";
 import { createIntentMatcher } from "@/lib/ai/intent";
@@ -232,7 +231,6 @@ export default function InsightsPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Customer comments</h1>
       <p>
         What customers say, read next to what they did. Every comment here is synthetic and belongs to one synthetic

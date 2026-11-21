@@ -15,7 +15,6 @@ import {
   saveCurrent,
   type ProjectRow,
 } from "@/lib/pilot/service";
-import { Nav } from "../nav";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -52,7 +51,6 @@ export default function AccountPage() {
   if (!PILOT) {
     return (
       <main>
-        <Nav />
         <h1>Pilot account</h1>
         <p>Pilot accounts are not turned on in this version of the app. Everything stays in this tab, and nothing is sent anywhere.</p>
       </main>
@@ -126,7 +124,6 @@ export default function AccountPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Pilot account</h1>
       <p>
         An account lets you keep ledger files in the cloud between visits. It is a pilot, on a test service. Only the ledger

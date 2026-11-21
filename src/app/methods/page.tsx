@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { formatPercent, formatPoints } from "@/lib/app/format";
 import { METHOD_NOTES, REDACTION_LIMITS, runMethodsReport, type MethodsReport } from "@/lib/methods/report";
-import { Nav } from "../nav";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -50,7 +49,6 @@ export default function MethodsPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Methods</h1>
       <p>
         {report?.note ?? "These checks ran on generated data. They verify the calculator, not any real world result."}

@@ -5,7 +5,6 @@ import { matchIdentities, maskEmail } from "@/lib/identity/identity";
 import { checkTimes, columnOf, parseCsv } from "@/lib/app/datacheck";
 import type { Explanation } from "@/lib/app/explain";
 import { Explain } from "../explain";
-import { Nav } from "../nav";
 
 type Source = { name: string; rows: string[][] };
 
@@ -105,7 +104,6 @@ export default function CheckPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Data check</h1>
       <p>
         Two checks you can run before a readout. Nothing is uploaded: files are read in this browser and are gone when

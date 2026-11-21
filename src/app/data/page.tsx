@@ -6,7 +6,6 @@ import { downloadText } from "@/lib/app/download";
 import { formatCount, formatPercent } from "@/lib/app/format";
 import { deleteBrowserData, getBrowserLedger, readBrowserUsage } from "@/lib/duckdb/client";
 import { exportNag, lastExportTime, noteExport, WARN_AT, type Usage } from "@/lib/usage/usage";
-import { Nav } from "../nav";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -82,7 +81,6 @@ export default function DataPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Your data in this tab</h1>
       <p>
         Everything you load here lives in this browser tab only. Nothing is stored, nothing is sent anywhere, and a page

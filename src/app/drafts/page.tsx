@@ -9,7 +9,6 @@ import { PAIN_LABELS, type Pain } from "@/lib/insights/comments";
 import { THEME_IDS, THEMES } from "@/lib/insights/evidence";
 import { FRAMEWORK_TAGS, type FrameworkTag } from "@/lib/ledger/ledger";
 import { EmailCheckForm } from "../compliance/email-check-form";
-import { Nav } from "../nav";
 
 const FRAMEWORK_NAMES: Record<FrameworkTag, string> = { PAS: "PAS, problem, agitate, solution", FAB: "FAB, feature, advantage, benefit", AIDA: "AIDA, attention, interest, desire, action" };
 const SEGMENTS: { value: Segment | ""; label: string }[] = [
@@ -90,7 +89,6 @@ export default function DraftsPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Email drafts</h1>
       <p>
         Draft a marketing email for a segment and a customer complaint, in a named framework, check it against the email

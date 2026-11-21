@@ -12,7 +12,6 @@ import { readoutOpensAt } from "@/lib/ledger/window";
 import type { AuditRow, Ledger, LedgerEntry } from "@/lib/ledger/ledger";
 import { PAIN_LABELS } from "@/lib/insights/comments";
 import { THEME_IDS, THEMES, themeOf } from "@/lib/insights/evidence";
-import { Nav } from "../../nav";
 import { AssignmentSection } from "./assignment-section";
 import { DesignSection } from "./design-section";
 import { exportDeck } from "../../deck-export";
@@ -142,7 +141,6 @@ export function EntryView() {
   if (error && !loaded) {
     return (
       <main>
-        <Nav />
         <p role="alert">{error}</p>
       </main>
     );
@@ -150,7 +148,6 @@ export function EntryView() {
   if (!loaded) {
     return (
       <main>
-        <Nav />
         <p>Loading</p>
       </main>
     );
@@ -162,7 +159,6 @@ export function EntryView() {
 
   return (
     <main>
-      <Nav />
       <h1>{entry.title}</h1>
       {error && <p role="alert">{error}</p>}
       <p>Status: {entry.status}</p>

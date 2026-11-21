@@ -10,6 +10,7 @@ import { COMPARE_DIMENSIONS, differenceSentence, type CompareDimension, type Com
 import { formatDuration, timingSentence, type Timing } from "@/lib/charts/timing";
 import { DETOURS, type BehindStep, type DetourStep } from "@/lib/charts/behind";
 import type { ExampleJourney } from "@/lib/charts/replay";
+import { journeyTiles } from "@/lib/charts/tiles";
 import { JOURNEY_STEPS } from "@/lib/demo/journeys";
 import { CHANNELS, SEGMENTS } from "@/lib/demo/journeys";
 import { stageCountsFromFlow, whatIf } from "@/lib/charts/whatif";
@@ -20,7 +21,6 @@ import { createCycle, runWhileCurrent } from "@/lib/app/latest";
 import { decodeJourneyView, encodeJourneyView, type JourneyView } from "@/lib/app/view-state";
 import { explainWhy, explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
-import { Nav } from "../nav";
 import { Chart } from "./chart";
 import { JourneyCanvas, type DesignedRules } from "./canvas";
 import { CHART_THEME, GROUP_COLOR, type ChartTheme } from "./theme";
@@ -481,6 +481,7 @@ export default function JourneysPage() {
   }
 
   const choices = useMemo(() => anchorChoices(allPaths), [allPaths]);
+  const tiles = useMemo(() => journeyTiles(allPaths), [allPaths]);
   const markers = useMemo(() => placeMarkers(launches, overTime?.days ?? []), [launches, overTime]);
   const around = useMemo(() => anchoredFlow(allPaths, { anchor, before, after, topN }), [allPaths, anchor, before, after, topN]);
 
@@ -607,7 +608,6 @@ export default function JourneysPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Journeys</h1>
       <p>
         Synthetic data only, so no real customer is shown. A click on a bar, or a button under it, filters the other
@@ -639,6 +639,25 @@ export default function JourneysPage() {
               Clear selection
             </button>
           </p>
+
+          <dl className="tiles" aria-label="The current selection at a glance">
+            <div>
+              <dt>Customers shown</dt>
+              <dd>{tiles.customers.toLocaleString("en-US")}</dd>
+            </div>
+            <div>
+              <dt>Reached Purchase</dt>
+              <dd>{tiles.bought === null ? "none selected" : formatPercent(tiles.bought, 1)}</dd>
+            </div>
+            <div>
+              <dt>Used Search or Support</dt>
+              <dd>{tiles.detoured === null ? "none selected" : formatPercent(tiles.detoured, 1)}</dd>
+            </div>
+            <div>
+              <dt>Most people stopped at</dt>
+              <dd>{tiles.topExit ? `${tiles.topExit.step}, ${tiles.topExit.count.toLocaleString("en-US")}` : "nobody stopped"}</dd>
+            </div>
+          </dl>
 
           {JOURNEY_DIMENSIONS.map((d) => {
             const list = counts[d] ?? [];

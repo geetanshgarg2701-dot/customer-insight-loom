@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Nav } from "../nav";
 
 export const metadata: Metadata = {
   title: "Terms | Customer Insight Loom",
@@ -9,7 +8,6 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main>
-      <Nav />
       <h1>Terms</h1>
       <p>Last updated 17 November 2026. These are the plain terms for this free, early version.</p>
 

@@ -88,8 +88,8 @@ test("keyboard only: Tab visits every control once and does not get trapped", as
     if (name === "" || seen.includes(name)) break;
     seen.push(name);
   }
-  // Navigation first, then the footer, in page order, and the loop ended instead of running forever.
-  expect(seen.slice(0, 5)).toEqual(["Home", "Data intake", "Ledger", "Journeys", "Pipeline"]);
+  // The skip link first, then the sidebar in its order, then the footer, and the loop ended instead of running forever.
+  expect(seen.slice(0, 6)).toEqual(["Skip to content", "Customer Insight Loom", "Home", "Ledger", "Email check", "Email drafts"]);
   expect(seen).toContain("Privacy");
   expect(seen[seen.length - 1]).toBe("Terms");
   expect(seen.length).toBeLessThan(40);
@@ -98,8 +98,10 @@ test("keyboard only: Tab visits every control once and does not get trapped", as
 test("keyboard only: a chart filter can be reached, shows focus, and toggles with Space and Enter", async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto("/journeys");
+  // The skip link jumps past the sidebar, then the Load button is reached by keyboard and started with Enter.
   await page.keyboard.press("Tab");
-  // The Load button is reached by keyboard and started with Enter.
+  expect(await focusedName(page)).toBe("Skip to content");
+  await page.keyboard.press("Enter");
   for (let i = 0; i < 12 && (await focusedName(page)) !== "Load synthetic journeys"; i++) await page.keyboard.press("Tab");
   expect(await focusedName(page)).toBe("Load synthetic journeys");
   await page.keyboard.press("Enter");

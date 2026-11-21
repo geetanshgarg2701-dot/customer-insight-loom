@@ -16,7 +16,6 @@ import {
   type ReviewItem,
   type WebhookResponse,
 } from "@/lib/ingest/webhook";
-import { Nav } from "../nav";
 
 /** The sandbox sender's names, mapped as a person might at the start. "checkout_started" is left unmapped on purpose. */
 const START_MAP: StepMap = { page_view: "Visit", product_view: "Product", add_to_cart: "Cart", order_paid: "Purchase", newsletter_open: null };
@@ -184,7 +183,6 @@ export default function IngestPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Webhook receiver sandbox</h1>
       <p>
         A webhook lets another tool send events to this app. The receiver is built and tested, but it is not deployed, because

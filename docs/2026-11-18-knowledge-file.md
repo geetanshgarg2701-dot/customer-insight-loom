@@ -45,8 +45,8 @@ Next.js 16.4.6 with the App Router, React 19.3, Tailwind 4.3.3, TypeScript stric
 
 | Check | Result |
 |---|---|
-| Unit tests, Vitest | 1,171 passed in 89 files, 1 skipped, the fixture writer |
-| Browser tests, Playwright in Edge | 126 passed in 35 files, plus 2 pilot account tests in 1 file run by npm run test:pilot |
+| Unit tests, Vitest | 1,175 passed in 90 files, 1 skipped, the fixture writer |
+| Browser tests, Playwright in Edge | 127 passed in 35 files, plus 2 pilot account tests in 1 file run by npm run test:pilot |
 | Static mirror test | 1 passed. It proves the site works under a project prefix with no request to another host |
 | Database tests, SQL on a Supabase test project | 6 files plus a seventh for the correction label. Not rerun on every change |
 | Type check and lint | Clean. Lint has one old warning |
@@ -124,7 +124,7 @@ A feature counts here only if a screen calls it.
 - The name is Customer Insight Loom. A loom weaves many threads into one cloth, as the app weaves customer paths into one picture. A well-known video tool is also called Loom, so a tagline keeps it distinct.
 - Hosting is GitHub Pages from a separate public repository holding only the built site, MIT licensed. The source repository stays private, because its history holds personal details. The public repository is named `customer-insight-loom`, because the source repository already holds the name `evidence-ledger`.
 - Identity matching in version 1 is exact on the normalized address. Dots and plus tags are never merged. Plus tag pairs are shown for a person to judge.
-- Quiet editorial design, one light palette, system fonts.
+- App look with a sidebar, one light palette, system fonts, chosen 2026-11-21. App look, chosen by the owner on 2026-11-21 to replace the first quiet editorial style, which they called boring: a sidebar app. An indigo sidebar with a faint warp thread texture and a woven mark, screens grouped as Experiments, Customers, Your data and About, with an icon on each link, the current screen marked with a gold bar and aria-current, and a skip to content link as the first Tab stop; a cool canvas with white card sections, one madder red accent, filled main buttons and chip style toggles; system fonts only. On a phone the sidebar folds into a wrapped row at the top. The home screen is rebuilt as three group cards, and says where data goes, with a different sentence in a pilot build. The Journeys screen has number tiles, customers shown, share who reached Purchase, share who used a detour and the step most people stopped at, worked out from the same path counts as the charts, checked by hand and against the generated customers. Chart colours were moved to indigo, teal, ochre and madder. Contrast was worked out from the colours: text on white 15.6 to 1, muted 6.3, accent 7.0, and each chart colour at least 3 to 1 against white, though only the axe checks in the browser tests were run, not a separate contrast tool. A dev server kept serving a stale stylesheet once, fixed by restarting it, which is a development tool problem and not in the build. Not done: the downloaded deck still uses Georgia and the old brown, and number tiles are only on Journeys. The design canvas was not used to mock directions first, as the plan said; the owner picked from three described directions in chat instead.
 - Name redaction packages were not approved, so that feature is deferred.
 - Real customer data is allowed only in one planned experiment on a tester's own data, run in the tester's browser, with written consent. Otherwise testers use the demo.
 

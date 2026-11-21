@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { PILOT } from "@/lib/pilot/enabled";
-import { Nav } from "../nav";
 
 export const metadata: Metadata = {
   title: "Privacy | Customer Insight Loom",
@@ -10,7 +9,6 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main>
-      <Nav />
       <h1>Privacy</h1>
       <p>Last updated 19 November 2026. This describes the early version of the app, which is what you are using.</p>
 

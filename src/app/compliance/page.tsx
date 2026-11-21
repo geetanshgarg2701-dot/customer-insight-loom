@@ -1,13 +1,11 @@
 "use client";
 
 import { CHECKED } from "@/lib/compliance/rules";
-import { Nav } from "../nav";
 import { EmailCheckForm } from "./email-check-form";
 
 export default function CompliancePage() {
   return (
     <main>
-      <Nav />
       <h1>Email check</h1>
       <p>
         Check a marketing email against US email law and the Gmail and Yahoo sender rules before it goes out. Each rule

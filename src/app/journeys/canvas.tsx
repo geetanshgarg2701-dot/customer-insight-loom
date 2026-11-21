@@ -289,7 +289,7 @@ export function JourneyCanvas({
   return (
     <div>
       <div
-        style={{ height: 560, border: `1px solid ${CHART_THEME.line}`, background: "#faf8f4" }}
+        style={{ height: 560, border: `1px solid ${CHART_THEME.line}`, background: "#ffffff" }}
         onKeyDown={(e) => {
           // React Flow selects a focused node on Enter or Space but sends no click, so a keyboard user would never open it.
           if (e.key !== "Enter" && e.key !== " ") return;

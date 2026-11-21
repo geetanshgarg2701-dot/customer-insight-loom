@@ -13,7 +13,6 @@ import { NO_FILTER, filterEntries, type EntryFilter } from "@/lib/ledger/filter"
 import { STATUSES, FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
 import { PAIN_LABELS } from "@/lib/insights/comments";
 import { THEME_IDS, THEMES } from "@/lib/insights/evidence";
-import { Nav } from "../nav";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -150,7 +149,6 @@ export default function LedgerPage() {
 
   return (
     <main>
-      <Nav />
       <h1>Ledger</h1>
       <p>
         Method: the ledger lives in this browser tab, in DuckDB-Wasm. Nothing is uploaded. A page

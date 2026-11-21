@@ -13,7 +13,6 @@ import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
-import { Nav } from "../nav";
 
 const TITLES: Record<PipelineDimension, string> = {
   segment: "Segment",
@@ -337,7 +336,6 @@ export default function PipelinePage() {
 
   return (
     <main>
-      <Nav />
       <h1>Pipeline</h1>
       <p>
         Synthetic data only, so no real customer is shown. This view shows where deals wait and how long they sit. A
