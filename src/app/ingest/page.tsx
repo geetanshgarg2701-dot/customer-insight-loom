@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatCount } from "@/lib/app/format";
+import { JOURNEY_TARGETS, suggestStep, type JourneyTarget, type StepMap } from "@/lib/ingest/step-map";
 import {
   LIMITS,
   acceptByHand,
+  applyStepMap,
   createIngestState,
   dismiss,
   processWebhook,
@@ -16,7 +18,9 @@ import {
 } from "@/lib/ingest/webhook";
 import { Nav } from "../nav";
 
-const STEPS = ["Visit", "Product", "Cart", "Purchase"] as const;
+/** The sandbox sender's names, mapped as a person might at the start. "checkout_started" is left unmapped on purpose. */
+const START_MAP: StepMap = { page_view: "Visit", product_view: "Product", add_to_cart: "Cart", order_paid: "Purchase", newsletter_open: null };
+const IGNORE = "ignore";
 const hex = (n: number) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 type Sent = { label: string; response: WebhookResponse; requests: number };
@@ -29,6 +33,9 @@ type View = {
   reasons: [string, number][];
   review: ReviewItem[];
   overflow: number;
+  ignored: number;
+  unmapped: [string, number][];
+  unmappedOverflow: number;
 };
 const viewOf = (s: IngestState): View => ({
   accepted: s.accepted.length,
@@ -37,6 +44,9 @@ const viewOf = (s: IngestState): View => ({
   reasons: Object.entries(s.unauthenticated.reasons),
   review: [...s.review],
   overflow: s.reviewOverflow,
+  ignored: s.ignored,
+  unmapped: [...s.unmapped],
+  unmappedOverflow: s.unmappedOverflow,
 });
 
 const SCENARIOS: { id: string; label: string; hint: string }[] = [
@@ -48,7 +58,9 @@ const SCENARIOS: { id: string; label: string; hint: string }[] = [
   { id: "many", label: "Send 101 events in one request", hint: "The limit is 100 events a request." },
   { id: "late", label: "Send an event from 40 days ago", hint: "Too late. It goes to the review list, where it can be accepted by hand." },
   { id: "future", label: "Send an event 2 days ahead", hint: "More than 24 hours in the future. Rejected to the review list." },
-  { id: "step", label: "Send an unmapped step", hint: "The sender may only use the four mapped steps." },
+  { id: "step", label: "Send an unmapped step", hint: "The name checkout_started is not mapped yet, so the event waits for a person to map it." },
+  { id: "ignored", label: "Send an ignored step", hint: "newsletter_open is mapped to ignore, so it is counted and not stored." },
+  { id: "badname", label: "Send a step name in an unsafe form", hint: "A name with markup in it is rejected and never listed for mapping." },
   { id: "flood", label: "Send 61 requests in a row", hint: "The 61st in a minute gets 429 and a Retry-After header." },
 ];
 
@@ -62,10 +74,14 @@ export default function IngestPage() {
   const [full, setFull] = useState(false);
   const [sent, setSent] = useState<Sent | null>(null);
   const [busy, setBusy] = useState(false);
+  const [map, setMap] = useState<StepMap>(START_MAP);
+  /** Choices for the waiting names, before a person applies them. An unset name shows its suggestion, if any. */
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  const [applied, setApplied] = useState<string | null>(null);
 
   useEffect(() => {
     // The secrets are made here, in this tab, when the page opens. No secret is in the code, and none leaves the page.
-    config.current = { signingSecret: `whsec_${hex(24)}`, identitySecret: hex(32), source: "sandbox-sender", steps: STEPS };
+    config.current = { signingSecret: `whsec_${hex(24)}`, identitySecret: hex(32), source: "sandbox-sender", steps: [], stepMap: START_MAP };
     void Promise.resolve().then(() => setReady(true));
   }, []);
 
@@ -104,7 +120,7 @@ export default function IngestPage() {
     const at = (ms: number) => new Date(Date.now() + ms).toISOString();
     const event = (over: Record<string, unknown> = {}) => ({
       customer: `demo.person${counter.current++}@example.invalid`,
-      step: "Cart",
+      step: "add_to_cart",
       occurred_at: at(-60_000),
       ...over,
     });
@@ -132,10 +148,38 @@ export default function IngestPage() {
       case "future":
         return post("an event 2 days ahead", one({ occurred_at: at(2 * 86_400_000) }));
       case "step":
-        return post("an unmapped step", one({ step: "Checkout" }));
+        return post("an unmapped step", one({ step: "checkout_started" }));
+      case "ignored":
+        return post("an ignored step", one({ step: "newsletter_open" }));
+      case "badname":
+        return post("a step name in an unsafe form", one({ step: "<b>Cart</b>" }));
       case "flood":
         return post("61 requests in a row", good(), { repeat: LIMITS.requestsPerMinute + 1 });
     }
+  }
+
+  /** The choice shown for a waiting name: what the person picked, else the suggestion, else nothing yet. */
+  const choiceFor = (name: string) => choices[name] ?? suggestStep(name) ?? "";
+
+  /** Applies the confirmed choices to the map and runs the waiting events through it. Called only from a click. */
+  function applyChoices() {
+    const cfg = config.current;
+    if (!cfg) return;
+    const next: Record<string, JourneyTarget | null> = { ...map };
+    for (const [name] of view.unmapped) {
+      const c = choiceFor(name);
+      if (c === "") continue;
+      next[name] = c === IGNORE ? null : (c as JourneyTarget);
+    }
+    config.current = { ...cfg, stepMap: next };
+    const out = applyStepMap(state.current, config.current, new Date());
+    setMap(next);
+    setChoices({});
+    setView(viewOf(state.current));
+    setApplied(
+      `Mapping applied: ${formatCount(out.accepted)} stored, ${formatCount(out.ignored)} ignored, ` +
+        `${formatCount(out.reviewed)} moved to the review list by the age rules, ${formatCount(out.waiting)} still waiting.`,
+    );
   }
 
   return (
@@ -190,7 +234,8 @@ export default function IngestPage() {
         <h2 id="h-state">What it holds</h2>
         <p>
           {formatCount(view.accepted)} events accepted, {formatCount(view.duplicates)} duplicates counted,{" "}
-          {formatCount(view.bad)} bad requests refused, {formatCount(view.review.length)} on the review list.
+          {formatCount(view.bad)} bad requests refused, {formatCount(view.review.length)} on the review list,{" "}
+          {formatCount(view.ignored)} ignored by the step map.
         </p>
         {view.bad > 0 && (
           <>
@@ -217,9 +262,71 @@ export default function IngestPage() {
         )}
       </section>
 
+      <section aria-labelledby="h-steps">
+        <h2 id="h-steps">Step names</h2>
+        <p>
+          A sender uses its own names for events. Each name is mapped to one of the journey&rsquo;s steps, or ignored. An event
+          whose name is not mapped yet waits on the review list, holding only the keyed hash of the customer, until you map it.
+          The app suggests a step from the words in a name, and nothing is mapped until you apply it.
+        </p>
+        <div style={{ overflowX: "auto" }}>
+          <table aria-label="Mapped step names">
+            <thead>
+              <tr>
+                <th scope="col">Sender&rsquo;s name</th>
+                <th scope="col">Journey step</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(map).map(([name, target]) => (
+                <tr key={name}>
+                  <th scope="row">{name}</th>
+                  <td>{target ?? "Ignored"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3>Waiting to be mapped</h3>
+        {view.unmapped.length === 0 ? (
+          <p>No unmapped names have arrived.</p>
+        ) : (
+          <>
+            <ul>
+              {view.unmapped.map(([name, n]) => {
+                const suggested = suggestStep(name);
+                return (
+                  <li key={name}>
+                    <label>
+                      {name}, {formatCount(n)} {n === 1 ? "event" : "events"} waiting{suggested ? `, suggested ${suggested}` : ", no suggestion"}{" "}
+                      <select value={choiceFor(name)} onChange={(e) => setChoices((c) => ({ ...c, [name]: e.target.value }))}>
+                        <option value="">Leave unmapped</option>
+                        {JOURNEY_TARGETS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                        <option value={IGNORE}>Ignore</option>
+                      </select>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+            <p>
+              <button type="button" onClick={applyChoices}>
+                Apply this mapping to the waiting events
+              </button>
+            </p>
+          </>
+        )}
+        {view.unmappedOverflow > 0 && <p>{formatCount(view.unmappedOverflow)} more events used names that could not be listed, because the list is full.</p>}
+        {applied && <p role="status">{applied}</p>}
+      </section>
+
       <section aria-labelledby="h-review">
         <h2 id="h-review">Review list</h2>
-        <p>Events that were rejected, late, in the future or deferred, each with its reason. Nothing is dropped silently.</p>
+        <p>Events that were rejected, late, in the future, deferred or waiting for a step name to be mapped, each with its reason. Nothing is dropped silently.</p>
         {view.overflow > 0 && <p>{formatCount(view.overflow)} more could not be listed because the list is full.</p>}
         {view.review.length === 0 ? (
           <p>Nothing is waiting.</p>

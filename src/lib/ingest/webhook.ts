@@ -17,6 +17,7 @@
  * app uses, so no email is kept. The numbers are the plan's starting defaults, not measured limits.
  */
 import { customerHash, looksLikeEmail, normalizeEmail } from "../assignment/hash";
+import { checkStepMap, MAX_UNMAPPED_NAMES, resolveStep, type StepMap } from "./step-map";
 
 export const LIMITS = {
   requestsPerMinute: 60,
@@ -49,8 +50,13 @@ export type IngestConfig = {
   identitySecret: string;
   /** Which sender this is, kept on every accepted event. */
   source: string;
-  /** The step names the sender may use, once mapped. */
+  /** The step names the sender may use, as they are. Not read when stepMap is given. */
   steps: readonly string[];
+  /**
+   * The sender's own names mapped to journey steps, or to null to ignore. When given, an event's step is stored as the
+   * mapped step, and a name not in the map waits on the review list as unmapped until a person maps it.
+   */
+  stepMap?: StepMap;
   /** True when storage is full. Events are deferred, and nothing is deleted. */
   readOnly?: boolean;
   entries?: readonly AffectedEntry[];
@@ -66,9 +72,11 @@ export type AcceptedEvent = {
   receivedAt: string;
   /** Finished entries whose result this event may have changed. */
   flags: string[];
+  /** The sender's own name for the step, when a step map turned it into a journey step. */
+  senderStep?: string;
 };
 
-export type ReviewKind = "rejected" | "too_late" | "in_future" | "deferred";
+export type ReviewKind = "rejected" | "too_late" | "in_future" | "deferred" | "unmapped";
 export type ReviewItem = {
   id: number;
   kind: ReviewKind;
@@ -76,8 +84,11 @@ export type ReviewItem = {
   receivedAt: string;
   /** Which sender it came from. */
   source: string;
-  /** The event, when it was valid enough to read, so a person can accept or dismiss it. Never an email. */
-  event: { key: string; customerHash: string; step: string; occurredAt: string } | null;
+  /**
+   * The event, when it was valid enough to read, so a person can accept or dismiss it. Never an email. For an unmapped
+   * event, step is the sender's name, waiting to be mapped.
+   */
+  event: { key: string; customerHash: string; step: string; occurredAt: string; senderStep?: string } | null;
 };
 
 export type IngestState = {
@@ -90,6 +101,12 @@ export type IngestState = {
   flagged: Map<string, number>;
   unauthenticated: { count: number; reasons: Record<string, number>; lastAt: string | null };
   nextId: number;
+  /** Events whose name is mapped to ignore. Counted, never stored. */
+  ignored: number;
+  /** Distinct unmapped names seen, with how many events used each, for a person to map. */
+  unmapped: Map<string, number>;
+  /** Events with an unmapped name that could not be listed because the list of names was full. */
+  unmappedOverflow: number;
 };
 
 export function createIngestState(): IngestState {
@@ -103,6 +120,9 @@ export function createIngestState(): IngestState {
     flagged: new Map(),
     unauthenticated: { count: 0, reasons: {}, lastAt: null },
     nextId: 1,
+    ignored: 0,
+    unmapped: new Map(),
+    unmappedOverflow: 0,
   };
 }
 
@@ -154,18 +174,23 @@ function addReview(state: IngestState, config: IngestConfig, item: Omit<ReviewIt
   state.review.push({ id: state.nextId++, source: config.source, ...item });
 }
 
-type Valid = { key: string; customerHash: string; step: string; occurredAt: string };
+type Valid = { key: string; customerHash: string; step: string; occurredAt: string; senderStep?: string };
+type Checked = { ok: true; event: Valid; route: "store" | "ignored" | "unmapped" } | { ok: false; reason: string };
 
-async function validate(raw: unknown, config: IngestConfig, nowIso: string): Promise<{ ok: true; event: Valid } | { ok: false; reason: string }> {
+async function validate(raw: unknown, config: IngestConfig, nowIso: string): Promise<Checked> {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, reason: "event must be an object" };
   const e = raw as Record<string, unknown>;
   if (e.customer === undefined || e.customer === null || e.customer === "") return { ok: false, reason: "customer is required" };
   if (typeof e.customer !== "string" || e.customer.length > 320 || !looksLikeEmail(normalizeEmail(e.customer))) {
     return { ok: false, reason: "customer is not an email address" };
   }
-  if (typeof e.step !== "string" || !config.steps.includes(e.step)) {
+  const resolved = config.stepMap ? resolveStep(config.stepMap, e.step) : null;
+  if (resolved) {
+    if (resolved.kind === "bad") return { ok: false, reason: "step is not a usable name: 1 to 64 letters, digits, dots, dashes, underscores or colons" };
+  } else if (typeof e.step !== "string" || !config.steps.includes(e.step)) {
     return { ok: false, reason: `step is not one this sender maps: ${config.steps.join(", ")}` };
   }
+  const name = e.step as string;
   const t = typeof e.occurred_at === "string" && e.occurred_at.length <= 40 && /^\d{4}-\d{2}-\d{2}T/.test(e.occurred_at) ? Date.parse(e.occurred_at) : Number.NaN;
   if (!Number.isFinite(t)) return { ok: false, reason: "occurred_at is not an ISO 8601 time" };
   if (e.idempotency_key !== undefined && (typeof e.idempotency_key !== "string" || e.idempotency_key.length < 1 || e.idempotency_key.length > 200)) {
@@ -178,8 +203,11 @@ async function validate(raw: unknown, config: IngestConfig, nowIso: string): Pro
   const hash = await customerHash(config.identitySecret, e.customer);
   const occurredAt = new Date(t).toISOString();
   // With no key from the sender, one is built from the source, the customer, the step, the time and any outside id.
-  const key = typeof e.idempotency_key === "string" ? `k:${e.idempotency_key}` : `b:${config.source}|${hash}|${e.step}|${occurredAt}|${typeof e.external_id === "string" ? e.external_id : ""}`;
-  return { ok: true, event: { key, customerHash: hash, step: e.step, occurredAt } };
+  // The sender's own name is used, so a resend matches even after the name is mapped.
+  const key = typeof e.idempotency_key === "string" ? `k:${e.idempotency_key}` : `b:${config.source}|${hash}|${name}|${occurredAt}|${typeof e.external_id === "string" ? e.external_id : ""}`;
+  if (!resolved) return { ok: true, route: "store", event: { key, customerHash: hash, step: name, occurredAt } };
+  if (resolved.kind === "mapped") return { ok: true, route: "store", event: { key, customerHash: hash, step: resolved.step, occurredAt, senderStep: name } };
+  return { ok: true, route: resolved.kind, event: { key, customerHash: hash, step: name, occurredAt } };
 }
 
 function flagsFor(config: IngestConfig, event: Valid): string[] {
@@ -189,10 +217,25 @@ function flagsFor(config: IngestConfig, event: Valid): string[] {
     .map((x) => x.id);
 }
 
+/** The age rules: more than 24 hours ahead, or more than 30 days old, goes to the review list. Null when the age is fine. */
+function ageCheck(event: Valid, nowMs: number): { kind: "in_future" | "too_late"; reason: string } | null {
+  const t = Date.parse(event.occurredAt);
+  if (t > nowMs + LIMITS.futureHours * HOUR_MS) return { kind: "in_future", reason: "the event is more than 24 hours in the future" };
+  if (t < nowMs - LIMITS.acceptDays * DAY_MS) return { kind: "too_late", reason: "the event is more than 30 days old" };
+  return null;
+}
+
+function noteUnmapped(state: IngestState, name: string): void {
+  if (state.unmapped.has(name)) state.unmapped.set(name, state.unmapped.get(name)! + 1);
+  else if (state.unmapped.size < MAX_UNMAPPED_NAMES) state.unmapped.set(name, 1);
+  else state.unmappedOverflow += 1;
+}
+
 function store(state: IngestState, config: IngestConfig, event: Valid, receivedAt: string): AcceptedEvent {
   const flags = flagsFor(config, event);
   for (const id of flags) state.flagged.set(id, (state.flagged.get(id) ?? 0) + 1);
-  const accepted: AcceptedEvent = { ...event, source: config.source, receivedAt, flags };
+  const { senderStep, ...rest } = event;
+  const accepted: AcceptedEvent = { ...rest, source: config.source, receivedAt, flags, ...(senderStep ? { senderStep } : {}) };
   state.accepted.push(accepted);
   return accepted;
 }
@@ -237,7 +280,12 @@ export async function processWebhook(config: IngestConfig, state: IngestState, r
 
   // 5. Each event on its own.
   const receivedAt = req.now.toISOString();
-  const counts = { accepted: 0, duplicates: 0, reviewed: 0, rejected: 0, deferred: 0 };
+  if (config.stepMap) {
+    const problems = checkStepMap(config.stepMap);
+    if (problems.length > 0) throw new RangeError(problems.join(" "));
+  }
+  const counts: Record<string, number> = { accepted: 0, duplicates: 0, reviewed: 0, rejected: 0, deferred: 0 };
+  if (config.stepMap) Object.assign(counts, { ignored: 0, unmapped: 0 });
   const flagged = new Set<string>();
   for (const raw of events) {
     const v = await validate(raw, config, receivedAt);
@@ -252,25 +300,30 @@ export async function processWebhook(config: IngestConfig, state: IngestState, r
       counts.duplicates += 1;
       continue;
     }
+    if (v.route === "ignored") {
+      state.ignored += 1;
+      counts.ignored += 1;
+      continue;
+    }
+    if (v.route === "unmapped") {
+      state.keys.add(event.key);
+      counts.unmapped += 1;
+      noteUnmapped(state, event.step);
+      addReview(state, config, { kind: "unmapped", reason: `the step name "${event.step}" is not mapped yet`, receivedAt, event });
+      continue;
+    }
     if (config.readOnly) {
       counts.deferred += 1;
       addReview(state, config, { kind: "deferred", reason: "storage is full, so this event waits for room", receivedAt, event });
       continue;
     }
-    const t = Date.parse(event.occurredAt);
-    if (t > nowMs + LIMITS.futureHours * HOUR_MS) {
-      state.keys.add(event.key);
-      counts.reviewed += 1;
-      addReview(state, config, { kind: "in_future", reason: "the event is more than 24 hours in the future", receivedAt, event });
-      continue;
-    }
-    if (t < nowMs - LIMITS.acceptDays * DAY_MS) {
-      state.keys.add(event.key);
-      counts.reviewed += 1;
-      addReview(state, config, { kind: "too_late", reason: "the event is more than 30 days old", receivedAt, event });
-      continue;
-    }
     state.keys.add(event.key);
+    const age = ageCheck(event, nowMs);
+    if (age) {
+      counts.reviewed += 1;
+      addReview(state, config, { ...age, receivedAt, event });
+      continue;
+    }
     counts.accepted += 1;
     for (const id of store(state, config, event, receivedAt).flags) flagged.add(id);
   }
@@ -296,4 +349,54 @@ export function dismiss(state: IngestState, id: number): void {
   const i = state.review.findIndex((r) => r.id === id);
   if (i < 0) throw new RangeError("That review item does not exist.");
   state.review.splice(i, 1);
+}
+
+/**
+ * Runs the events waiting as unmapped through a new or changed map. A name now mapped to a step goes through the same
+ * age rules as on arrival, judged at `now`, and is stored or moved to the review list. A name mapped to ignore is counted
+ * and dropped. Anything still unmapped keeps waiting. A map that fails its checks changes nothing.
+ */
+export function applyStepMap(
+  state: IngestState,
+  config: IngestConfig,
+  now: Date,
+): { accepted: number; ignored: number; reviewed: number; waiting: number } {
+  if (!config.stepMap) throw new RangeError("There is no step map to apply.");
+  const problems = checkStepMap(config.stepMap);
+  if (problems.length > 0) throw new RangeError(problems.join(" "));
+  const out = { accepted: 0, ignored: 0, reviewed: 0, waiting: 0 };
+  const nowMs = now.getTime();
+  const keep: ReviewItem[] = [];
+  const later: ReviewItem[] = [];
+  for (const item of state.review) {
+    if (item.kind !== "unmapped" || !item.event) {
+      keep.push(item);
+      continue;
+    }
+    const resolved = resolveStep(config.stepMap, item.event.step);
+    if (resolved.kind === "ignored") {
+      state.ignored += 1;
+      out.ignored += 1;
+      continue;
+    }
+    if (resolved.kind !== "mapped") {
+      keep.push(item);
+      out.waiting += 1;
+      continue;
+    }
+    const event: Valid = { ...item.event, step: resolved.step, senderStep: item.event.step };
+    const age = ageCheck(event, nowMs);
+    if (age) {
+      later.push({ ...item, ...age, event });
+      out.reviewed += 1;
+      continue;
+    }
+    store(state, { ...config, source: item.source }, event, item.receivedAt);
+    out.accepted += 1;
+  }
+  state.review = [...keep, ...later];
+  // The list of names to map is rebuilt from what still waits.
+  state.unmapped = new Map();
+  for (const item of state.review) if (item.kind === "unmapped" && item.event) noteUnmapped(state, item.event.step);
+  return out;
 }
