@@ -1,6 +1,6 @@
 # Static mirror: a copy of the site for a host with no server
 
-Written Tuesday November 17, 2026, for review finding R4-5. Nothing is deployed. This only makes the app buildable as plain files and shows that the result works.
+Written Tuesday November 17, 2026, for review finding R4-5. Nothing was deployed when this was written; it was deployed on 2026-11-21, see `2026-11-21-deployment.md`. This only makes the app buildable as plain files and shows that the result works.
 
 ## Why
 
