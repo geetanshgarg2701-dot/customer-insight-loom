@@ -1,8 +1,10 @@
 # Customer Insight Loom
 
+**Live app: https://geetanshgarg2701-dot.github.io/customer-insight-loom/**
+
 Customer journeys, pipelines and email experiments, woven into one picture with the evidence kept and the uncertainty shown. It is free. The ledger records each experiment: you record the bet before you send, hold back a control group, and read the result once, after the conversion window closes. When a result is too small to tell, it says so plainly.
 
-It runs entirely in your browser. Your files are read on your own computer, held in memory, and never uploaded. There is no account and no tracking. See `/privacy` in the app for the details, and `src/lib/app/privacy-claims.test.ts` for the test that keeps those claims true.
+It runs entirely in your browser. Your files are read on your own computer, held in memory, and never uploaded. There is no account in the public build, and no tracking. A separate pilot build can turn on accounts that save ledger files to a test service, and it is off unless that build is given settings. See `/privacy` in the app for the details, and `src/lib/app/privacy-claims.test.ts` for the test that keeps those claims true.
 
 **This is an early version.** It has not been tried on real customer data, and it does not remove personal names from text. A current, honest list of what is built and what is not is in [docs/2026-11-17-build-status.md](docs/2026-11-17-build-status.md).
 
@@ -43,7 +45,7 @@ The app needs no server, so it can be served as plain files.
 ```bash
 npm run build:static                        # for a site of its own, or a custom domain
 npm run build:static -- your-repo-name      # for a project page served under /your-repo-name
-npm run test:static                         # tests a build made with the prefix evidence-ledger
+npm run test:static                         # tests a build made with the prefix customer-insight-loom
 ```
 
 The copy is written to `out/`. On Windows in Git Bash, write the prefix without a leading slash, because Git Bash rewrites a leading slash. The script prints the size of the copy and warns about hosts that cap the size of one file. See [docs/2026-11-17-release-checklist.md](docs/2026-11-17-release-checklist.md) before publishing it anywhere.
@@ -66,4 +68,8 @@ It costs nothing to run. Every number on screen comes from code, and the tests f
 
 ## License
 
-No license has been chosen yet.
+Released under the MIT License. See the `LICENSE` file.
+
+## Publishing
+
+The live site is served by GitHub Pages from the `gh-pages` branch of this repository, which holds only the built files. The source is on `main`. How a publish is done, and what was checked on the live site, is in `docs/2026-11-21-deployment.md`.
