@@ -71,6 +71,12 @@ test("the warning has no axe violations and fits a phone", async ({ page }) => {
   await expect(warning).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+  // The warning sits wholly on the screen, at the bottom, and is centered across.
+  const box = (await warning.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  expect(box.y + box.height).toBeLessThanOrEqual(812);
+  expect(Math.abs(box.x + box.width / 2 - 375 / 2)).toBeLessThan(4);
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).exclude("nextjs-portal").analyze();
   expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((x) => x.target.join(" ")).join(" | ")}`)).toEqual([]);
 });

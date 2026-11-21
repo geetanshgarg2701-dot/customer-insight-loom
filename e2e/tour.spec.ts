@@ -33,6 +33,23 @@ test("the tour opens on its own, walks four steps, loads the demo ledger, and fi
   await expect(page.getByRole("table", { name: "Ledger entries" })).toBeVisible({ timeout: 60_000 });
 });
 
+test("the tour card is centered on the screen, on a laptop and on a phone, and fits inside it", async ({ page }) => {
+  for (const size of [{ width: 1280, height: 800 }, { width: 375, height: 812 }]) {
+    await page.setViewportSize(size);
+    await page.goto("/");
+    const tour = page.getByRole("dialog", { name: "Quick tour of the app" });
+    await expect(tour).toBeVisible();
+    const box = (await tour.boundingBox())!;
+    // Centered across and down, to within a few pixels, and wholly on the screen.
+    expect(Math.abs(box.x + box.width / 2 - size.width / 2), `${size.width}px wide, across`).toBeLessThan(4);
+    expect(Math.abs(box.y + box.height / 2 - size.height / 2), `${size.width}px wide, down`).toBeLessThan(4);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(size.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+  }
+});
+
 test("Skip and Escape close it at once, it does not reopen on its own in the same visit, and the button brings it back", async ({ page }) => {
   await page.goto("/");
   const tour = page.getByRole("dialog", { name: "Quick tour of the app" });

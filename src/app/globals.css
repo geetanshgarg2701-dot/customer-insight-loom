@@ -484,6 +484,11 @@ dd {
 
 /* The guided tour: a modal card over a dimmed page. The browser's own dialog keeps focus inside it and closes on Escape. */
 dialog.tour {
+  /* The CSS reset sets every margin to zero, which removes the automatic margins the browser uses to center a modal dialog.
+     They are put back here, and a tall card scrolls inside the screen instead of running off it. */
+  margin: auto;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 1.4rem 1.6rem 1.2rem;
