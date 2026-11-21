@@ -35,9 +35,12 @@ An earlier note in these docs said nothing was deployed and that no public site 
 - Every request in that session went to the one site. No cookie, no local storage, no session storage.
 - Thirteen console errors, all 404 for the optional prefetch files named `__next.<page>.__PAGE__.txt`. GitHub Pages cannot rewrite paths, so it cannot serve them. Pages and links still work, as the earlier mirror test showed.
 
+## The in-browser language model, checked on the live site, 2026-11-21
+
+On the Comments screen, Load the model downloaded and started the model in the browser, which showed "The model is loaded in this tab." The two large files were the quantized model, 23 MB, and the runtime, 26.9 MB. Code 100 comments then ran: the model agreed with the generator's coded pain on 87 of 100 comments and was uncertain on none. That is in the same range as the 205 of 251 measured in the tests, and it is one run on synthetic comments, not a new measurement. Every request went to the one site, and nothing was stored in cookies, local storage or session storage.
+
 ## Not checked
 
-- The in-browser language model on the Comments screen was not loaded on the live site. Its files answer 200 with the right types, but the roughly 51 MB download and the model running were not tried there.
 - The first visit downloads about 35 MB of database files. The time to first load on a slow connection was not measured.
 - Whether GitHub Pages compresses the wasm files is not known.
 
