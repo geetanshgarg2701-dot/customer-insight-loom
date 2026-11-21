@@ -48,10 +48,19 @@ On the Comments screen, Load the model downloaded and started the model in the b
 
 GitHub's push protection blocked the first publish to the built site, reporting a Mistral AI API key in `_next/static/chunks/3j5t779ze4ogu.js`. The match was the model name `Mistral3ForConditionalGeneration` in the Transformers.js library, which is 32 letters and digits right after the word Mistral. It is not a key. The owner marked it a false positive on GitHub, which lets that one string through for that repository. A later build with the same library string should not be blocked again, but a changed string could be.
 
-## A second host: Vercel (prepared, not yet deployed)
+## A second host: Vercel, live
 
-`vercel.json` in the repository makes Vercel run the same static build as GitHub Pages, at the site root: `npm ci`, then `npm run build:static` with no prefix, serving `out/`. It sets no framework, so Vercel does not run its own Next.js server build. The build downloads the model files from Hugging Face during install, and checks each against a fixed SHA-256 before keeping it.
+https://customer-insight-loom.vercel.app , a project named customer-insight-loom in the owner's Vercel account, Marketing Hub, on the free Hobby plan. Created from the `main` branch on 2026-11-21 and built in 2 minutes.
 
-Checked locally on 2026-11-21: the root build passes the site scan, holds no test project address, and served from a plain file server at the root it loaded 100,000 synthetic customers in 84 ms with every request on one origin and nothing stored. The project's own mirror test server cannot serve a root path, so that check used Python's file server.
+`vercel.json` in the repository makes Vercel run the same static build as GitHub Pages, at the site root: `npm ci`, then `npm run build:static` with no prefix, serving `out/`. It sets no framework, so Vercel does not run its own Next.js server build, and the project's preset was set to Other. The build downloads the model files from Hugging Face during install, and checks each against a fixed SHA-256 before keeping it. No environment variables were added, and the Supabase integration offered at the end of the import was not added, so this site has no Account link and sends nothing.
 
-Not checked, because no Vercel build has run yet: that Vercel's default Node version builds the project, which was developed on Node 26 and pins none; that the 150 MB output and the 37.5 MB files are accepted; that the model download works from Vercel's build machines; and that the Hobby plan's transfer limit of 100 GB a month holds with a first visit near 35 MB. To deploy: vercel.com/new, import this repository, no environment variables. If the build fails on the Node version, set it under Project Settings, General, Node.js Version.
+Checked on the Vercel address, 2026-11-21:
+
+- Home, Journeys, Ledger and Privacy answer 200, and an unknown address answers 404. The two database files and the model runtime are served as `application/wasm`, and the model file is served.
+- On Journeys, Load synthetic journeys loaded 100,000 customers in 75 ms. The four number tiles read 100,000 customers, 16.3 percent reached Purchase, 26.4 percent used Search or Support, and most people stopped at Product, 33,792 people. These are the same figures as on GitHub Pages.
+- On Comments, the model loaded and coded 100 synthetic comments, agreeing on 87 and uncertain on none, the same result as on GitHub Pages.
+- Every request went to the one address, and nothing was stored in cookies, local storage or session storage.
+
+How the two hosts update, which differs: Vercel rebuilds and redeploys by itself on every push to `main`. GitHub Pages serves the `gh-pages` branch, which is built and published by hand, as described above. So after a change to `main`, Vercel is current within minutes and Pages stays on the old build until it is published again.
+
+Not checked: the Node version Vercel used, the Hobby plan's transfer limit of 100 GB a month against a first visit near 35 MB, and how long a first visit takes on a slow connection. The address `customer-insight-loom.vercel.app` is the project's main address. The other addresses Vercel makes for each deployment may sit behind Vercel's own login, which was not tested.

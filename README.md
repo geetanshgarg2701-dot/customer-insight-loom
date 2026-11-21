@@ -1,6 +1,6 @@
 # Customer Insight Loom
 
-**Live app: https://geetanshgarg2701-dot.github.io/customer-insight-loom/**
+**Live app: https://customer-insight-loom.vercel.app** and https://geetanshgarg2701-dot.github.io/customer-insight-loom/
 
 Customer journeys, pipelines and email experiments, woven into one picture with the evidence kept and the uncertainty shown. It is free. The ledger records each experiment: you record the bet before you send, hold back a control group, and read the result once, after the conversion window closes. When a result is too small to tell, it says so plainly.
 
@@ -72,4 +72,4 @@ Released under the MIT License. See the `LICENSE` file.
 
 ## Publishing
 
-The live site is served by GitHub Pages from the `gh-pages` branch of this repository, which holds only the built files. The source is on `main`. How a publish is done, and what was checked on the live site, is in `docs/2026-11-21-deployment.md`.
+The site is served from two places. GitHub Pages serves the `gh-pages` branch, which holds only the built files and is published by hand. Vercel builds `main` by itself on every push, using `vercel.json`. The source is on `main`. How a publish is done, and what was checked on the live site, is in `docs/2026-11-21-deployment.md`.
