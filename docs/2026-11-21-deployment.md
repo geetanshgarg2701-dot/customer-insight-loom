@@ -47,3 +47,11 @@ On the Comments screen, Load the model downloaded and started the model in the b
 ## A scanner false positive, and what was done
 
 GitHub's push protection blocked the first publish to the built site, reporting a Mistral AI API key in `_next/static/chunks/3j5t779ze4ogu.js`. The match was the model name `Mistral3ForConditionalGeneration` in the Transformers.js library, which is 32 letters and digits right after the word Mistral. It is not a key. The owner marked it a false positive on GitHub, which lets that one string through for that repository. A later build with the same library string should not be blocked again, but a changed string could be.
+
+## A second host: Vercel (prepared, not yet deployed)
+
+`vercel.json` in the repository makes Vercel run the same static build as GitHub Pages, at the site root: `npm ci`, then `npm run build:static` with no prefix, serving `out/`. It sets no framework, so Vercel does not run its own Next.js server build. The build downloads the model files from Hugging Face during install, and checks each against a fixed SHA-256 before keeping it.
+
+Checked locally on 2026-11-21: the root build passes the site scan, holds no test project address, and served from a plain file server at the root it loaded 100,000 synthetic customers in 84 ms with every request on one origin and nothing stored. The project's own mirror test server cannot serve a root path, so that check used Python's file server.
+
+Not checked, because no Vercel build has run yet: that Vercel's default Node version builds the project, which was developed on Node 26 and pins none; that the 150 MB output and the 37.5 MB files are accepted; that the model download works from Vercel's build machines; and that the Hobby plan's transfer limit of 100 GB a month holds with a first visit near 35 MB. To deploy: vercel.com/new, import this repository, no environment variables. If the build fails on the Node version, set it under Project Settings, General, Node.js Version.
