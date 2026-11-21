@@ -30,13 +30,18 @@ test("linked charts filter each other on 100,000 synthetic journeys, and the upd
   const pathsTable = page.getByRole("table", { name: "Top paths" });
   await expect(pathsTable).toContainText("Search");
   await expect(pathsTable).toContainText("Support");
+  // The table can be caught part way through drawing, with a row that has no count cell yet. That reads as not ready, NaN,
+  // and the poll reads again, instead of failing on a half drawn table.
   const customerSum = async () => {
     const rows = await pathsTable.getByRole("row").allInnerTexts();
     return rows
       .filter((r) => !/^Path|^All customers/.test(r))
-      .reduce((n, r) => n + Number(r.split(/\t/)[1].replace(/,/g, "")), 0);
+      .reduce((n, r) => {
+        const cell = r.split(/\t/)[1];
+        return cell === undefined ? Number.NaN : n + Number(cell.replace(/,/g, ""));
+      }, 0);
   };
-  expect(await customerSum()).toBe(100_000);
+  await expect.poll(customerSum).toBe(100_000);
   await expect(pathsTable.getByRole("row", { name: /^All customers shown 100,000/ })).toBeVisible();
   await page.getByRole("group", { name: "Rarity threshold" }).getByRole("button", { name: "Merge paths under 5 percent" }).click();
   await expect(pathsTable).toContainText("Other paths");
