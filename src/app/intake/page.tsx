@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createBrowserIntake } from "@/lib/duckdb/client";
+import { HEALTH_WEIGHTS, type HealthReport } from "@/lib/intake/health";
 import { defaultMapping } from "@/lib/intake/mapping";
 import type {
   Header,
@@ -15,6 +16,16 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
+const PART_LABELS = {
+  completeness: "Completeness: cells that have a value",
+  uniqueness: "Uniqueness: rows that do not repeat",
+  validity: "Validity: numbers and dates that parse",
+  tidiness: "Tidiness: no stray spaces",
+  rowIntegrity: "Row integrity: rows that loaded",
+} as const;
+const BAND_TEXT = { good: "Good", fair: "Fair, a few things to fix", poor: "Poor, needs cleaning" } as const;
+const SEVERITY_TEXT = { high: "Fix first", medium: "Worth fixing", low: "Minor", info: "For your information" } as const;
+
 export default function IntakePage() {
   const intakeRef = useRef<Intake | null>(null);
   const [busy, setBusy] = useState(false);
@@ -24,6 +35,7 @@ export default function IntakePage() {
   const [mapping, setMapping] = useState<MappingEntry[]>([]);
   const [result, setResult] = useState<LoadResult | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [health, setHealth] = useState<HealthReport | null>(null);
 
   useEffect(() => {
     const holder = intakeRef;
@@ -40,6 +52,7 @@ export default function IntakePage() {
     setHeaders(null);
     setResult(null);
     setPreview(null);
+    setHealth(null);
     setFileName(file.name);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -61,9 +74,11 @@ export default function IntakePage() {
     setError(null);
     setResult(null);
     setPreview(null);
+    setHealth(null);
     try {
       setResult(await intake.load(mapping));
       setPreview(await intake.preview());
+      setHealth(await intake.health());
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -211,6 +226,76 @@ export default function IntakePage() {
               ))}
             </tbody>
           </table>
+        </section>
+      )}
+
+      {health && (
+        <section aria-labelledby="h-health">
+          <h2 id="h-health">Data health</h2>
+          <p role="status">
+            <strong>
+              {health.score} out of 100, {BAND_TEXT[health.band]}.
+            </strong>{" "}
+            {health.rows.toLocaleString("en-US")} rows and {health.columns.toLocaleString("en-US")} columns were checked.
+          </p>
+          <p>{health.caveat}</p>
+
+          {health.findings.length === 0 ? (
+            <p>Nothing to clean. No missing values, repeated rows, badly formed numbers or dates, or stray spaces were found.</p>
+          ) : (
+            <>
+              <h3>Cleaning report</h3>
+              <ul>
+                {health.findings.map((f, i) => (
+                  <li key={`${f.id}-${f.column ?? "file"}-${i}`}>
+                    <strong>{SEVERITY_TEXT[f.severity]}.</strong> {f.text} {f.fix}
+                    {f.examples && f.examples.length > 0 && (
+                      <>
+                        {" "}
+                        First rows to check: {f.examples.join(", ")}, counting the first row after the header as row 1.
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <details>
+            <summary>How the score is made</summary>
+            <div style={{ overflowX: "auto" }}>
+              <table aria-label="How the score is made">
+                <thead>
+                  <tr>
+                    <th scope="col">Part</th>
+                    <th scope="col">Worth</th>
+                    <th scope="col">Share earned</th>
+                    <th scope="col">Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Object.keys(HEALTH_WEIGHTS) as (keyof typeof HEALTH_WEIGHTS)[]).map((id) => {
+                    const part = health.parts[id];
+                    return (
+                      <tr key={id}>
+                        <th scope="row">{PART_LABELS[id]}</th>
+                        <td>{part.scored ? "" : "Not scored. "}{part.weight} points</td>
+                        <td>{part.scored ? `${Math.round(part.share * 100)} percent` : "no number or date column"}</td>
+                        <td>{part.points.toFixed(1)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p>
+              The points add up to the score. When a file has no number or date column, validity has nothing to check, so
+              its weight is shared among the other parts in proportion, and a clean file still scores 100. Text cells that
+              say N/A, null, none or similar are counted as missing. A column counts as numbers or dates when at least 80
+              percent of its filled cells look like them. Only year-month-day dates are checked. The report shows column
+              names, counts and row numbers, never the values.
+            </p>
+          </details>
         </section>
       )}
     </main>

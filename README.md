@@ -16,6 +16,10 @@ It runs entirely in your browser. Your files are read on your own computer, held
 - **Journeys.** Linked charts, a flow with drop off, top paths, a what if, and an anchored view that shows what customers did before and after any one event.
 - **Data check.** Match two files on email and check a time column against clock changes, in the browser. Addresses are shown masked, and times that never happened or happened twice are listed by row, not guessed.
 - **Methods.** The checks that ran on generated data to test the statistics, with the counts.
+- **Guided tour.** A four step tour on the home screen, which loads the demo ledger and can be skipped.
+- **Data health.** A score from 0 to 100 and a cleaning report for a loaded CSV, with row numbers and no cell values.
+- **Behavioral ideas.** Nine ideas that start a ledger draft as a prediction against a holdout, with a note on using each honestly.
+- **Retention timer.** An optional timer that deletes everything in the tab after a stretch of inactivity.
 - **Explanations.** The main numbers can say how they were worked out, built from the real values.
 
 ## Run it

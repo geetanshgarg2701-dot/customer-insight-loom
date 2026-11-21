@@ -51,12 +51,19 @@ export type Preview = {
   rowCount: number;
 };
 
+import type { HealthReport } from "./health";
+
 export interface Intake {
   /** Reads the header row only. No data row is loaded and nothing is previewed. */
   open(bytes: Uint8Array): Promise<Header[]>;
   /** Loads the included columns. Throws BlockedColumnError for a blocked column. */
   load(mapping: MappingEntry[]): Promise<LoadResult>;
   preview(): Promise<Preview>;
+  /**
+   * A health score and a plain cleaning report for the loaded columns. Counts and row numbers only, never a cell value.
+   * Throws NotLoadedError before a load.
+   */
+  health(): Promise<HealthReport>;
   /**
    * Raw values of chosen columns, blocked ones included, for assignment and
    * results matching only. The caller hashes identity values at once and keeps

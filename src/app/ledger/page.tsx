@@ -8,6 +8,7 @@ import { noteExport } from "@/lib/usage/usage";
 import { demoAudienceCsv } from "@/lib/demo/synthetic";
 import { familywiseLine } from "@/lib/ledger/familywise";
 import { FrameworkSection } from "./framework-section";
+import { HypothesisPicker } from "./hypothesis-picker";
 import { ledgerCsv } from "@/lib/ledger/csv";
 import { NO_FILTER, filterEntries, type EntryFilter } from "@/lib/ledger/filter";
 import { STATUSES, FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
@@ -160,6 +161,7 @@ export default function LedgerPage() {
 
       <section aria-labelledby="new-entry">
         <h2 id="new-entry">New entry</h2>
+        <HypothesisPicker title={title} hypothesis={hypothesis} setTitle={setTitle} setHypothesis={setHypothesis} />
         <form onSubmit={(e) => void onCreate(e)}>
           <p>
             <label>

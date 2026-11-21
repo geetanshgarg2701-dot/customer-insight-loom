@@ -5,6 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import { downloadText } from "@/lib/app/download";
 import { formatCount, formatPercent } from "@/lib/app/format";
 import { deleteBrowserData, getBrowserLedger, readBrowserUsage } from "@/lib/duckdb/client";
+import { RETENTION_MINUTES, leftText } from "@/lib/usage/retention";
+import { retentionStore } from "@/lib/usage/retention-store";
+import { useRetention } from "@/lib/usage/use-retention";
 import { exportNag, lastExportTime, noteExport, WARN_AT, type Usage } from "@/lib/usage/usage";
 
 function messageOf(error: unknown): string {
@@ -27,6 +30,8 @@ export default function DataPage() {
   const [typed, setTyped] = useState("");
   const [lastExport, setLastExport] = useState<number | null>(lastExportTime());
   const [deletedNotice, setDeletedNotice] = useState(false);
+  const [expiredNotice, setExpiredNotice] = useState(false);
+  const retention = useRetention();
   const [now, setNow] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -45,6 +50,10 @@ export default function DataPage() {
     if (window.location.hash === "#deleted") {
       window.history.replaceState(null, "", window.location.pathname);
       void Promise.resolve().then(() => setDeletedNotice(true));
+    }
+    if (window.location.hash === "#expired") {
+      window.history.replaceState(null, "", window.location.pathname);
+      void Promise.resolve().then(() => setExpiredNotice(true));
     }
     void Promise.resolve().then(refresh);
   }, [refresh]);
@@ -87,6 +96,12 @@ export default function DataPage() {
         reload empties it all. This screen shows what the tab holds, how much memory it uses, and clears it on request.
       </p>
       {deletedNotice && <p role="status">Everything in this tab was deleted, and the page was reloaded.</p>}
+      {expiredNotice && (
+        <p role="status">
+          Everything in this tab was deleted because it was inactive for longer than the time you set, and the page was
+          reloaded. The timer is off again.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
 
       <section aria-labelledby="h-memory">
@@ -171,6 +186,45 @@ export default function DataPage() {
             Export the ledger
           </button>
         </p>
+      </section>
+
+      <section aria-labelledby="h-retention">
+        <h2 id="h-retention">Delete automatically after inactivity</h2>
+        <p>
+          Off until you turn it on. When it is on, this tab deletes everything it holds after a stretch with no clicks or key
+          presses, and warns you for the last minute. It matters most on a computer other people use. It lives in this tab
+          only, so a reload turns it off, as a reload already empties the tab.
+        </p>
+        <p>
+          <label>
+            Delete after{" "}
+            <select
+              value={retention.state?.minutes ?? 0}
+              onChange={(e) => {
+                const minutes = Number(e.target.value);
+                if (minutes === 0) retentionStore.stop();
+                else retentionStore.start(minutes, Date.now());
+              }}
+            >
+              <option value={0}>Off</option>
+              {RETENTION_MINUTES.map((m) => (
+                <option key={m} value={m}>
+                  {m} minutes without activity
+                </option>
+              ))}
+            </select>
+          </label>
+        </p>
+        {retention.state && (
+          <p role="status">
+            {retention.status.phase === "off" || retention.status.phase === "expired"
+              ? "Starting the timer."
+              : `Everything in this tab will be deleted after ${retention.state.minutes} minutes without activity. ${
+                  retention.status.secondsLeft > 60 ? `About ${leftText(retention.status.secondsLeft)} left.` : "Under a minute left."
+                }`}
+          </p>
+        )}
+        <p>Export the ledger first if you want to keep it. A file you exported stays where you saved it.</p>
       </section>
 
       <section aria-labelledby="h-delete">

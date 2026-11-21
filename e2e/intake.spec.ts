@@ -106,3 +106,60 @@ test("shows a clear message for an empty file", async ({ page }) => {
     .setInputFiles({ name: "empty.csv", mimeType: "text/csv", buffer: Buffer.from("") });
   await expect(page.getByText("The file is empty.")).toBeVisible({ timeout: 30_000 });
 });
+
+const MESSY = [
+  "id,amount,order_date,note,status",
+  "1,10.5,2026-07-01,ok,done",
+  "2,abc,2026-07-02,N/A,done",
+  "3,7,2026-02-30,,done",
+  "3,7,2026-02-30,,done",
+  "4,8,2026-07-04, fine,done",
+  "5,12,2026-07-05,fine,done",
+  "9,1",
+].join("\n") + "\n";
+
+test("a loaded file gets a health score and a cleaning report with row numbers, and the report shows no cell value", async ({ page }) => {
+  test.setTimeout(120_000);
+  await chooseFile(page, "orders.csv", MESSY);
+  await page.getByRole("button", { name: "Load and preview" }).click();
+  const health = page.getByRole("region", { name: "Data health" });
+  await expect(health).toBeVisible({ timeout: 60_000 });
+
+  // The score is the one the unit test works out: 6 loaded rows of 7, one repeat, and the flaws named below.
+  await expect(health.getByRole("status")).toContainText(/\d+ out of 100, (Good|Fair|Poor)/);
+  await expect(health.getByRole("status")).toContainText("6 rows and 5 columns were checked.");
+
+  const report = health.getByRole("list");
+  await expect(report).toContainText('The column "amount" mostly holds numbers, but 1 cell is not a number.');
+  await expect(report).toContainText('The column "order_date" mostly holds dates, but 2 cells are not a valid date.');
+  await expect(report).toContainText("First rows to check: 3, 4, counting the first row after the header as row 1.");
+  await expect(report).toContainText("1 row repeats an earlier row exactly.");
+  await expect(report).toContainText("1 row was skipped because it had too few or too many fields.");
+  await expect(report).toContainText('Every filled cell in the column "status" holds the same value.');
+  await expect(report.getByText("Fix first.").first()).toBeVisible();
+
+  // The cleaning report names columns, counts and rows. Values only appear in the preview, which existed before.
+  const reportText = await report.innerText();
+  for (const value of ["abc", "2026-02-30", "10.5"]) expect(reportText).not.toContain(value);
+
+  // The score's working is there for anyone who wants to check it.
+  await health.getByText("How the score is made").click();
+  const parts = health.getByRole("table", { name: "How the score is made" });
+  await expect(parts.getByRole("row", { name: /^Completeness/ })).toBeVisible();
+  await expect(parts.getByRole("row", { name: /^Row integrity/ })).toContainText("86 percent");
+  await expect(health.getByText(/cannot tell whether a value is right/)).toBeVisible();
+});
+
+test("the health section has no axe violations and fits a phone", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await chooseFile(page, "orders.csv", MESSY);
+  await page.getByRole("button", { name: "Load and preview" }).click();
+  await expect(page.getByRole("region", { name: "Data health" })).toBeVisible({ timeout: 60_000 });
+  await page.getByText("How the score is made").click();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  const AxeBuilder = (await import("@axe-core/playwright")).default;
+  const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).exclude("nextjs-portal").analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((x) => x.target.join(" ")).join(" | ")}`)).toEqual([]);
+});

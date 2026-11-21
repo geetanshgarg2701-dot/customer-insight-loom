@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PILOT } from "@/lib/pilot/enabled";
+import { GuidedTour } from "./guided-tour";
 
 type Screen = { href: string; name: string; what: string };
 
@@ -45,6 +46,8 @@ export default function Home() {
         Customer journeys, pipelines and email experiments in one picture, with the evidence kept and the uncertainty
         shown. When a result is too small to tell, it says so plainly.
       </p>
+
+      <GuidedTour />
 
       <div className="home-groups">
         {GROUPS.map((g) => (

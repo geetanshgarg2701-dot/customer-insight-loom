@@ -10,6 +10,7 @@ import {
   UnsupportedDelimiterError,
   type OtherDelimiter,
 } from "./errors";
+import { scoreHealth, type ColumnHealth, type ColumnKind, type HealthReport } from "./health";
 import { validateMapping } from "./mapping";
 import type {
   Header,
@@ -29,6 +30,15 @@ export const PREVIEW_CELL_MAX = 500;
 export const MAX_COLUMNS = 1000;
 export const MAX_LINE_BYTES = 8 * 1024 * 1024;
 const SKIP_EXAMPLES = 20;
+
+/** Words that stand for "no value". A cell that says one of these is counted as missing in the health report. */
+const PLACEHOLDERS = ["n/a", "na", "#n/a", "n.a.", "null", "none", "nan", "-", "--", "unknown", "?"];
+const PLACEHOLDER_LIST = PLACEHOLDERS.map((w) => `'${w.replace(/'/g, "''")}'`).join(",");
+const DATE_SHAPE = "'^\\d{4}-\\d{2}-\\d{2}'";
+/** A column is a number or a date column when at least this share of its filled cells look like one. */
+const KIND_SHARE = 0.8;
+const HEALTH_CHUNK = 40;
+const HEALTH_EXAMPLES = 5;
 
 /**
  * Stands in for NULL while reading, so an empty field stays an empty string
@@ -264,6 +274,75 @@ export function createIntake(engine: SqlEngine): Intake {
         }),
         rowCount: loaded.rowCount,
       };
+    },
+
+    async health(): Promise<HealthReport> {
+      if (!loaded) throw new NotLoadedError();
+      const n = loaded.targets.length;
+      const real = (i: number) => `v${i} IS NOT NULL AND lower(trim(v${i})) NOT IN (${PLACEHOLDER_LIST})`;
+      const isNumber = (i: number) => `TRY_CAST(trim(v${i}) AS DOUBLE) IS NOT NULL`;
+      const dateLike = (i: number) => `regexp_matches(v${i}, ${DATE_SHAPE})`;
+      const validDate = (i: number) => `${dateLike(i)} AND TRY_CAST(substr(v${i}, 1, 10) AS DATE) IS NOT NULL`;
+
+      const total = (
+        await engine.all(
+          `SELECT count(*) AS file_rows, count(*) FILTER (WHERE _kind = 'ok') AS rows FROM ${TABLE}`,
+        )
+      ).map(toPlainRow)[0];
+      const rowsInFile = Number(total.file_rows);
+      const rows = Number(total.rows);
+
+      const allValues = Array.from({ length: n }, (_, i) => `v${i}`).join(", ");
+      const distinctRows = n === 0 || rows === 0 ? 0 : Number(
+        (await engine.all(`SELECT count(*) AS d FROM (SELECT DISTINCT ${allValues} FROM ${TABLE} WHERE _kind = 'ok')`)).map(toPlainRow)[0].d,
+      );
+      const duplicateRows = rows === 0 ? 0 : rows - distinctRows;
+
+      const columns: ColumnHealth[] = [];
+      for (let from = 0; from < n; from += HEALTH_CHUNK) {
+        const upTo = Math.min(n, from + HEALTH_CHUNK);
+        const parts: string[] = [];
+        for (let i = from; i < upTo; i++) {
+          parts.push(
+            `count(v${i}) AS nn${i}`,
+            `count(DISTINCT v${i}) AS d${i}`,
+            `count(*) FILTER (WHERE v${i} IS NOT NULL AND lower(trim(v${i})) IN (${PLACEHOLDER_LIST})) AS ph${i}`,
+            `count(*) FILTER (WHERE ${real(i)} AND ${isNumber(i)}) AS num${i}`,
+            `count(*) FILTER (WHERE ${real(i)} AND ${dateLike(i)}) AS dl${i}`,
+            `count(*) FILTER (WHERE ${real(i)} AND ${validDate(i)}) AS dv${i}`,
+            `count(*) FILTER (WHERE v${i} IS NOT NULL AND v${i} <> trim(v${i})) AS ws${i}`,
+          );
+        }
+        const stats = toPlainRow((await engine.all(`SELECT ${parts.join(", ")} FROM ${TABLE} WHERE _kind = 'ok'`))[0]);
+        for (let i = from; i < upTo; i++) {
+          const nonNull = Number(stats[`nn${i}`]);
+          const placeholders = Number(stats[`ph${i}`]);
+          const filled = nonNull - placeholders;
+          const num = Number(stats[`num${i}`]);
+          const dl = Number(stats[`dl${i}`]);
+          const dv = Number(stats[`dv${i}`]);
+          const kind: ColumnKind = filled === 0 ? "text" : num / filled >= KIND_SHARE ? "number" : dl / filled >= KIND_SHARE ? "date" : "text";
+          const invalid = kind === "number" ? filled - num : kind === "date" ? filled - dv : 0;
+          const column: ColumnHealth = {
+            name: loaded.targets[i],
+            nonNull,
+            placeholders,
+            distinct: Number(stats[`d${i}`]),
+            kind,
+            invalid,
+            strayWhitespace: Number(stats[`ws${i}`]),
+          };
+          if (invalid > 0) {
+            const bad = kind === "number" ? `NOT (${isNumber(i)})` : `NOT (${validDate(i)})`;
+            const found = await engine.all(
+              `SELECT _row AS row FROM ${TABLE} WHERE _kind = 'ok' AND ${real(i)} AND ${bad} ORDER BY _row LIMIT ${HEALTH_EXAMPLES}`,
+            );
+            column.examples = found.map((r) => Number(toPlainRow(r).row));
+          }
+          columns.push(column);
+        }
+      }
+      return scoreHealth({ rowsInFile, rows, duplicateRows, columns });
     },
 
     async readColumnsForMatching(indices) {

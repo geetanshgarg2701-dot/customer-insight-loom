@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { Nav } from "./nav";
+import { RetentionGuard } from "./retention-guard";
 
 export const metadata: Metadata = {
   title: "Customer Insight Loom",
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </footer>
           </div>
         </div>
+        <RetentionGuard />
       </body>
     </html>
   );
