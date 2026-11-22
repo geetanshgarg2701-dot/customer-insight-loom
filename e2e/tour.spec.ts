@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 test("the tour opens on its own, walks four steps, loads the demo ledger, and finishes", async ({ page }) => {
   test.setTimeout(180_000);
@@ -29,7 +30,7 @@ test("the tour opens on its own, walks four steps, loads the demo ledger, and fi
   await expect(tour).toBeHidden();
 
   // The demo ledger is really there.
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ledger" }).click();
+  await navTo(page, "Ledger");
   await expect(page.getByRole("table", { name: "Ledger entries" })).toBeVisible({ timeout: 60_000 });
 });
 
@@ -58,9 +59,9 @@ test("Skip and Escape close it at once, it does not reopen on its own in the sam
   await expect(tour).toBeHidden();
 
   // Away and back in the same visit: it stays closed.
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Methods" }).click();
+  await navTo(page, "Methods");
   await expect(page.getByRole("heading", { level: 1, name: "Methods" })).toBeVisible();
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Home" }).click();
+  await navTo(page, "Home");
   await expect(page.getByRole("heading", { level: 1, name: "Customer Insight Loom" })).toBeVisible();
   await expect(tour).toBeHidden();
 

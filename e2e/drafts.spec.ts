@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 test("a draft is built in the named framework, blocked until the address and statements are done, then approved in the sandbox and sent nowhere", async ({ page, context, baseURL }) => {
   test.setTimeout(120_000);
@@ -67,7 +68,7 @@ test("a draft is built in the named framework, blocked until the address and sta
   // The draft becomes a ledger entry that carries the framework and the complaint.
   await section.getByRole("button", { name: "Make a draft ledger entry from this" }).click();
   await expect(section.getByText(/^Made a draft ledger entry\./)).toBeVisible();
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ledger" }).click();
+  await navTo(page, "Ledger");
   await page.getByRole("link", { name: "Email: A simpler answer on shipping" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Email: A simpler answer on shipping" })).toBeVisible();
   await expect(page.getByText("Framework tag: PAS")).toBeVisible();

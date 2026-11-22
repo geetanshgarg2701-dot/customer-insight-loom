@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import JSZip from "jszip";
 import { formatCount, formatPercent, formatSignedPoints } from "../src/lib/app/format";
+import { navTo } from "./nav-helper";
 
 async function slidesOf(path: string) {
   const zip = await JSZip.loadAsync(fs.readFileSync(path));
@@ -79,7 +80,7 @@ test("the evidence chain makes a deck with the chain slide and the linked test, 
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
   await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Comments" }).click();
+  await navTo(page, "Comments");
   await page.getByRole("button", { name: "Load synthetic comments" }).click();
   await expect(page.getByRole("list", { name: "Evidence chain for Shipping costs too much" })).toBeVisible({ timeout: 120_000 });
   const enabled = page.getByRole("button", { name: "Export the decision deck for this chain" });

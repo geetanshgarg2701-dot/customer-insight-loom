@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 /**
  * Next keeps a visited page's React state across client navigation. Each
@@ -30,7 +31,7 @@ test("a second entry never shows the first entry's assignment or its download", 
   await expect(assign.getByText("Assigned 1000 people")).toBeVisible({ timeout: 60_000 });
   await expect(assign.getByRole("button", { name: "Download assignment file" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await navTo(page, "Ledger");
   await page.getByLabel("Title", { exact: true }).fill("Second entry");
   await page.getByLabel("Hypothesis").fill("H");
   await page.getByRole("button", { name: "Create draft" }).click();

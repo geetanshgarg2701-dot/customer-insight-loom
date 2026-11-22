@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
-// The app look applies to every screen: the near black canvas, the system font and the sidebar with the current screen marked.
+// The app look applies to every screen: the near black canvas, the system font and the top menu with the current screen marked.
 // Every screen fits a phone, 375 pixels wide, with no sideways scroll.
 const CANVAS = "rgb(3, 3, 3)";
 
@@ -21,7 +22,7 @@ test.describe("phone width", () => {
       await expect(page.getByRole("main")).toBeVisible();
       expect(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(CANVAS);
       expect(await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/^system-ui/);
-      expect(await page.getByRole("navigation", { name: "Main" }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(5, 8, 7)");
+      expect(await page.getByRole("navigation", { name: "Main" }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(3, 3, 3, 0.72)");
       await expect(page).not.toHaveTitle(/Create Next App/);
       await expectFits(page, path);
     });
@@ -40,9 +41,9 @@ test.describe("phone width", () => {
   });
 });
 
-test("the sidebar marks the current screen, follows client side links, and a skip link jumps past it", async ({ page }) => {
+test("the top menu marks the current screen, follows client side links, and a skip link jumps past it", async ({ page }) => {
   await page.goto("/pipeline");
-  // The first Tab lands on the skip link, which shows on focus and moves focus past the sidebar.
+  // The first Tab lands on the skip link, which shows on focus and moves focus past the menu.
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "Skip to content" });
   await expect(skip).toBeFocused();
@@ -51,10 +52,10 @@ test("the sidebar marks the current screen, follows client side links, and a ski
   await expect(page.locator("#content")).toBeFocused();
 
   const nav = page.getByRole("navigation", { name: "Main" });
-  await expect(nav.getByRole("link", { name: "Pipeline" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Pipeline", exact: true, includeHidden: true })).toHaveAttribute("aria-current", "page");
   await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
-  await nav.getByRole("link", { name: "Ledger" }).click();
+  await navTo(page, "Ledger");
   await expect(page.getByRole("heading", { level: 1, name: "Ledger" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Ledger" })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Pipeline" })).not.toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Ledger", exact: true, includeHidden: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Pipeline", exact: true, includeHidden: true })).not.toHaveAttribute("aria-current", "page");
 });

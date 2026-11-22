@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 async function startAt(page: Page, minutes: string) {
   await page.goto("/data");
@@ -48,7 +49,7 @@ test("at the deadline everything in the tab is deleted and the page reloads with
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
   await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Your data" }).click();
+  await navTo(page, "Your data");
   await expect(page.getByText("The ledger has 4 entries.")).toBeVisible({ timeout: 60_000 });
 
   await page.getByLabel("Delete after").selectOption("15");

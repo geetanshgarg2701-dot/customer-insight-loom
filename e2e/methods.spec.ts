@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { METHOD_NOTES, runMethodsReport } from "../src/lib/methods/report";
+import { navTo } from "./nav-helper";
 
 test("shows the honesty and redaction counts, the same as the code computes in Node", async ({
   page,
@@ -56,6 +57,6 @@ test("shows the honesty and redaction counts, the same as the code computes in N
 
 test("links to the methods page from the main nav", async ({ page }) => {
   await page.goto("/ledger");
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Methods" }).click();
+  await navTo(page, "Methods");
   await expect(page.getByRole("heading", { name: "Methods" })).toBeVisible();
 });

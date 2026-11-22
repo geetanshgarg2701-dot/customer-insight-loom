@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { JOURNEY_STEPS, syntheticJourneys } from "../src/lib/demo/journeys";
+import { navTo } from "./nav-helper";
 
 const rows = syntheticJourneys(100_000, 11);
 const n = (v: number) => v.toLocaleString("en-US");
@@ -57,7 +58,7 @@ test("the July demo test is marked on its day with a before and after count, and
   await page.goto("/ledger");
   await page.getByRole("button", { name: "Load demo data" }).click();
   await expect(page.getByText("Loaded 4 synthetic demo entries.")).toBeVisible({ timeout: 120_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Journeys" }).click();
+  await navTo(page, "Journeys");
   const section = await load(page);
   await expect(section.getByText(/^3 ledger tests launched outside these dates/)).toBeVisible();
   const marked = section.getByRole("list", { name: "Ledger tests launched during these days" }).getByRole("listitem");

@@ -4,6 +4,7 @@ import { syntheticJourneys } from "../src/lib/demo/journeys";
 import { syntheticComments } from "../src/lib/insights/comments";
 import { prepareComments } from "../src/lib/insights/prepare";
 import { customerRevenue } from "../src/lib/insights/evidence";
+import { navTo } from "./nav-helper";
 
 const journeys = syntheticJourneys(20_000, 11);
 const comments = syntheticComments(journeys, 3_000, 17);
@@ -110,7 +111,7 @@ test("going from the journeys screen to the comments screen loads the comments w
   await page.goto("/journeys");
   await page.getByRole("button", { name: "Load synthetic journeys" }).click();
   await expect(page.getByText(/Showing 100,000 of 100,000 customers/)).toBeVisible({ timeout: 180_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Comments" }).click();
+  await navTo(page, "Comments");
   await page.getByRole("button", { name: "Load synthetic comments" }).click();
   await expect(page.getByRole("list", { name: "Evidence chain for Shipping costs too much" })).toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);

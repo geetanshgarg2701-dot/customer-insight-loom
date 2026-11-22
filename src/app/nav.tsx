@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PILOT } from "@/lib/pilot/enabled";
 
 /**
- * The sidebar. Screens are grouped by what a marketer is doing, and the current one is marked for sight and for screen
- * readers. Client side links keep the in-browser ledger alive between screens.
+ * The top menu. Screens are grouped by what a marketer is doing, each group opens as a small menu, and the current screen is
+ * marked for sight and for screen readers. Client side links keep the in-browser ledger alive between screens. On a phone the
+ * whole menu folds behind one Menu button and the groups are listed flat.
  */
 
 type Item = { href: string; label: string; icon: ReactNode };
@@ -82,27 +83,87 @@ export function Nav() {
   const path = normalize(usePathname() ?? "/");
   const current = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
   const groups = PILOT ? [...GROUPS, { label: "Pilot", items: [{ href: "/account", label: "Account", icon: ICONS.account }] }] : GROUPS;
+  // Which group menu is open, and whether the whole menu is open on a phone. Each remembers the screen it was opened on, so
+  // moving to another screen closes both without any effect.
+  const [openAt, setOpenAt] = useState<{ id: string | null; path: string }>({ id: null, path });
+  const [mobileAt, setMobileAt] = useState<{ on: boolean; path: string }>({ on: false, path });
+  const open = openAt.path === path ? openAt.id : null;
+  const mobileOpen = mobileAt.path === path && mobileAt.on;
+  const setOpen = (id: string | null) => setOpenAt({ id, path });
+  const setMobileOpen = (on: boolean) => setMobileAt({ on, path });
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      // Escape closes the open menu and puts focus back on the button that opened it.
+      const button = root.current?.querySelector<HTMLButtonElement>("button[aria-expanded='true']");
+      setOpenAt((o) => ({ ...o, id: null }));
+      setMobileAt((m) => ({ ...m, on: false }));
+      button?.focus();
+    }
+    function onClick(e: MouseEvent) {
+      if (root.current && !root.current.contains(e.target as Node)) setOpenAt((o) => ({ ...o, id: null }));
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClick);
+    };
+  }, []);
+
   return (
-    <nav aria-label="Main" className="sidebar">
+    <nav aria-label="Main" className="topnav" ref={root}>
       <Link href="/" className="brand">
         <Mark />
         <span>Customer Insight Loom</span>
       </Link>
-      {groups.map((g) => (
-        <div key={g.label ?? "start"} className="nav-group">
-          {g.label && <p className="nav-label">{g.label}</p>}
-          <ul>
-            {g.items.map((it) => (
-              <li key={it.href}>
+      <button type="button" className="menu-toggle" aria-expanded={mobileOpen} aria-controls="menu" onClick={() => setMobileOpen(!mobileOpen)}>
+        Menu
+      </button>
+      <ul id="menu" className={mobileOpen ? "menu open" : "menu"}>
+        {groups.map((g) => {
+          const id = `group-${(g.label ?? "start").toLowerCase().replace(/\s+/g, "-")}`;
+          // A group with one screen is a plain link, not a menu.
+          if (g.items.length === 1) {
+            const it = g.items[0];
+            return (
+              <li key={id} className="menu-item">
                 <Link href={it.href} aria-current={current(it.href) ? "page" : undefined}>
-                  {it.icon}
                   <span>{it.label}</span>
                 </Link>
               </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+            );
+          }
+          const isOpen = open === id;
+          return (
+            <li key={id} className="menu-item has-drop" data-current={g.items.some((it) => current(it.href)) ? "true" : undefined}>
+              <button type="button" className="group-button" aria-expanded={isOpen} aria-controls={id} onClick={() => setOpen(isOpen ? null : id)}>
+                {g.label}
+                <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false" className="chev">
+                  <path d="m2 4 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <p className="group-label" aria-hidden="true">
+                {g.label}
+              </p>
+              <ul id={id} className={isOpen ? "drop open" : "drop"}>
+                {g.items.map((it) => (
+                  <li key={it.href}>
+                    <Link href={it.href} aria-current={current(it.href) ? "page" : undefined}>
+                      {it.icon}
+                      <span>{it.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+      <Link href="/ledger" className="button-link topnav-cta">
+        Try the demo
+      </Link>
     </nav>
   );
 }

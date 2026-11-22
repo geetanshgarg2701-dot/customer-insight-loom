@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 async function loadDemo(page: import("@playwright/test").Page) {
   await page.goto("/ledger");
@@ -10,7 +11,7 @@ async function loadDemo(page: import("@playwright/test").Page) {
 test("the data screen shows what the tab holds and its memory, nudges to export, and deletes everything after a typed confirmation", async ({ page }) => {
   test.setTimeout(240_000);
   await loadDemo(page);
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Your data" }).click();
+  await navTo(page, "Your data");
   await expect(page.getByRole("heading", { level: 1, name: "Your data in this tab" })).toBeVisible();
 
   // The memory meter reads real numbers from the database, against its own limit.
@@ -54,7 +55,7 @@ test("a screen that loaded 100,000 rows has dropped them by the time the data sc
   await page.goto("/journeys");
   await page.getByRole("button", { name: "Load synthetic journeys" }).click();
   await expect(page.getByText(/Showing 100,000 of 100,000 customers/)).toBeVisible({ timeout: 180_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Your data" }).click();
+  await navTo(page, "Your data");
 
   const memory = page.getByRole("region", { name: "Memory" });
   await expect(memory.getByRole("status")).toContainText("MiB of", { timeout: 60_000 });
@@ -70,7 +71,7 @@ test("the data screen has no axe violations and fits a phone", async ({ page }) 
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 375, height: 812 });
   await loadDemo(page);
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Your data" }).click();
+  await navTo(page, "Your data");
   await expect(page.getByRole("region", { name: "Memory" }).getByRole("status")).toContainText("MiB of", { timeout: 60_000 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);

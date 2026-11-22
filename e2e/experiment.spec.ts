@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 const N = 4000;
 
@@ -143,7 +144,7 @@ test("runs an experiment from draft to a recorded readout, and exports and impor
   await expect(readout.getByRole("button", { name: "Record a new version" })).toBeDisabled();
 
   // The ledger list keeps its state across client side navigation.
-  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await navTo(page, "Ledger");
   const list = page.getByRole("table", { name: "Ledger entries" });
   await expect(list).toContainText("Win back offer");
   await expect(list).toContainText("readable");
@@ -229,7 +230,7 @@ test("rebuilds the same assignment file in a new session, and never leaks it to 
   const original = fs.readFileSync((await first.path())!, "utf8");
 
   // A second entry must not inherit the first entry's assignment or its download.
-  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await navTo(page, "Ledger");
   await page.getByLabel("Title", { exact: true }).fill("Other entry");
   await page.getByLabel("Hypothesis").fill("H");
   await page.getByRole("button", { name: "Create draft" }).click();
@@ -239,7 +240,7 @@ test("rebuilds the same assignment file in a new session, and never leaks it to 
   await expect(assign.getByText(/Assigned \d+ people/)).toHaveCount(0);
 
   // Export, then reload. A new session starts with an empty ledger, so the download is gone.
-  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await navTo(page, "Ledger");
   const [exported] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export ledger" }).click(),

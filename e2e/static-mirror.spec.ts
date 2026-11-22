@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { expect, test } from "@playwright/test";
 import JSZip from "jszip";
+import { navTo } from "./nav-helper";
 
 const PREFIX = process.env.MIRROR_PREFIX ?? "evidence-ledger";
 
@@ -40,15 +41,15 @@ test("the static mirror loads DuckDB from its own prefix and runs the demo with 
   expect(deck.suggestedFilename()).toMatch(/^decision-deck-.*\.pptx$/);
   const zip = await JSZip.loadAsync(fs.readFileSync((await deck.path())!));
   expect(Object.keys(zip.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))).toHaveLength(5);
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ledger" }).click();
+  await navTo(page, "Ledger");
 
   // The theme coding model loads from the site's own prefix and asks for nothing outside it.
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Comments" }).click();
+  await navTo(page, "Comments");
   await page.getByRole("button", { name: "Load synthetic comments" }).click();
   const coding = page.getByRole("region", { name: "Theme coding by the in-browser model" });
   await coding.getByRole("button", { name: /^Load the model, about \d+ MB$/ }).click();
   await expect(coding.getByText("The model is loaded in this tab.")).toBeVisible({ timeout: 120_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ledger" }).click();
+  await navTo(page, "Ledger");
 
   // Moving between pages by clicking works without the prefetch files.
   await page.getByRole("link", { name: "Methods" }).click();

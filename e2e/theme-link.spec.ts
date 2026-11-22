@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { navTo } from "./nav-helper";
 
 test("an entry that names a theme shows up as the test link in that theme's evidence chain, and can be retargeted while a draft", async ({ page }) => {
   test.setTimeout(180_000);
@@ -14,7 +15,7 @@ test("an entry that names a theme shows up as the test link in that theme's evid
   await expect(link).toBeVisible();
 
   // Client side links keep the in-browser ledger, so the comments screen can read it.
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Comments" }).click();
+  await navTo(page, "Comments");
   await page.getByRole("button", { name: "Load synthetic comments" }).click();
   const chain = page.getByRole("list", { name: "Evidence chain for Shipping costs too much" });
   await expect(chain).toBeVisible({ timeout: 120_000 });
