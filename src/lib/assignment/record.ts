@@ -1,4 +1,5 @@
 import type { ExperimentReadout } from "../stats/experiment";
+import type { RevenueReadout } from "../stats/revenue";
 import type { Verification } from "./assign";
 
 type Readable = Extract<ExperimentReadout, { status: "readable" }>;
@@ -35,5 +36,29 @@ export function resultRecord(readout: Readable, verification: Verification, comp
     computed_at: computedAt,
     engine_version: r.engineVersion,
     method: r.method,
+  };
+}
+
+/**
+ * The revenue part of a stored result, or null when revenue was not shown. Aggregates only: the two means, the difference
+ * and its interval. A result with no revenue part is the same as one stored before revenue existed.
+ */
+export function revenueRecord(revenue: RevenueReadout | null) {
+  if (revenue === null || revenue.status === "not_shown") return null;
+  const arm = (a: { n: number; perRecipient: number; purchasers: number }) => ({ n: a.n, per_recipient: a.perRecipient, purchasers: a.purchasers });
+  if (revenue.status === "means_only") {
+    return { status: "means_only" as const, treatment: arm(revenue.treatment), control: arm(revenue.control), difference: revenue.difference };
+  }
+  return {
+    status: "shown" as const,
+    treatment: arm(revenue.treatment),
+    control: arm(revenue.control),
+    difference: revenue.difference,
+    interval_low: revenue.low,
+    interval_high: revenue.high,
+    significant: revenue.significant,
+    alpha: revenue.alpha,
+    over_treated: revenue.overTreated,
+    method: revenue.method,
   };
 }

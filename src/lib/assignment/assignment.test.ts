@@ -310,8 +310,8 @@ describe("results upload, verified against the stored assignment", () => {
     const columns = (await engine.all("SELECT column_name FROM information_schema.columns WHERE table_name = 'experiment_results'")).map(
       (r) => String(r.column_name),
     );
-    // Group, outcome and whether the email was received. No identity, no hash.
-    expect(columns.sort()).toEqual(["arm", "converted", "received"]);
+    // Group, outcome, whether the email was received, and revenue. No identity, no hash.
+    expect(columns.sort()).toEqual(["arm", "converted", "received", "revenue"]);
   });
 });
 

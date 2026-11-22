@@ -187,3 +187,49 @@ describe("renderDeck, the real .pptx file", () => {
     expect(first).not.toContain("<script>");
   });
 });
+
+describe("a stored result with revenue per recipient", () => {
+  const SHOWN = {
+    status: "shown",
+    treatment: { n: 1000, per_recipient: 4.8, purchasers: 120 },
+    control: { n: 1000, per_recipient: 5, purchasers: 100 },
+    difference: -0.2,
+    interval_low: -0.95,
+    interval_high: 0.55,
+    significant: false,
+    alpha: 0.05,
+    over_treated: { n: 1000, estimate: -200, low: -950, high: 550 },
+    method: "Welch",
+  };
+  const slideLines = (revenue: unknown) => {
+    const deck = buildDeck({ entry: { ...ENTRY, result: { ...RESULT, revenue } }, generatedAt: GENERATED });
+    return deck.slides.find((s) => s.kind === "result")!.lines!.join("\n");
+  };
+
+  it("adds one revenue line, with the sign and the interval", () => {
+    const text = slideLines(SHOWN);
+    expect(text).toContain("Revenue per recipient: treatment $4.80, control $5.00. Difference -$0.20, with a 95 percent interval from -$0.95 to +$0.55.");
+  });
+
+  it("says there is no range when a group had too few purchases", () => {
+    const text = slideLines({ status: "means_only", treatment: SHOWN.treatment, control: { ...SHOWN.control, purchasers: 12 }, difference: -0.2 });
+    expect(text).toContain("Revenue per recipient: treatment $4.80, control $5.00. Difference -$0.20. No range is shown, because a group had under 30 purchases.");
+  });
+
+  it("adds nothing when the result has no revenue part, so an older result reads as before", () => {
+    expect(slideLines(undefined)).not.toContain("Revenue per recipient");
+    expect(slideLines(null)).not.toContain("Revenue per recipient");
+  });
+
+  it("refuses a revenue part that is not in the shape the ledger writes, so no wrong number is printed", () => {
+    expect(() => readResult({ ...RESULT, revenue: { status: "shown", difference: "lots" } })).toThrow(RangeError);
+    expect(() => readResult({ ...RESULT, revenue: { status: "other" } })).toThrow(RangeError);
+  });
+
+  it("reaches the .pptx file", async () => {
+    const deck = buildDeck({ entry: { ...ENTRY, result: { ...RESULT, revenue: SHOWN } }, generatedAt: GENERATED });
+    const zip = await JSZip.loadAsync(await renderDeck(deck));
+    const xml = await Promise.all(Object.keys(zip.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f)).map((f) => zip.file(f)!.async("string")));
+    expect(xml.join("")).toContain("Revenue per recipient: treatment $4.80, control $5.00.");
+  });
+});

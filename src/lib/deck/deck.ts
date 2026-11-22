@@ -37,7 +37,19 @@ export type DeckSlide = {
 };
 export type DeckModel = { fileName: string; slides: DeckSlide[] };
 
+/** Revenue per recipient as the ledger stores it. Absent on a result recorded without a revenue column. */
+export type StoredRevenue = {
+  status: "shown" | "means_only";
+  treatment: { n: number; per_recipient: number; purchasers: number };
+  control: { n: number; per_recipient: number; purchasers: number };
+  difference: number;
+  interval_low: number | null;
+  interval_high: number | null;
+  alpha: number | null;
+};
+
 export type StoredResult = {
+  revenue: StoredRevenue | null;
   lift: number;
   interval_low: number;
   interval_high: number;
@@ -52,6 +64,36 @@ export type StoredResult = {
 };
 
 const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+function readRevenue(raw: unknown): StoredRevenue | null {
+  if (raw === null || raw === undefined) return null;
+  const bad = () => new RangeError("The stored result is not in the shape the ledger writes, so no deck was made from it.");
+  if (typeof raw !== "object") throw bad();
+  const r = raw as Record<string, unknown>;
+  const arm = (v: unknown) => {
+    const a = v as Record<string, unknown> | null | undefined;
+    if (!a || typeof a !== "object" || !num(a.n) || !num(a.per_recipient) || !num(a.purchasers)) throw bad();
+    return { n: a.n, per_recipient: a.per_recipient, purchasers: a.purchasers };
+  };
+  if (r.status !== "shown" && r.status !== "means_only") throw bad();
+  if (!num(r.difference)) throw bad();
+  const treatment = arm(r.treatment);
+  const control = arm(r.control);
+  if (r.status === "means_only") return { status: "means_only", treatment, control, difference: r.difference, interval_low: null, interval_high: null, alpha: null };
+  if (!num(r.interval_low) || !num(r.interval_high) || !num(r.alpha)) throw bad();
+  return { status: "shown", treatment, control, difference: r.difference, interval_low: r.interval_low, interval_high: r.interval_high, alpha: r.alpha };
+}
+
+const dollars = (x: number) => `${x < 0 ? "-" : ""}$${Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const signedDollars = (x: number) => (x > 0 ? `+${dollars(x)}` : dollars(x));
+
+/** The one line the result slide carries for revenue per recipient. */
+export function revenueLine(rev: StoredRevenue): string {
+  const head = `Revenue per recipient: treatment ${dollars(rev.treatment.per_recipient)}, control ${dollars(rev.control.per_recipient)}. Difference ${signedDollars(rev.difference)}`;
+  if (rev.status === "means_only") return `${head}. No range is shown, because a group had under 30 purchases.`;
+  const level = Math.round((1 - (rev.alpha ?? 0.05)) * 100);
+  return `${head}, with a ${level} percent interval from ${signedDollars(rev.interval_low ?? 0)} to ${signedDollars(rev.interval_high ?? 0)}.`;
+}
 
 /** Reads a stored result. Refuses a shape that is not the ledger's, so a wrong number is never printed. */
 export function readResult(raw: unknown): StoredResult | null {
@@ -75,6 +117,7 @@ export function readResult(raw: unknown): StoredResult | null {
     throw new RangeError("The stored result is not in the shape the ledger writes, so no deck was made from it.");
   }
   return {
+    revenue: readRevenue(r.revenue),
     lift: r.lift,
     interval_low: r.interval_low,
     interval_high: r.interval_high,
@@ -195,6 +238,7 @@ export function buildDeck(input: { entry: DeckEntry; chain?: ChainStep[]; chainT
       lines: [
         `Lift ${formatSignedPoints(result.lift)}, with a ${level} interval from ${formatSignedPoints(result.interval_low)} to ${formatSignedPoints(result.interval_high)}.`,
         `p value ${result.p_value.toFixed(4)}.`,
+        ...(result.revenue ? [revenueLine(result.revenue)] : []),
         `${verdict.label}. ${verdict.text}`,
       ],
     });

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { guessColumn } from "@/lib/app/columns";
+import { localZone, zones } from "@/lib/app/zones";
+import { describeTimeCounts } from "@/lib/assignment/conversion-time";
 import { formatCount, formatPercent, formatPoints, formatSignedPoints } from "@/lib/app/format";
 import { explainReadout } from "@/lib/app/explain";
 import { Explain } from "../../explain";
@@ -10,14 +12,16 @@ import { downloadText } from "@/lib/app/download";
 import { correctionFor, correctionLine, correctionShort } from "@/lib/ledger/correction";
 import { verifyBrowserResults } from "@/lib/duckdb/client";
 import type { Verification } from "@/lib/assignment/assign";
-import { resultRecord } from "@/lib/assignment/record";
+import { resultRecord, revenueRecord } from "@/lib/assignment/record";
 import { demoResultRows, demoResultsCsv, seedFromId } from "@/lib/demo/synthetic";
 import type { Ledger, LedgerEntry, ResultVersion } from "@/lib/ledger/ledger";
-import { ReadoutLockedError, assertReadoutOpen } from "@/lib/ledger/window";
+import { ReadoutLockedError, assertReadoutOpen, conversionWindowHours } from "@/lib/ledger/window";
 import type { ExperimentReadout } from "@/lib/stats/experiment";
+import type { RevenueReadout } from "@/lib/stats/revenue";
+import { RevenuePanel } from "./revenue-panel";
 import { useCsvColumns } from "./use-csv-columns";
 
-type Outcome = { verification: Verification; readout: ExperimentReadout; ragged: { few: number; many: number } };
+type Outcome = { verification: Verification; readout: ExperimentReadout; revenue: RevenueReadout | null; ragged: { few: number; many: number } };
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -51,7 +55,9 @@ export function ResultsSection({
   onChange: () => Promise<void>;
 }) {
   const csv = useCsvColumns();
-  const [chosen, setChosen] = useState<Partial<Record<"email" | "group" | "converted" | "received", number>>>({});
+  const [chosen, setChosen] = useState<Partial<Record<"email" | "group" | "converted" | "received" | "revenue" | "convertedAt", number>>>({});
+  const zoneList = useMemo(() => zones(), []);
+  const [zone, setZone] = useState(() => localZone(zoneList));
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -97,10 +103,19 @@ export function ResultsSection({
     converted: chosen.converted ?? (names ? guessColumn(names, /convert/i) : -1),
     // Optional. A column that says whether each person received the email, to show delivery next to the readout.
     received: chosen.received ?? (names ? guessColumn(names, /receiv|deliver/i) : -1),
+    // Optional, and never guessed: a revenue column is only used when the person picks one.
+    revenue: chosen.revenue ?? -1,
+    // Optional, and never guessed either: times are only read when the person picks the column.
+    convertedAt: chosen.convertedAt ?? -1,
   };
 
   const required = [cols.email, cols.group, cols.converted];
-  const picked = cols.received >= 0 ? [...required, cols.received] : required;
+  const picked = [
+    ...required,
+    ...(cols.received >= 0 ? [cols.received] : []),
+    ...(cols.revenue >= 0 ? [cols.revenue] : []),
+    ...(cols.convertedAt >= 0 ? [cols.convertedAt] : []),
+  ];
   const ready = required.every((c) => c >= 0) && new Set(picked).size === picked.length;
 
   async function onVerify() {
@@ -109,11 +124,29 @@ export function ResultsSection({
     setError(null);
     setOutcome(null);
     try {
-      const { rows, skipped } = await csv.read(cols.received >= 0 ? [...required, cols.received] : required);
+      const { rows, skipped } = await csv.read(picked);
+      // The optional columns follow the three required ones, in the order picked.
+      const at = {
+        received: cols.received >= 0 ? picked.indexOf(cols.received) : -1,
+        revenue: cols.revenue >= 0 ? picked.indexOf(cols.revenue) : -1,
+        convertedAt: cols.convertedAt >= 0 ? picked.indexOf(cols.convertedAt) : -1,
+      };
+      // The time rules need the launch instant and the window. Without them the column is not used.
+      const windowHours = conversionWindowHours(entry.design);
+      const time = at.convertedAt >= 0 && entry.launchedAt && windowHours !== null ? { launchedAt: entry.launchedAt, windowHours, timeZone: zone } : undefined;
       const result = await verifyBrowserResults({
         entryId: entry.id,
-        rows: rows.map(([email, group, converted, received]) => ({ email, group, converted, received })),
+        rows: rows.map((r) => ({
+          email: r[0],
+          group: r[1],
+          converted: r[2],
+          received: at.received >= 0 ? r[at.received] : undefined,
+          // A revenue key, even a blank one, says the file has a revenue column.
+          ...(at.revenue >= 0 ? { revenue: r[at.revenue] } : {}),
+          ...(at.convertedAt >= 0 ? { convertedAt: r[at.convertedAt] } : {}),
+        })),
         treatmentShare: share,
+        time,
       });
       setOutcome({ ...result, ragged: { few: skipped.tooFewFields, many: skipped.tooManyFields } });
       await csv.release();
@@ -133,7 +166,10 @@ export function ResultsSection({
         entry.id,
         {
           // Aggregates only. No email, no hash and no row level data.
-          result: resultRecord(outcome.readout, outcome.verification, ledger.now().toISOString()),
+          result: {
+            ...resultRecord(outcome.readout, outcome.verification, ledger.now().toISOString()),
+            ...(revenueRecord(outcome.revenue) ? { revenue: revenueRecord(outcome.revenue) } : {}),
+          },
           comparisonsCount: COMPARISONS_ON_THIS_SCREEN,
           correctionMethod: correctionFor(entry.entryType, COMPARISONS_ON_THIS_SCREEN),
           // The first result needs no reason. Any later one is a new version and must say why.
@@ -288,6 +324,57 @@ export function ResultsSection({
                 It is used only to show how far delivery matches the assignment.
               </p>
               <p>
+                <label>
+                  Revenue column, optional{" "}
+                  <select value={cols.revenue} onChange={(e) => setChosen({ ...chosen, revenue: Number(e.target.value) })}>
+                    <option value={-1}>No revenue column</option>
+                    {csv.headers.map((h) => (
+                      <option key={h.index} value={h.index}>
+                        {h.name || `Column ${h.index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </p>
+              <p>
+                A revenue column holds what each person spent in the window, as a plain number such as 40.50, with no currency
+                sign or thousands separator. Leave it blank for people who did not buy. Revenue per recipient is shown only if
+                everyone marked as converted has a value, and it is never worked out as lift times one order value.
+              </p>
+              <p>
+                <label>
+                  Converted at column, optional{" "}
+                  <select value={cols.convertedAt} onChange={(e) => setChosen({ ...chosen, convertedAt: Number(e.target.value) })}>
+                    <option value={-1}>No converted at column</option>
+                    {csv.headers.map((h) => (
+                      <option key={h.index} value={h.index}>
+                        {h.name || `Column ${h.index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </p>
+              {cols.convertedAt >= 0 && (
+                <p>
+                  <label>
+                    Time zone for times with no zone{" "}
+                    <select value={zone} onChange={(e) => setZone(e.target.value)}>
+                      {zoneList.map((z) => (
+                        <option key={z} value={z}>
+                          {z}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </p>
+              )}
+              <p>
+                A converted at column holds when each person converted, such as 2026-03-02 10:15 or 2026-03-02T10:15:00Z. A time
+                with no zone is read in the zone above. Someone who converted before launch is left out. Someone who converted after the
+                window closed counts as not converted in the window. A time that never happened, or happened twice, because the clocks
+                changed is left out, never guessed. Each of these is counted below the readout.
+              </p>
+              <p>
                 A blank converted value means that person&apos;s conversion window is still open. They are excluded and
                 counted.
               </p>
@@ -315,6 +402,7 @@ export function ResultsSection({
               <tr><th scope="row">Rows skipped for field count</th><td>{outcome.ragged.few + outcome.ragged.many}</td></tr>
             </tbody>
           </table>
+          {v.time && describeTimeCounts(v.time).map((t) => <p key={t}>{t}</p>)}
           <p>
             Sample ratio check: {r.srm.pass ? "passed" : "failed"}, p {r.srm.pValue.toPrecision(3)}. Method:{" "}
             {r.srm.method}
@@ -346,6 +434,7 @@ export function ResultsSection({
               <p>{verdict.label}</p>
               <p>{verdict.text}</p>
               {r.delivery && <p>Delivery: {r.delivery.note}</p>}
+              {outcome.revenue && <RevenuePanel revenue={outcome.revenue} />}
               <p>Method: {r.readout.method}</p>
               <p>{correctionLine(correctionFor(entry.entryType, COMPARISONS_ON_THIS_SCREEN), COMPARISONS_ON_THIS_SCREEN)}</p>
               <p>
@@ -400,18 +489,25 @@ export function ResultsSection({
                 <th>Recorded at</th>
                 <th>Reason</th>
                 <th>Lift</th>
+                <th>Revenue per recipient</th>
                 <th>Correction</th>
               </tr>
             </thead>
             <tbody>
               {versions.map((v) => {
                 const lift = (v.result as { lift?: unknown } | null)?.lift;
+                const revenue = (v.result as { revenue?: { difference?: unknown } } | null)?.revenue?.difference;
                 return (
                   <tr key={v.id}>
                     <td>{v.version}</td>
                     <td>{v.recordedAt}</td>
                     <td>{v.reason}</td>
                     <td>{typeof lift === "number" ? formatSignedPoints(lift) : "not available"}</td>
+                    <td>
+                      {typeof revenue === "number"
+                        ? `${revenue < 0 ? "-" : "+"}$${Math.abs(revenue).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : "not recorded"}
+                    </td>
                     <td>{correctionShort(v.correctionMethod, v.comparisonsCount)}</td>
                   </tr>
                 );

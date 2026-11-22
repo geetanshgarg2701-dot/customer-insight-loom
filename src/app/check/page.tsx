@@ -3,29 +3,13 @@
 import { useMemo, useState } from "react";
 import { matchIdentities, maskEmail } from "@/lib/identity/identity";
 import { checkTimes, columnOf, parseCsv } from "@/lib/app/datacheck";
+import { localZone, zones } from "@/lib/app/zones";
 import type { Explanation } from "@/lib/app/explain";
 import { Explain } from "../explain";
 
 type Source = { name: string; rows: string[][] };
 
 const SHOWN = 8;
-
-function zones(): string[] {
-  try {
-    return Intl.supportedValuesOf("timeZone");
-  } catch {
-    return ["UTC"];
-  }
-}
-
-function localZone(list: string[]): string {
-  try {
-    const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return list.includes(z) ? z : "UTC";
-  } catch {
-    return "UTC";
-  }
-}
 
 async function readSource(file: File | undefined): Promise<Source | null> {
   if (!file) return null;

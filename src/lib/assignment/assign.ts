@@ -9,7 +9,10 @@
  */
 import type { SqlEngine, SqlParam } from "../intake/types";
 import { insertRows, type Arm, type Ledger } from "../ledger/ledger";
+import { toPlainRow } from "../duckdb/normalize";
+import { checkConversionTime, emptyTimeCounts, type TimeContext, type TimeCounts } from "./conversion-time";
 import { experimentReadout, type ExperimentReadout } from "../stats/experiment";
+import { revenueReadout, type RevenueReadout } from "../stats/revenue";
 import { csvCell } from "../app/csv";
 import { bucketOf, customerHash, looksLikeEmail, normalizeEmail, unprotect } from "./hash";
 
@@ -104,6 +107,18 @@ function parseConverted(raw: string | null): boolean | null | "invalid" {
   return "invalid";
 }
 
+/**
+ * Revenue is a plain number: digits with an optional decimal part. A currency sign, a thousands separator, an exponent and a
+ * negative are not guessed at. Blank means not reported.
+ */
+function parseRevenue(raw: string | null | undefined): number | null | "invalid" {
+  const v = (raw ?? "").trim();
+  if (v === "") return null;
+  if (!/^\d+(\.\d+)?$/.test(v)) return "invalid";
+  const n = Number(v);
+  return Number.isFinite(n) ? n : "invalid";
+}
+
 export type Verification = {
   rows: number;
   matched: number;
@@ -116,6 +131,8 @@ export type Verification = {
   invalid: number;
   /** Assigned people with no row in the upload. */
   missing: number;
+  /** What the time rules did. Absent when the file has no time column or no launch details were given. */
+  time?: TimeCounts;
 };
 
 const RESULTS_TABLE = "experiment_results";
@@ -124,23 +141,38 @@ export async function verifyResults(input: {
   engine: SqlEngine;
   ledger: Ledger;
   entryId: string;
-  rows: readonly { email: string | null; group: string | null; converted: string | null; received?: string | null }[];
+  /** A revenue key on the rows, even a blank one, says the file has a revenue column. Without the key there is no revenue result. */
+  rows: readonly {
+    email: string | null;
+    group: string | null;
+    converted: string | null;
+    received?: string | null;
+    revenue?: string | null;
+    /** When the person converted. A key on the rows, even a blank one, says the file has a time column. */
+    convertedAt?: string | null;
+  }[];
   treatmentShare: number;
   alpha?: number;
-}): Promise<{ verification: Verification; readout: ExperimentReadout }> {
+  /** Launch, window and zone. With a time column, the time rules run against these. */
+  time?: TimeContext;
+}): Promise<{ verification: Verification; readout: ExperimentReadout; revenue: RevenueReadout | null }> {
   const { engine, ledger, entryId } = input;
   const secret = await ledger.workspaceSecret();
   const stored = new Map((await ledger.listAssignments(entryId)).map((a) => [a.customerEmailHash, a.arm]));
 
   let invalid = 0;
-  const parsed: { hash: string; group: Arm; converted: boolean | null; received: boolean | null }[] = [];
+  const hasRevenue = input.rows.some((r) => r.revenue !== undefined);
+  let invalidRevenue = 0;
+  const timeCounts = input.time && input.rows.some((r) => r.convertedAt !== undefined) ? emptyTimeCounts(input.time.timeZone) : null;
+  const parsed: { hash: string; group: Arm; converted: boolean | null; received: boolean | null; revenue: number | null; convertedAt: string | null }[] = [];
   const touched = new Set<string>();
   for (let i = 0; i < input.rows.length; i += HASH_BATCH) {
     const batch = input.rows.slice(i, i + HASH_BATCH).map((r) => {
       const email = normalizeEmail(unprotect(r.email ?? ""));
       const received = parseConverted(r.received ?? null);
       // A received value that cannot be read counts as not reported. It does not invalidate the row.
-      return { email, group: parseGroup(r.group), converted: parseConverted(r.converted), received: received === "invalid" ? null : received };
+      const revenue = parseRevenue(r.revenue);
+      return { email, group: parseGroup(r.group), converted: parseConverted(r.converted), received: received === "invalid" ? null : received, revenue, convertedAt: r.convertedAt ?? null };
     });
     const hashes = await Promise.all(
       batch.map((b) => (looksLikeEmail(b.email) ? customerHash(secret, b.email) : Promise.resolve(null))),
@@ -152,7 +184,8 @@ export async function verifyResults(input: {
         invalid++;
         return;
       }
-      parsed.push({ hash, group: b.group, converted: b.converted, received: b.received });
+      parsed.push({ hash, group: b.group, converted: b.converted, received: b.received, revenue: b.revenue === "invalid" ? null : b.revenue, convertedAt: b.convertedAt });
+      if (b.revenue === "invalid") invalidRevenue++;
     });
   }
 
@@ -171,20 +204,46 @@ export async function verifyResults(input: {
     const arm = stored.get(hash);
     if (arm === undefined) unknown++;
     else if (arm !== list[0].group) groupMismatch++;
-    else matched.push([arm, list[0].converted, list[0].received]);
+    else {
+      const row = list[0];
+      let converted = row.converted;
+      let revenue = row.revenue;
+      // The time rules apply only to someone who converted, and only once the row has passed the other checks.
+      if (timeCounts && input.time && converted === true) {
+        const verdict = checkConversionTime(row.convertedAt, input.time);
+        if (verdict === "in_window") timeCounts.inWindow++;
+        else if (verdict === "none") timeCounts.noTime++;
+        else if (verdict === "after_window") {
+          // They converted, but not in the window. They stay in the count as not converted, and their revenue goes with it.
+          timeCounts.afterWindow++;
+          converted = false;
+          revenue = null;
+        } else {
+          if (verdict === "before_launch") timeCounts.beforeLaunch++;
+          else if (verdict === "impossible") timeCounts.impossible++;
+          else if (verdict === "ambiguous") timeCounts.ambiguous++;
+          else timeCounts.unreadable++;
+          continue;
+        }
+      }
+      matched.push([arm, converted, row.received, revenue]);
+    }
   }
   let missing = 0;
   for (const hash of stored.keys()) if (!touched.has(hash)) missing++;
 
   // The table holds group and outcome only. No identity reaches it.
-  await engine.exec(`CREATE OR REPLACE TABLE ${RESULTS_TABLE} (arm VARCHAR NOT NULL, converted BOOLEAN, received BOOLEAN)`);
-  await insertRows(engine, RESULTS_TABLE, ["arm", "converted", "received"], matched);
+  await engine.exec(`CREATE OR REPLACE TABLE ${RESULTS_TABLE} (arm VARCHAR NOT NULL, converted BOOLEAN, received BOOLEAN, revenue DOUBLE)`);
+  await insertRows(engine, RESULTS_TABLE, ["arm", "converted", "received", "revenue"], matched);
   const readout = await experimentReadout(engine, RESULTS_TABLE, {
     treatmentShare: input.treatmentShare,
     alpha: input.alpha,
   });
 
+  const revenue = hasRevenue ? await revenueResult(engine, input.alpha, invalidRevenue) : null;
+
   return {
+    revenue,
     verification: {
       rows: input.rows.length,
       matched: matched.length,
@@ -193,7 +252,38 @@ export async function verifyResults(input: {
       duplicate,
       invalid,
       missing,
+      ...(timeCounts ? { time: timeCounts } : {}),
     },
     readout,
   };
+}
+
+/**
+ * Revenue per recipient for the people whose window has closed, from the results table. A person who did not convert counts
+ * as zero revenue. The variance is the database's own sample variance.
+ */
+async function revenueResult(engine: SqlEngine, alpha: number | undefined, invalidValues: number): Promise<RevenueReadout> {
+  const rows = (
+    await engine.all(
+      `SELECT arm, ` +
+        `count(*) FILTER (WHERE converted IS NOT NULL) AS n, ` +
+        `coalesce(sum(CASE WHEN converted THEN revenue ELSE 0 END) FILTER (WHERE converted IS NOT NULL), 0) AS total, ` +
+        `coalesce(var_samp(CASE WHEN converted THEN coalesce(revenue, 0) ELSE 0 END) FILTER (WHERE converted IS NOT NULL), 0) AS spread, ` +
+        `count(*) FILTER (WHERE converted) AS purchasers, ` +
+        `count(*) FILTER (WHERE converted AND revenue IS NULL) AS unreported, ` +
+        `count(*) FILTER (WHERE converted = false AND revenue IS NOT NULL) AS ignored ` +
+        `FROM ${RESULTS_TABLE} GROUP BY arm`,
+    )
+  ).map(toPlainRow);
+  const empty = () => ({ n: 0, sum: 0, variance: 0, purchasers: 0 });
+  const arms = { treatment: empty(), control: empty() };
+  let unreported = 0;
+  let ignored = 0;
+  for (const r of rows) {
+    if (r.arm !== "treatment" && r.arm !== "control") continue;
+    arms[r.arm] = { n: Number(r.n), sum: Number(r.total), variance: Number(r.spread), purchasers: Number(r.purchasers) };
+    unreported += Number(r.unreported);
+    ignored += Number(r.ignored);
+  }
+  return revenueReadout({ ...arms, unreportedConverters: unreported, invalidValues, ignoredOnNonConverters: ignored, alpha });
 }
