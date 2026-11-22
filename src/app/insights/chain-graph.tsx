@@ -21,7 +21,7 @@ function LinkNode({ data }: NodeProps<Node<Data>>) {
         minHeight: CHAIN_NODE.height,
         boxSizing: "border-box",
         padding: "8px 10px",
-        background: "#fffdf8",
+        background: CHART_THEME.fill,
         color: CHART_THEME.text,
         border: `${data.missing ? "1px dashed" : "2px solid"} ${data.missing ? CHART_THEME.line : CHART_THEME.palette[0]}`,
         fontFamily: CHART_THEME.fontFamily,

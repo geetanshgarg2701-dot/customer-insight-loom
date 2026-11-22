@@ -10,6 +10,8 @@ export type ChartTheme = {
   text: string;
   /** The colour of axis lines and grid lines. */
   line: string;
+  /** The fill of a node or a box drawn on a chart. */
+  fill: string;
   fontFamily: string;
   fontSize: number;
 };
@@ -19,19 +21,20 @@ export type ChartTheme = {
  * and the group name is always printed next to its color, so color is never the only signal.
  */
 export const GROUP_COLOR: Record<string, string> = {
-  new: "#2f4a8a",
-  returning: "#1f7a72",
-  vip: "#b7791f",
-  ads: "#b7791f",
-  email: "#1f7a72",
-  organic: "#a8243b",
+  new: "#7aa7ff",
+  returning: "#5fd3a8",
+  vip: "#f2c14e",
+  ads: "#f2c14e",
+  email: "#5fd3a8",
+  organic: "#ff8a9a",
 };
 
 export const CHART_THEME: ChartTheme = {
-  // Indigo, teal, ochre and madder. Each is at least 3 to 1 against white, the floor for chart marks, WCAG 1.4.11.
-  palette: ["#2f4a8a", "#1f7a72", "#b7791f", "#a8243b"],
-  text: "#18203a",
-  line: "#d6dbe6",
+  // Mint, blue, gold and coral. Each is at least 3 to 1 against the near black cards, the floor for chart marks, WCAG 1.4.11.
+  palette: ["#5fd3a8", "#7aa7ff", "#f2c14e", "#ff8a9a"],
+  text: "#e8efec",
+  line: "#2c3833",
+  fill: "#0d1311",
   fontFamily: "system-ui, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
   fontSize: 13,
 };

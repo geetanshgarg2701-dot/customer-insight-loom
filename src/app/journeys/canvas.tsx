@@ -37,7 +37,7 @@ function StepNode({ data }: NodeProps<Node<StepData>>) {
       style={{
         width: 160,
         padding: "8px 10px",
-        background: "#fffdf8",
+        background: CHART_THEME.fill,
         color: CHART_THEME.text,
         border: `${data.kind === "branch" ? "1px dashed" : "2px solid"} ${data.kind === "branch" ? CHART_THEME.palette[1] : CHART_THEME.palette[0]}`,
         fontFamily: CHART_THEME.fontFamily,
@@ -75,7 +75,7 @@ function RuleNode({ data }: NodeProps<Node<RuleData>>) {
       style={{
         width: 200,
         padding: "8px 10px",
-        background: "#fffdf8",
+        background: CHART_THEME.fill,
         color: CHART_THEME.text,
         border: `1px dashed ${CHART_THEME.palette[2]}`,
         fontFamily: CHART_THEME.fontFamily,
@@ -252,6 +252,9 @@ export function JourneyCanvas({
       label: `${n(c)}`,
       style: { stroke: CHART_THEME.palette[0], strokeWidth: 1 + (6 * c) / maxCount },
       labelStyle: { fill: CHART_THEME.text, fontFamily: CHART_THEME.fontFamily, fontSize: 12 },
+      labelBgStyle: { fill: CHART_THEME.fill, stroke: CHART_THEME.line },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 4,
       markerEnd: { type: MarkerType.ArrowClosed, color: CHART_THEME.palette[0] },
     };
   }), [counts, maxCount]);
@@ -267,6 +270,9 @@ export function JourneyCanvas({
     label: s.loop ? "loop, sketch" : "sketch",
     style: { stroke: s.loop ? CHART_THEME.palette[3] : CHART_THEME.palette[2], strokeDasharray: "6 4", strokeWidth: 2 },
     labelStyle: { fill: CHART_THEME.text, fontFamily: CHART_THEME.fontFamily, fontSize: 12 },
+      labelBgStyle: { fill: CHART_THEME.fill, stroke: CHART_THEME.line },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 4,
     markerEnd: { type: MarkerType.ArrowClosed, color: s.loop ? CHART_THEME.palette[3] : CHART_THEME.palette[2] },
   }));
 
@@ -317,7 +323,7 @@ export function JourneyCanvas({
   return (
     <div>
       <div
-        style={{ height: 560, border: `1px solid ${CHART_THEME.line}`, background: "#ffffff" }}
+        style={{ height: 560, border: `1px solid ${CHART_THEME.line}`, background: CHART_THEME.fill }}
         onKeyDown={(e) => {
           // React Flow selects a focused node on Enter or Space but sends no click, so a keyboard user would never open it.
           if (e.key !== "Enter" && e.key !== " ") return;

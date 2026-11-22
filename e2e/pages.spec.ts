@@ -28,7 +28,7 @@ test("an unknown address gets a real 404 page in the same style, with a way home
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Go to the home page" })).toBeVisible();
-  expect(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(238, 241, 246)");
+  expect(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(3, 3, 3)");
 });
 
 test("the site has its own icon, not the starter template's", async ({ page, request, baseURL }) => {
@@ -38,5 +38,5 @@ test("the site has its own icon, not the starter template's", async ({ page, req
   const response = await request.get(new URL(href!, baseURL!).toString());
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toMatch(/svg/);
-  expect(await response.text()).toContain("#a8243b");
+  expect(await response.text()).toContain("#267a5b");
 });

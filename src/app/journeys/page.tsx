@@ -192,7 +192,7 @@ function timingOption(t: Timing, theme: ChartTheme): ChartOption {
     series: [
       {
         type: "boxplot",
-        itemStyle: { color: "#efe6d6", borderColor: theme.palette[0] },
+        itemStyle: { color: theme.fill, borderColor: theme.palette[0] },
         data: shown.map((s) => [s.p10Hours!, s.p25Hours!, s.medianHours!, s.p75Hours!, s.p90Hours!]),
       },
     ],

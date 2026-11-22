@@ -1,37 +1,40 @@
 @import "tailwindcss";
 
 /*
- * The app look, chosen by the owner on 2026-11-21 to replace the first quiet editorial style: an app with a sidebar.
- * An indigo sidebar with a faint warp thread texture, a cool canvas, white cards, and one madder red accent. System
- * fonts only, so no font file is downloaded. Contrast was worked out from the colours: text on white 15.6 to 1, muted on
- * white 6.3 and on the canvas 5.5, accent on white 7.0 and white on accent 7.0, sidebar text on indigo 9.9, sidebar
- * group names 5.7, accent on its tint 5.8. Every rule below uses these tokens, so the look changes in one place.
+ * The app look, chosen by the owner on 2026-11-21 from a reference they showed: near black, soft green beams of light from the
+ * top, glass cards, pill buttons and one bright green card. The greens were sampled from the reference image. System fonts only,
+ * so no font file is downloaded. Contrast was worked out from the colours: text on the card #f1f5f3 on #0b0e0d is 17 to 1, muted
+ * #a3aba7 on the card 8 to 1, link mint #7fdcbc on the card 11 to 1, text on the green buttons #e2f2ea on #0e3426 11 to 1, and
+ * mint on its pressed tint #11432e 7 to 1. Every rule below uses these tokens, so the look changes in one place.
  */
 :root {
-  --canvas: #eef1f6;
-  --surface: #ffffff;
-  --sunken: #f5f7fa;
-  --text: #18203a;
-  --muted: #586079;
-  --line: #d6dbe6;
-  --accent: #a8243b;
-  --accent-tint: #f8e4e8;
-  --accent-text: #ffffff;
-  --indigo: #20294a;
-  --indigo-text: #d4d9e8;
-  --indigo-muted: #9aa3c0;
-  --gold: #d9a441;
-  --danger: #8f1d1d;
+  --canvas: #030303;
+  --surface: #0b0e0d;
+  --sunken: #111715;
+  --text: #f1f5f3;
+  --muted: #a3aba7;
+  --line: #26312c;
+  --accent: #7fdcbc;
+  --accent-fill: #0e3426;
+  --accent-ring: #2f8f6c;
+  --accent-tint: #11432e;
+  --accent-text: #e2f2ea;
+  --beam: rgba(30, 150, 108, 0.55);
+  --indigo: #050807;
+  --indigo-text: #cfd8d4;
+  --indigo-muted: #98a39e;
+  --gold: #96d9c4;
+  --danger: #ff9a9a;
   --font: system-ui, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
   --size: 16px;
   --gap: 1.1rem;
-  --radius: 10px;
+  --radius: 14px;
 }
 
 html {
   background: var(--canvas);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
@@ -42,6 +45,8 @@ body {
   line-height: 1.55;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 64px 64px;
 }
 
 /* The shell: the sidebar and the content beside it on a laptop, one above the other on a phone. */
@@ -49,6 +54,8 @@ body {
   min-height: 100vh;
 }
 .content {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -56,6 +63,33 @@ body {
 }
 .content:focus {
   outline: none;
+}
+/* Three soft beams of light from the top of every page. They sit behind the content and take no clicks. */
+.content::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 22rem;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(34px);
+  background:
+    radial-gradient(ellipse 9rem 20rem at 18% -1rem, var(--beam), transparent 70%),
+    radial-gradient(ellipse 9rem 22rem at 50% -1.5rem, var(--beam), transparent 70%),
+    radial-gradient(ellipse 9rem 20rem at 82% -1rem, var(--beam), transparent 70%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .content::before {
+    animation: beams-in 0.9s ease-out both;
+  }
+}
+@keyframes beams-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @media (min-width: 900px) {
   .shell {
@@ -78,10 +112,10 @@ body {
   left: 0.5rem;
 }
 
-/* The sidebar. The faint vertical lines are the warp threads of a loom, the one decoration in the app. */
+/* The sidebar: near black with a hairline edge. */
 nav.sidebar {
   background-color: var(--indigo);
-  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 7px);
+  border-right: 1px solid var(--line);
   color: var(--indigo-text);
   padding: 1rem 0.75rem;
 }
@@ -122,7 +156,7 @@ nav.sidebar ul a {
   align-items: center;
   gap: 0.65rem;
   padding: 0.45rem 0.6rem;
-  border-radius: 8px;
+  border-radius: 10px;
   border-left: 3px solid transparent;
 }
 nav.sidebar ul a:hover {
@@ -193,7 +227,7 @@ main {
 }
 
 h1 {
-  font-size: 1.85rem;
+  font-size: 2.1rem;
   line-height: 1.15;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -252,7 +286,7 @@ li {
 
 /* Sections are the cards. A section inside a section is a part of the card, set off by a rule, not a card in a card. */
 section {
-  background: var(--surface);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)), var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 1.25rem 1.4rem;
@@ -275,23 +309,24 @@ button {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.38em 0.95em;
+  border-radius: 999px;
+  padding: 0.42em 1.1em;
   margin: 0 0.5em 0.5em 0;
   cursor: pointer;
 }
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--accent-ring);
   color: var(--accent);
 }
 /* The main action of a form. */
 button[type="submit"] {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-ring);
   color: var(--accent-text);
+  box-shadow: 0 0 22px -8px rgba(38, 122, 91, 0.8);
 }
 button[type="submit"]:hover:not(:disabled) {
-  background: #8e1d31;
+  background: #134a36;
   color: var(--accent-text);
 }
 button:disabled {
@@ -319,7 +354,7 @@ textarea {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.3em 0.55em;
   max-width: 100%;
 }
@@ -421,7 +456,7 @@ legend {
 }
 [role="alert"] {
   color: var(--danger);
-  background: #fbeaea;
+  background: #2a1214;
   border-left: 3px solid var(--danger);
   border-radius: 0 8px 8px 0;
   padding: 0.5rem 0.75rem;
@@ -495,10 +530,10 @@ dialog.tour {
   width: min(34rem, calc(100vw - 2rem));
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 16px 40px rgba(24, 32, 58, 0.3);
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.7);
 }
 dialog.tour::backdrop {
-  background: rgba(24, 32, 58, 0.55);
+  background: rgba(0, 0, 0, 0.72);
 }
 dialog.tour h2 {
   font-size: 1.3rem;
@@ -519,7 +554,7 @@ dialog.tour h2 {
 .tour-bar > span {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--accent-ring);
 }
 .tour-actions {
   display: flex;
@@ -538,14 +573,21 @@ a.button-link {
   display: inline-block;
   font-weight: 550;
   color: var(--accent-text);
-  background: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  padding: 0.38em 0.95em;
+  background: var(--accent-fill);
+  border: 1px solid var(--accent-ring);
+  border-radius: 999px;
+  padding: 0.42em 1.1em;
   text-decoration: none;
+  box-shadow: 0 0 22px -8px rgba(38, 122, 91, 0.8);
 }
 a.button-link:hover {
-  background: #8e1d31;
+  background: #134a36;
+}
+a.button-link.plain {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text);
+  box-shadow: none;
 }
 
 /* The warning before the retention timer deletes the tab's data. It sits above everything at the bottom of the screen. */
@@ -560,7 +602,7 @@ a.button-link:hover {
   background: var(--surface);
   border: 2px solid var(--danger);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(24, 32, 58, 0.25);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
   padding: 0.9rem 1.1rem 0.5rem;
 }
 .retention-warning p {
@@ -577,7 +619,7 @@ dl.tiles {
 dl.tiles > div {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-top: 3px solid var(--indigo);
+  border-top: 3px solid var(--accent-ring);
   border-radius: var(--radius);
   padding: 0.8rem 1rem;
 }
@@ -595,10 +637,81 @@ dl.tiles dd {
   line-height: 1.2;
 }
 
-/* The home screen: the screens grouped as they are in the sidebar, one card per group. */
+/* The home screen: a hero with the headline, then the screens grouped as they are in the sidebar, one card per group. */
+.hero {
+  text-align: center;
+  padding: 2.2rem 0 1.4rem;
+}
+.hero .badge {
+  display: inline-block;
+  font-size: 0.85rem;
+  padding: 0.28rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent-ring);
+  background: var(--accent-tint);
+  color: var(--accent-text);
+  margin: 0 0 1.1rem;
+}
+.hero h1 {
+  font-size: clamp(2.1rem, 5.4vw, 3.4rem);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin: 0 auto 0.9rem;
+  max-width: 24ch;
+  background: linear-gradient(90deg, #6cc7a8 0%, #d1f0e8 45%, #ffffff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero .home-lead {
+  margin: 0 auto 1.4rem;
+}
+.hero .cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero > * {
+    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .hero > :nth-child(2) {
+    animation-delay: 0.1s;
+  }
+  .hero > :nth-child(3) {
+    animation-delay: 0.2s;
+  }
+  .hero > :nth-child(4) {
+    animation-delay: 0.32s;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .home-lead {
   font-size: 1.1rem;
   max-width: 60ch;
+}
+/* The first group is the bright card, as in the reference: black at the top fading to green. */
+.home-groups > section:first-child {
+  background: linear-gradient(180deg, #040606 0%, #15271f 55%, #1b5a43 100%);
+  box-shadow: 0 20px 60px -28px var(--beam);
+}
+.home-groups > section:first-child li p,
+.home-groups > section:first-child > p {
+  color: #dbe6e1;
+}
+.home-groups > section:first-child li {
+  border-top-color: rgba(255, 255, 255, 0.22);
 }
 .home-groups {
   display: grid;

@@ -41,11 +41,22 @@ const GROUPS: { id: string; title: string; intro: string; screens: Screen[] }[] 
 export default function Home() {
   return (
     <main>
-      <h1>Customer Insight Loom</h1>
-      <p className="home-lead">
-        Customer journeys, pipelines and email experiments in one picture, with the evidence kept and the uncertainty
-        shown. When a result is too small to tell, it says so plainly.
-      </p>
+      <div className="hero">
+        <span className="badge">Your files stay in your browser</span>
+        <h1>Customer Insight Loom</h1>
+        <p className="home-lead">
+          Customer journeys, pipelines and email experiments in one picture, with the evidence kept and the uncertainty
+          shown. When a result is too small to tell, it says so plainly.
+        </p>
+        <div className="cta">
+          <Link className="button-link" href="/ledger">
+            Start with the experiment ledger
+          </Link>
+          <Link className="button-link plain" href="/journeys">
+            Explore customer journeys
+          </Link>
+        </div>
+      </div>
 
       <GuidedTour />
 
