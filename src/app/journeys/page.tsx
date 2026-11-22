@@ -22,6 +22,7 @@ import { decodeJourneyView, encodeJourneyView, type JourneyView } from "@/lib/ap
 import { explainWhy, explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { Chart } from "./chart";
+import { LoadingSkeleton } from "../skeleton";
 import { JourneyCanvas, type DesignedRules } from "./canvas";
 import { CHART_THEME, GROUP_COLOR, type ChartTheme } from "./theme";
 
@@ -615,12 +616,14 @@ export default function JourneysPage() {
       </p>
 
       {!loaded && (
-        <p>
-          <button type="button" disabled={busy} onClick={() => void onLoad()}>
-            Load synthetic journeys
-          </button>{" "}
-          {busy && "Loading 100,000 synthetic customers"}
-        </p>
+        <>
+          <p>
+            <button type="button" disabled={busy} onClick={() => void onLoad()}>
+              Load synthetic journeys
+            </button>
+          </p>
+          {busy && <LoadingSkeleton text="Loading 100,000 synthetic customers" />}
+        </>
       )}
       {error && <p role="alert">{error}</p>}
       {fromLink !== null && (
@@ -631,7 +634,7 @@ export default function JourneysPage() {
       )}
 
       {loaded && (
-        <>
+        <div className="fade-in">
           <p>
             Showing {shown.toLocaleString("en-US")} of {ROWS.toLocaleString("en-US")} customers.{" "}
             {elapsed !== null && <span>Updated in {elapsed} ms.</span>}{" "}
@@ -643,19 +646,19 @@ export default function JourneysPage() {
           <dl className="tiles" aria-label="The current selection at a glance">
             <div>
               <dt>Customers shown</dt>
-              <dd>{tiles.customers.toLocaleString("en-US")}</dd>
+              <dd key={tiles.customers} className="swap">{tiles.customers.toLocaleString("en-US")}</dd>
             </div>
             <div>
               <dt>Reached Purchase</dt>
-              <dd>{tiles.bought === null ? "none selected" : formatPercent(tiles.bought, 1)}</dd>
+              <dd key={String(tiles.bought)} className="swap">{tiles.bought === null ? "none selected" : formatPercent(tiles.bought, 1)}</dd>
             </div>
             <div>
               <dt>Used Search or Support</dt>
-              <dd>{tiles.detoured === null ? "none selected" : formatPercent(tiles.detoured, 1)}</dd>
+              <dd key={String(tiles.detoured)} className="swap">{tiles.detoured === null ? "none selected" : formatPercent(tiles.detoured, 1)}</dd>
             </div>
             <div>
               <dt>Most people stopped at</dt>
-              <dd>{tiles.topExit ? `${tiles.topExit.step}, ${tiles.topExit.count.toLocaleString("en-US")}` : "nobody stopped"}</dd>
+              <dd key={tiles.topExit ? `${tiles.topExit.step}${tiles.topExit.count}` : "none"} className="swap">{tiles.topExit ? `${tiles.topExit.step}, ${tiles.topExit.count.toLocaleString("en-US")}` : "nobody stopped"}</dd>
             </div>
           </dl>
 
@@ -1441,7 +1444,7 @@ export default function JourneysPage() {
               </>
             )}
           </section>
-        </>
+        </div>
       )}
     </main>
   );

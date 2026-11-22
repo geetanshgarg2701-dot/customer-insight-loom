@@ -1148,3 +1148,190 @@ ol.chain > li > p {
     display: block;
   }
 }
+
+/* The Reduce motion switch turns every animation and transition off for this tab, on top of the system setting. */
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+nav.topnav .motion-switch {
+  margin: 0;
+  font-size: 0.85rem;
+  padding: 0.3em 0.8em;
+  white-space: nowrap;
+}
+
+/* Loading: the shape of what is coming, a plain line, and a thin bar that slides. All soft, and still under reduced motion. */
+.skeleton {
+  margin: 0 0 1.25rem;
+}
+.sk {
+  display: block;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #0f1412 0%, #18211d 50%, #0f1412 100%);
+  background-size: 200% 100%;
+  border: 1px solid var(--line);
+}
+.sk-progress {
+  height: 4px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.4rem 0 1rem;
+  max-width: 24rem;
+}
+.sk-progress span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-ring);
+}
+.sk-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+.sk-tiles .sk {
+  height: 4.6rem;
+}
+.sk-chart {
+  height: 14rem;
+  margin-top: 1rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sk {
+    animation: sk-shimmer 2.4s ease-in-out infinite;
+  }
+  .sk-progress span {
+    animation: sk-slide 1.5s ease-in-out infinite;
+  }
+}
+@keyframes sk-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes sk-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+/* What has loaded fades in over the shape, and a number that changes slides in, so a change is seen. */
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in {
+    animation: fade-in 0.22s ease-out both;
+  }
+  .swap {
+    animation: swap-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The range picture: a number line with zero dashed, the interval as a bar that grows out from the lift, and the lift as a dot. */
+.range-plot {
+  --tone: #f2c14e;
+  margin: 1rem 0 1.25rem;
+  max-width: 40rem;
+}
+.range-plot[data-tone="above"] {
+  --tone: #5fd3a8;
+}
+.range-plot[data-tone="below"] {
+  --tone: #ff8a9a;
+}
+.range-stage {
+  position: relative;
+  height: 5.4rem;
+  margin: 0 1.4rem;
+}
+.range-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2.3rem;
+  height: 2px;
+  background: var(--line);
+}
+.range-zero {
+  position: absolute;
+  top: 0.5rem;
+  bottom: 1.6rem;
+  border-left: 2px dashed var(--muted);
+}
+.range-bar {
+  position: absolute;
+  top: calc(2.3rem - 7px);
+  height: 16px;
+  border-radius: 999px;
+  background: var(--tone);
+  opacity: 0.85;
+}
+.range-lift {
+  position: absolute;
+  top: calc(2.3rem - 10px);
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--tone);
+}
+.range-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3.6rem;
+}
+.range-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.range-plot figcaption {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 0.2rem;
+  max-width: 60ch;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .range-bar {
+    animation: range-grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .range-lift {
+    animation: range-pop 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.55s both;
+  }
+}
+@keyframes range-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes range-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}

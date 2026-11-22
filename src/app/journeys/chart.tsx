@@ -1,18 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef } from "react";
+import { useReducedMotion } from "@/lib/app/motion";
 import { loadEcharts, withMotion, type ChartOption } from "@/lib/charts/echarts";
 
 type Params = { name?: string; dataType?: string };
-
-const REDUCE_MOTION = "(prefers-reduced-motion: reduce)";
-
-/** Follows the system setting live, so changing it takes effect without a reload. */
-function subscribeMotion(callback: () => void): () => void {
-  const query = window.matchMedia(REDUCE_MOTION);
-  query.addEventListener("change", callback);
-  return () => query.removeEventListener("change", callback);
-}
 
 /**
  * One chart. It draws the option it is given and reports clicks. The data and the filtering live outside, so the
@@ -31,11 +23,8 @@ export function Chart({
 }) {
   const host = useRef<HTMLDivElement>(null);
   const instance = useRef<import("echarts/core").ECharts | null>(null);
-  const reduceMotion = useSyncExternalStore(
-    subscribeMotion,
-    () => window.matchMedia(REDUCE_MOTION).matches,
-    () => false,
-  );
+  // The system setting and the Reduce motion switch, followed live.
+  const reduceMotion = useReducedMotion();
   const latest = useRef({ option, onSelect, reduceMotion });
   // Kept current after each render, so the click handler set up once always calls the newest callback.
   useEffect(() => {

@@ -18,6 +18,7 @@ import type { Ledger, LedgerEntry, ResultVersion } from "@/lib/ledger/ledger";
 import { ReadoutLockedError, assertReadoutOpen, conversionWindowHours } from "@/lib/ledger/window";
 import type { ExperimentReadout } from "@/lib/stats/experiment";
 import type { RevenueReadout } from "@/lib/stats/revenue";
+import { IntervalPlot } from "../../interval-plot";
 import { RevenuePanel } from "./revenue-panel";
 import { useCsvColumns } from "./use-csv-columns";
 
@@ -411,6 +412,7 @@ export function ResultsSection({
           <p>{r.message}</p>
           {r.status === "readable" && verdict && (
             <>
+              <IntervalPlot low={r.readout.interval.low} high={r.readout.interval.high} lift={r.readout.lift} alpha={r.readout.alpha} />
               <table aria-label="Readout">
                 <tbody>
                   <tr><th scope="row">Treatment rate</th><td>{formatPercent(r.readout.treatmentRate)}</td></tr>

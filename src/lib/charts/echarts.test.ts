@@ -8,9 +8,18 @@ describe("withMotion", () => {
     expect(withMotion(option, true).animation).toBe(false);
   });
 
-  it("leaves the chart as it is otherwise, so it keeps ECharts's own default", () => {
-    expect(withMotion(option, false)).toBe(option);
-    expect(withMotion(option, false).animation).toBeUndefined();
+  it("adds a short glide with no bounce when motion is allowed, and never turns animation off", () => {
+    const moving = withMotion(option, false);
+    expect(moving.animation).toBeUndefined();
+    expect(moving.animationDurationUpdate).toBe(350);
+    expect(moving.animationEasingUpdate).toBe("cubicOut");
+    expect(String(moving.animationEasing)).not.toMatch(/bounce|elastic|back/i);
+    expect(String(moving.animationEasingUpdate)).not.toMatch(/bounce|elastic|back/i);
+    expect(moving.series).toBe(option.series);
+  });
+
+  it("lets a chart's own timing win over the defaults", () => {
+    expect(withMotion({ ...option, animationDurationUpdate: 100 }, false).animationDurationUpdate).toBe(100);
   });
 
   it("keeps everything else in the option, and does not change the original", () => {

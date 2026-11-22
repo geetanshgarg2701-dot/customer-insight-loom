@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PILOT } from "@/lib/pilot/enabled";
+import { MotionSwitch } from "./motion-switch";
 
 /**
  * The top menu. Screens are grouped by what a marketer is doing, each group opens as a small menu, and the current screen is
@@ -161,6 +162,7 @@ export function Nav() {
           );
         })}
       </ul>
+      <MotionSwitch />
       <Link href="/ledger" className="button-link topnav-cta">
         Try the demo
       </Link>

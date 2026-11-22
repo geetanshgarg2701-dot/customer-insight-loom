@@ -14,6 +14,7 @@ import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
+import { LoadingSkeleton } from "../skeleton";
 
 const TITLES: Record<PipelineDimension, string> = {
   segment: "Segment",
@@ -345,12 +346,14 @@ export default function PipelinePage() {
       </p>
 
       {!loaded && (
-        <p>
-          <button type="button" disabled={busy} onClick={() => void onLoad()}>
-            Load synthetic pipeline
-          </button>{" "}
-          {busy && "Loading 100,000 synthetic deals"}
-        </p>
+        <>
+          <p>
+            <button type="button" disabled={busy} onClick={() => void onLoad()}>
+              Load synthetic pipeline
+            </button>
+          </p>
+          {busy && <LoadingSkeleton text="Loading 100,000 synthetic deals" />}
+        </>
       )}
       {error && <p role="alert">{error}</p>}
       {fromLink !== null && (
@@ -361,7 +364,7 @@ export default function PipelinePage() {
       )}
 
       {loaded && (
-        <>
+        <div className="fade-in">
           <p>
             Showing {shown.toLocaleString("en-US")} of {ROWS.toLocaleString("en-US")} deals. Cutoff is 1 November 2026,
             the demo date. {elapsed !== null && <span>Updated in {elapsed} ms.</span>}{" "}
@@ -373,11 +376,11 @@ export default function PipelinePage() {
           <dl className="tiles" aria-label="The current selection at a glance">
             <div>
               <dt>Deals shown</dt>
-              <dd>{tiles.deals.toLocaleString("en-US")}</dd>
+              <dd key={tiles.deals} className="swap">{tiles.deals.toLocaleString("en-US")}</dd>
             </div>
             <div>
               <dt>Reached Won</dt>
-              <dd>{tiles.won === null ? "none selected" : formatPercent(tiles.won, 1)}</dd>
+              <dd key={String(tiles.won)} className="swap">{tiles.won === null ? "none selected" : formatPercent(tiles.won, 1)}</dd>
             </div>
             <div>
               <dt>Hardest step</dt>
@@ -845,7 +848,7 @@ export default function PipelinePage() {
               </>
             )}
           </section>
-        </>
+        </div>
       )}
     </main>
   );

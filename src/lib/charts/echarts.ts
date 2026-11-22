@@ -63,5 +63,7 @@ export function loadEcharts(): Promise<typeof import("echarts/core")> {
  * The charts animate by default, so this only ever turns animation off.
  */
 export function withMotion(option: ChartOption, reduceMotion: boolean): ChartOption {
-  return reduceMotion ? { ...option, animation: false } : option;
+  if (reduceMotion) return { ...option, animation: false };
+  // A change of data glides over a third of a second and settles, with no bounce, which would misstate a value.
+  return { animationDuration: 600, animationDurationUpdate: 350, animationEasing: "cubicOut", animationEasingUpdate: "cubicOut", ...option };
 }
