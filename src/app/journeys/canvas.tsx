@@ -9,6 +9,8 @@ import { DESIGNED_JOURNEY, edgeCounts, stepStats, transitionsNotDesigned, wouldC
 import { formatDuration, type Timing } from "@/lib/charts/timing";
 import { INACTIVE_CHOICES, WAIT_CHOICES, type ExitResult, type WaitResult } from "@/lib/charts/rules";
 import { formatPercent } from "@/lib/app/format";
+import { downloadText } from "@/lib/app/download";
+import { designToFile, markLoops, readDesignFile } from "@/lib/charts/design-file";
 import { explainDesigned, explainRules } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { CHART_THEME } from "./theme";
@@ -282,8 +284,34 @@ export function JourneyCanvas({
             text: `This connection makes a loop: ${from} to ${to}. It is drawn as a dashed back edge below the steps. Check that the loop is intended.`,
             warn: true,
           }
-        : { text: `Added ${from} to ${to} to the sketch. It is not saved and it has no customer numbers.`, warn: false },
+        : { text: `Added ${from} to ${to} to the sketch. It has no customer numbers. Save the design to a file to keep it.`, warn: false },
     );
+  }
+
+  /** Saves the design as a small file the person keeps. Nothing is stored in the browser and nothing is uploaded. */
+  function saveDesign() {
+    const text = designToFile({ waitStep, waitDays, inactiveDays, sketch: sketch.map((s) => ({ from: s.from, to: s.to })) }, new Date().toISOString());
+    downloadText("journey-design.json", "application/json", text);
+    setMessage({ text: "Saved journey-design.json. It holds the sketch, the wait and the exit rule, and no customer data.", warn: false });
+  }
+
+  /** Opens a saved design. A file that is not one of ours is refused whole, so nothing is half applied. */
+  async function openDesign(file: File | undefined) {
+    if (!file) return;
+    try {
+      const design = readDesignFile(await file.text());
+      setSketch(markLoops(design.sketch));
+      onWaitStep(design.waitStep);
+      onWaitDays(design.waitDays);
+      onInactiveDays(design.inactiveDays);
+      const loops = markLoops(design.sketch).filter((x) => x.loop).length;
+      setMessage({
+        text: `Opened ${file.name}: ${design.sketch.length} sketched ${design.sketch.length === 1 ? "connection" : "connections"}, a ${design.waitDays} day wait, and an exit after ${design.inactiveDays} days inactive.${loops > 0 ? ` ${loops} of the connections make a loop. Check that the loops are intended.` : ""}`,
+        warn: loops > 0,
+      });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "That file could not be opened.", warn: true });
+    }
   }
 
   return (
@@ -347,6 +375,22 @@ export function JourneyCanvas({
         >
           Clear the sketch
         </button>
+      </p>
+      <p>
+        <button type="button" onClick={saveDesign}>
+          Save the design to a file
+        </button>{" "}
+        <label>
+          Open a saved design{" "}
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={(e) => {
+              void openDesign(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
       </p>
       {message && <p role={message.warn ? "alert" : "status"}>{message.text}</p>}
 
