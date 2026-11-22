@@ -41,6 +41,15 @@ test("the entry page makes a deck whose numbers match the ledger's own export of
   const { xml, chartXml } = await slidesOf((await download.path())!);
   expect(xml).toHaveLength(5);
   expect(xml[0]).toContain("Synthetic: win back email with a 10 percent offer");
+
+  // The deck uses the app's current look: a font PowerPoint has on Windows and Mac, and the app's red and ink.
+  const everything = xml.join("") + chartXml.join("");
+  expect(everything).toContain('typeface="Calibri"');
+  expect(everything).not.toContain("Georgia");
+  expect(everything).toContain("A8243B");
+  expect(everything).toContain("18203A");
+  expect(everything).not.toContain("8A3B12");
+  expect(everything).not.toContain("FAF8F4");
   const result = xml[3];
   expect(result).toContain(formatPercent(treatment));
   expect(result).toContain(formatPercent(control));

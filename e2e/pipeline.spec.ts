@@ -152,3 +152,27 @@ test.describe("phone width", () => {
     expect(scroll).toBeLessThanOrEqual(client);
   });
 });
+
+test("the number tiles match the generator, and follow a filter", async ({ page }) => {
+  test.setTimeout(240_000);
+  const { syntheticPipeline } = await import("../src/lib/demo/pipeline");
+  const rows = syntheticPipeline(100_000, 21); // the seed the page uses
+  const pct = (x: number) => `${(x * 100).toFixed(1)} percent`;
+  await page.goto("/pipeline");
+  await page.getByRole("button", { name: "Load synthetic pipeline" }).click();
+  await expect(page.getByText(/Showing 100,000 of 100,000 deals/)).toBeVisible({ timeout: 180_000 });
+  const tiles = page.locator('dl[aria-label="The current selection at a glance"]');
+  const tile = (name: RegExp) => tiles.locator("> div").filter({ has: page.locator("dt", { hasText: name }) });
+
+  const won = rows.filter((r) => r.status === "won").length / rows.length;
+  await expect(tile(/^Deals shown$/)).toContainText("100,000");
+  await expect(tile(/^Reached Won$/)).toContainText(pct(won));
+  await expect(tile(/^Hardest step$/)).toContainText(/\w+ to \w+, \d+\.\d percent go on/);
+  await expect(tile(/^Stalled for 30 days or more$/)).toContainText(/\d[\d,]*, \d+\.\d percent/);
+
+  // Choosing a segment recounts every tile.
+  await page.getByRole("group", { name: "Filter by segment" }).getByRole("button", { name: /^smb, / }).click();
+  const smb = rows.filter((r) => r.segment === "smb");
+  await expect(tile(/^Deals shown$/)).toContainText(smb.length.toLocaleString("en-US"));
+  await expect(tile(/^Reached Won$/)).toContainText(pct(smb.filter((r) => r.status === "won").length / smb.length));
+});

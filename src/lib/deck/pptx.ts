@@ -4,12 +4,14 @@
  */
 import type { DeckModel, DeckSlide } from "./deck";
 
-const FONT = "Georgia";
-const INK = "1F1D1A";
-const ACCENT = "8A3B12";
-const MUTED = "5E584E";
-const LINE = "CFC7B8";
-const PAPER = "FAF8F4";
+// The app's look, in the form PowerPoint reads. Calibri comes with Office on Windows and Mac, so the deck looks the same
+// wherever it is opened, which the app's own system fonts could not promise. The colours match globals.css.
+const FONT = "Calibri";
+const INK = "18203A";
+const ACCENT = "A8243B";
+const MUTED = "586079";
+const LINE = "D6DBE6";
+const SURFACE = "FFFFFF";
 
 type Pres = import("pptxgenjs").default;
 type Slide = ReturnType<Pres["addSlide"]>;
@@ -29,7 +31,7 @@ function addLines(slide: Slide, lines: string[], box: { x: number; y: number; w:
 function addTable(slide: Slide, table: NonNullable<DeckSlide["table"]>, box: { x: number; y: number; w: number }): void {
   const cell = (text: string, header: boolean) => ({
     text,
-    options: { fontFace: FONT, fontSize: header ? 14 : 13, bold: header, color: header ? PAPER : INK, fill: { color: header ? ACCENT : PAPER } },
+    options: { fontFace: FONT, fontSize: header ? 14 : 13, bold: header, color: header ? SURFACE : INK, fill: { color: header ? ACCENT : SURFACE } },
   });
   slide.addTable([table.header.map((h) => cell(h, true)), ...table.rows.map((r) => r.map((c) => cell(c, false)))], {
     ...box,
@@ -48,7 +50,7 @@ export async function renderDeck(deck: DeckModel): Promise<Uint8Array> {
 
   for (const s of deck.slides) {
     const slide = pptx.addSlide();
-    slide.background = { color: PAPER };
+    slide.background = { color: SURFACE };
     if (s.kind === "title") {
       slide.addText(s.title, { x: 0.8, y: 1.8, w: 11.7, h: 1.8, fontFace: FONT, fontSize: 38, bold: true, color: INK, valign: "bottom", fit: "shrink" });
       slide.addShape("line", { x: 0.8, y: 3.75, w: 3, h: 0, line: { color: ACCENT, width: 3 } });

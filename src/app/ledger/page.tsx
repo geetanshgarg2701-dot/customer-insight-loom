@@ -9,6 +9,7 @@ import { demoAudienceCsv } from "@/lib/demo/synthetic";
 import { familywiseLine } from "@/lib/ledger/familywise";
 import { FrameworkSection } from "./framework-section";
 import { HypothesisPicker } from "./hypothesis-picker";
+import { ledgerTiles } from "@/lib/ledger/tiles";
 import { ledgerCsv } from "@/lib/ledger/csv";
 import { NO_FILTER, filterEntries, type EntryFilter } from "@/lib/ledger/filter";
 import { STATUSES, FRAMEWORK_TAGS, type FrameworkTag, type LedgerEntry } from "@/lib/ledger/ledger";
@@ -145,6 +146,7 @@ export default function LedgerPage() {
   }
 
   const family = entries ? familywiseLine(entries) : null;
+  const tiles = entries ? ledgerTiles(entries) : null;
   const visible = entries ? filterEntries(entries, filter) : null;
   const filtered = JSON.stringify(filter) !== JSON.stringify(NO_FILTER);
 
@@ -158,6 +160,27 @@ export default function LedgerPage() {
 
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
+
+      {tiles && tiles.entries > 0 && (
+        <dl className="tiles" aria-label="The ledger at a glance">
+          <div>
+            <dt>Entries</dt>
+            <dd>{tiles.entries.toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>Drafts</dt>
+            <dd>{tiles.drafts.toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>Registered or running</dt>
+            <dd>{tiles.underway.toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>Ready to read or closed</dt>
+            <dd>{tiles.finished.toLocaleString("en-US")}</dd>
+          </div>
+        </dl>
+      )}
 
       <section aria-labelledby="new-entry">
         <h2 id="new-entry">New entry</h2>

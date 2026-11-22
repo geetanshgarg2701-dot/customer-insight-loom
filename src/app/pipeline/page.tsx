@@ -8,6 +8,7 @@ import { decodePipelineView, encodePipelineView, type PipelineView } from "@/lib
 import type { ChartOption } from "@/lib/charts/echarts";
 import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
+import { pipelineTiles } from "@/lib/charts/pipeline-tiles";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { CHART_THEME, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
@@ -333,6 +334,7 @@ export default function PipelinePage() {
   const anySelected = PIPELINE_DIMENSIONS.some((d) => (selection[d] ?? []).length > 0);
   const shown = funnel[0]?.count ?? 0;
   const stalledTotal = stalled.reduce((n, s) => n + s.count, 0);
+  const tiles = pipelineTiles(funnel, stalledTotal);
 
   return (
     <main>
@@ -367,6 +369,28 @@ export default function PipelinePage() {
               Clear selection
             </button>
           </p>
+
+          <dl className="tiles" aria-label="The current selection at a glance">
+            <div>
+              <dt>Deals shown</dt>
+              <dd>{tiles.deals.toLocaleString("en-US")}</dd>
+            </div>
+            <div>
+              <dt>Reached Won</dt>
+              <dd>{tiles.won === null ? "none selected" : formatPercent(tiles.won, 1)}</dd>
+            </div>
+            <div>
+              <dt>Hardest step</dt>
+              <dd>{tiles.hardestStep ? `${tiles.hardestStep.from} to ${tiles.hardestStep.to}, ${formatPercent(tiles.hardestStep.goOn, 1)} go on` : "none selected"}</dd>
+            </div>
+            <div>
+              <dt>Stalled for {threshold} days or more</dt>
+              <dd>
+                {tiles.stalled.toLocaleString("en-US")}
+                {tiles.stalledShare === null ? "" : `, ${formatPercent(tiles.stalledShare, 1)}`}
+              </dd>
+            </div>
+          </dl>
 
           <section aria-labelledby="h-filters">
             <h2 id="h-filters">Filters</h2>
