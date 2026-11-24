@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DARK_CHART, LIGHT_CHART } from "./theme";
+import { DARK_CHART, LIGHT_CHART, barEmphasis, barItem } from "./theme";
 
 const CSS = readFileSync("src/app/globals.css", "utf8");
 const tokens = (block: string) => Object.fromEntries([...block.matchAll(/--([a-z0-9-]+): (#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]]));
@@ -50,5 +50,56 @@ describe.each(LOOKS)("the $name look", ({ css, chart }) => {
   it.each(Object.keys(VISION))("the four series stay apart for %s vision", (v) => {
     const labs = chart.palette.map((c) => lab(c, VISION[v]));
     for (let i = 0; i < 4; i++) for (let j = 0; j < i; j++) expect(Math.hypot(...labs[i].map((n, k) => n - labs[j][k]))).toBeGreaterThan(10);
+  });
+});
+
+describe.each(LOOKS)("the bar colors in the $name look", ({ css, chart }) => {
+  it("the neutral mark and the accent are at least 3 to 1 on the canvas and the surface", () => {
+    for (const color of [chart.mark, chart.selected]) for (const b of ["canvas", "surface"]) expect(ratio(color, css[b]), `${color} on ${b}`).toBeGreaterThanOrEqual(3);
+  });
+  it("the chart text is at least 4.5 to 1 on the canvas and the surface", () => {
+    for (const b of ["canvas", "surface"]) expect(ratio(chart.text, css[b]), b).toBeGreaterThanOrEqual(4.5);
+  });
+  it("the stylesheet tokens and the chart theme agree, and the selected color is the app accent", () => {
+    expect(chart.mark).toBe(css.mark);
+    expect(chart.selected).toBe(css["mark-selected"]);
+    expect(chart.selected).toBe(css.accent);
+  });
+  it.each(Object.keys(VISION))("the mark and the selected color stay apart for %s vision", (v) => {
+    expect(Math.hypot(...lab(chart.mark, VISION[v]).map((n, k) => n - lab(chart.selected, VISION[v])[k]))).toBeGreaterThan(10);
+  });
+  it("a bar is the neutral mark unless picked, and a picked bar is the accent, and nothing is faded", () => {
+    expect(barItem(chart, false)).toEqual({ color: chart.mark });
+    expect(barItem(chart, true)).toEqual({ color: chart.selected });
+    expect(barEmphasis(chart)).toEqual({ itemStyle: { color: chart.selected } });
+    expect(JSON.stringify([barItem(chart, false), barItem(chart, true)])).not.toContain("opacity");
+  });
+  it("the mark is quiet: far less colorful than any of the four series colors", () => {
+    const chroma = (hex: string) => Math.hypot(...lab(hex, VISION.typical).slice(1));
+    for (const c of chart.palette) expect(chroma(chart.mark)).toBeLessThan(chroma(c) / 2);
+  });
+});
+
+describe("the bar builders", () => {
+  const journeys = readFileSync("src/app/journeys/page.tsx", "utf8");
+  const pipeline = readFileSync("src/app/pipeline/page.tsx", "utf8");
+  const section = (src: string, name: string) => src.slice(src.indexOf(`function ${name}`), src.indexOf(`
+}
+`, src.indexOf(`function ${name}`)));
+  it.each([
+    [journeys, "barOption"],
+    [pipeline, "funnelOption"],
+    [pipeline, "dwellOption"],
+    [pipeline, "stalledOption"],
+    [pipeline, "snapshotOption"],
+  ])("%#: %s uses the roles, never a series color or a fade", (src, name) => {
+    const body = section(src, name);
+    expect(body.length).toBeGreaterThan(200);
+    expect(body).toContain("barItem");
+    expect(body).toContain("barEmphasis");
+    expect(body).not.toMatch(/palette|opacity/);
+  });
+  it("starts every bar axis at zero: no builder asks for a scale that skips it", () => {
+    for (const src of [journeys, pipeline]) expect(src).not.toMatch(/scale: true/);
   });
 });

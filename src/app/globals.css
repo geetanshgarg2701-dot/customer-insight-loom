@@ -29,6 +29,8 @@
   --series-2: #c4510a;
   --series-3: #007a5a;
   --series-4: #a64b87;
+  --mark: #7d838c;
+  --mark-selected: #1d5e47;
   --font: system-ui, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
   --size: 16px;
@@ -59,6 +61,8 @@
     --series-2: #e69f00;
     --series-3: #2eb38c;
     --series-4: #d08ab5;
+    --mark: #7b828b;
+    --mark-selected: #7fd1b4;
   }
 }
 

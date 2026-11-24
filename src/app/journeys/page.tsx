@@ -24,7 +24,7 @@ import { Explain } from "../explain";
 import { Chart } from "./chart";
 import { LoadingSkeleton } from "../skeleton";
 import { JourneyCanvas, type DesignedRules } from "./canvas";
-import { useChartTheme, type ChartTheme } from "./theme";
+import { barEmphasis, barItem, useChartTheme, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
   channel: "Channel",
@@ -52,7 +52,6 @@ function messageOf(error: unknown): string {
 function barOption(counts: Count[], selected: string[], theme: ChartTheme): ChartOption {
   return {
     aria: { enabled: true },
-    color: theme.palette,
     textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
     tooltip: { trigger: "item" },
     grid: { left: 60, right: 16, top: 16, bottom: 28 },
@@ -66,10 +65,11 @@ function barOption(counts: Count[], selected: string[], theme: ChartTheme): Char
     series: [
       {
         type: "bar",
+        emphasis: barEmphasis(theme),
         data: counts.map((c) => ({
           value: c.count,
           name: c.value,
-          itemStyle: { opacity: selected.length === 0 || selected.includes(c.value) ? 1 : 0.35 },
+          itemStyle: barItem(theme, selected.includes(c.value)),
         })),
       },
     ],

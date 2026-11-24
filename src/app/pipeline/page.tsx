@@ -10,7 +10,7 @@ import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { pipelineTiles } from "@/lib/charts/pipeline-tiles";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
-import { useChartTheme, type ChartTheme } from "../journeys/theme";
+import { barEmphasis, barItem, useChartTheme, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
@@ -33,9 +33,8 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-const base = (theme: ChartTheme): Pick<ChartOption, "aria" | "color" | "textStyle" | "tooltip"> => ({
+const base = (theme: ChartTheme): Pick<ChartOption, "aria" | "textStyle" | "tooltip"> => ({
   aria: { enabled: true },
-  color: theme.palette,
   textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
   tooltip: { trigger: "item" },
 });
@@ -55,10 +54,11 @@ function funnelOption(funnel: FunnelStage[], selected: string[], theme: ChartThe
     series: [
       {
         type: "bar",
+        emphasis: barEmphasis(theme),
         data: funnel.map((f) => ({
           value: f.count,
           name: f.stage,
-          itemStyle: { opacity: selected.length === 0 || selected.includes(f.stage) ? 1 : 0.35 },
+          itemStyle: barItem(theme, selected.includes(f.stage)),
         })),
       },
     ],
@@ -80,7 +80,7 @@ function dwellOption(h: DwellHistogram, theme: ChartTheme): ChartOption {
       axisLabel: { color: theme.text, interval: "auto" },
     },
     yAxis: { type: "value", splitLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
-    series: [{ type: "bar", data: h.bins.map((b) => b.count) }],
+    series: [{ type: "bar", emphasis: barEmphasis(theme), data: h.bins.map((b) => ({ value: b.count, itemStyle: barItem(theme, false) })) }],
   };
 }
 
@@ -95,7 +95,7 @@ function stalledOption(stalled: Stalled[], theme: ChartTheme): ChartOption {
       axisLabel: { color: theme.text },
     },
     yAxis: { type: "value", splitLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
-    series: [{ type: "bar", data: stalled.map((s) => s.count) }],
+    series: [{ type: "bar", emphasis: barEmphasis(theme), data: stalled.map((s) => ({ value: s.count, itemStyle: barItem(theme, false) })) }],
   };
 }
 
@@ -123,7 +123,8 @@ function snapshotOption(s: PipelineAt, max: number, theme: ChartTheme): ChartOpt
     series: [
       {
         type: "bar",
-        data: values.map((v) => ({ value: v, itemStyle: { color: theme.palette[0] } })),
+        emphasis: barEmphasis(theme),
+        data: values.map((v) => ({ value: v, itemStyle: barItem(theme, false) })),
         label: {
           show: true,
           position: "top",
