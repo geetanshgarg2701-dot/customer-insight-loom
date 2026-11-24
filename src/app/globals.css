@@ -1306,3 +1306,41 @@ th.rb-col {
 .flow-panel li {
   margin: 0 0 0.25rem;
 }
+
+/* The pipeline funnel as bands. Square edges, no shadow, no gradient. A thickness is set in code from its count. */
+.fb {
+  display: block;
+  max-width: none;
+}
+.fb-ink {
+  fill: var(--text-2);
+}
+.fb-on {
+  fill: var(--mark-selected);
+}
+.fb-drop {
+  fill: var(--mark);
+}
+.fb-name {
+  font-size: 14px;
+  font-weight: 600;
+  fill: var(--text);
+}
+.fb-count,
+.fb-note {
+  font-size: 13px;
+  fill: var(--text-2);
+}
+.fb-hit {
+  fill: transparent;
+}
+.fb-stage {
+  cursor: pointer;
+}
+.fb-stage:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fb-stage[aria-pressed="true"] .fb-name {
+  fill: var(--mark-selected);
+}

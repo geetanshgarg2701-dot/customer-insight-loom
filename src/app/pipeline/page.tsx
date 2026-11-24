@@ -11,6 +11,7 @@ import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { pipelineTiles } from "@/lib/charts/pipeline-tiles";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { barEmphasis, barItem, useChartTheme, type ChartTheme } from "../journeys/theme";
+import { FunnelBands } from "./funnel-bands";
 import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
@@ -40,32 +41,6 @@ const base = (theme: ChartTheme): Pick<ChartOption, "aria" | "textStyle" | "tool
   textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
   tooltip: { trigger: "item" },
 });
-
-function funnelOption(funnel: FunnelStage[], selected: string[], theme: ChartTheme): ChartOption {
-  return {
-    ...base(theme),
-    grid: { left: 90, right: 24, top: 8, bottom: 24 },
-    xAxis: { type: "value", splitLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
-    yAxis: {
-      type: "category",
-      inverse: true,
-      data: funnel.map((f) => f.stage),
-      axisLine: { lineStyle: { color: theme.line } },
-      axisLabel: { color: theme.text },
-    },
-    series: [
-      {
-        type: "bar",
-        emphasis: barEmphasis(theme),
-        data: funnel.map((f) => ({
-          value: f.count,
-          name: f.stage,
-          itemStyle: barItem(theme, selected.includes(f.stage)),
-        })),
-      },
-    ],
-  };
-}
 
 function dwellOption(h: DwellHistogram, theme: ChartTheme): ChartOption {
   const label = (from: number, i: number) => (i === h.bins.length - 1 && from >= 60 ? `${from}+` : `${from} to ${from + h.binDays}`);
@@ -448,12 +423,7 @@ export default function PipelinePage() {
           <section aria-labelledby="h-funnel">
             <h2 id="h-funnel">Stage funnel</h2>
             <p>How many deals reached each stage, and the share of the stage before that made it.</p>
-            <Chart
-              label="Deals that reached each stage"
-              option={funnelOption(funnel, selection.stage ?? [], chartTheme)}
-              height={200}
-              onSelect={(name) => void toggle("stage", name)}
-            />
+            <FunnelBands funnel={funnel} selected={selection.stage ?? []} onToggle={(name) => void toggle("stage", name)} />
             <table className="short-first" aria-label="Stage funnel">
               <thead>
                 <tr>

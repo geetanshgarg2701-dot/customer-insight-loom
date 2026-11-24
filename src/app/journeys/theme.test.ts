@@ -88,7 +88,6 @@ describe("the bar builders", () => {
 `, src.indexOf(`function ${name}`)));
   it.each([
     [journeys, "barOption"],
-    [pipeline, "funnelOption"],
     [pipeline, "dwellOption"],
     [pipeline, "stalledOption"],
     [pipeline, "snapshotOption"],
@@ -98,6 +97,15 @@ describe("the bar builders", () => {
     expect(body).toContain("barItem");
     expect(body).toContain("barEmphasis");
     expect(body).not.toMatch(/palette|opacity/);
+  });
+  it("draws the funnel bands with the roles: ink and the selected color from the tokens, never a series color or a fade", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const block = css.slice(css.indexOf(".fb-ink {"), css.indexOf(".fb-stage[aria-pressed"));
+    expect(block).toContain("var(--text-2)");
+    expect(block).toContain("var(--mark-selected)");
+    expect(block).toContain("var(--mark)");
+    expect(block).not.toMatch(/series|opacity/);
+    expect(readFileSync("src/app/pipeline/funnel-bands.tsx", "utf8")).not.toMatch(/opacity|series/);
   });
   it("starts every bar axis at zero: no builder asks for a scale that skips it", () => {
     for (const src of [journeys, pipeline]) expect(src).not.toMatch(/scale: true/);
