@@ -101,7 +101,7 @@ function BandEdge(props: EdgeProps<Edge<BandData>>) {
   const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data } = props;
   const [path] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   const color = data?.active ? CSS_CHART.selected : data?.tone === "ink" ? INK : CSS_CHART.mark;
-  return <BaseEdge id={props.id} path={path} style={{ stroke: color, strokeWidth: data?.width ?? 1, fill: "none", strokeLinecap: "butt" }} interactionWidth={0} />;
+  return <BaseEdge id={props.id} className="band" path={path} style={{ stroke: color, strokeWidth: data?.width ?? 1, fill: "none", strokeLinecap: "butt" }} interactionWidth={0} />;
 }
 
 export const BAND_NODE_TYPES = { stage: StageNode, stub: StubNode, tab: TabNode };

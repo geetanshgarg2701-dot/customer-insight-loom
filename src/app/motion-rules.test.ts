@@ -89,3 +89,47 @@ describe("the stylesheet's motion", () => {
     expect(off.map((d) => `${d.property}: ${d.value}`).sort()).toEqual(["animation: none !important", "transition: none !important"]);
   });
 });
+
+describe("the motion added in step 6", () => {
+  const NEW_TRANSITIONS = [".flow-stage", ".react-flow__edge-path.band", ".fb-pillar"];
+  const transitions = DECLARATIONS.filter((d) => d.property === "transition" && NEW_TRANSITIONS.some((s) => d.context.some((c) => c.includes(s))));
+
+  it("eases a change of color over 200 to 300 milliseconds, and only where the system has not asked for less motion", () => {
+    expect(transitions.length).toBe(NEW_TRANSITIONS.length);
+    for (const t of transitions) {
+      expect(t.context.some((c) => c.startsWith("@media (prefers-reduced-motion: no-preference)")), t.value).toBe(true);
+      for (const s of times(t.value)) {
+        expect(s, t.value).toBeGreaterThanOrEqual(0.2);
+        expect(s, t.value).toBeLessThanOrEqual(0.3);
+      }
+      expect(t.value).not.toMatch(/\b(width|height|top|left|right|bottom|margin|padding|transform)\b/);
+    }
+  });
+
+  it("adds no animation that loops, and no keyframes, since the count up is drawn by the script and the rest are transitions", () => {
+    expect(animations.filter((a) => a.value.includes("infinite")).every((a) => LOADING.test(a.value.split(" ")[0]))).toBe(true);
+    const names = DECLARATIONS.flatMap((d) => d.context.filter((c) => c.startsWith("@keyframes ")));
+    expect(new Set(names).size).toBeLessThanOrEqual(24);
+    expect(names.some((n) => /count|cu\b/.test(n))).toBe(false);
+  });
+
+  it("counts up once, for under 600 milliseconds, and not at all under reduced motion", () => {
+    const source = readFileSync("src/app/count-up.tsx", "utf8");
+    const ms = Number(/export const COUNT_MS = (\d+);/.exec(source)?.[1]);
+    expect(ms).toBeGreaterThan(0);
+    expect(ms, "600 milliseconds at most").toBeLessThanOrEqual(600);
+    expect(source, "plays once per page load").toMatch(/const played = new Set<string>\(\)/);
+    expect(source).toMatch(/if \(played\.has\(id\)/);
+    expect(source, "does not loop").not.toMatch(/setInterval|requestAnimationFrame\(tick\);\s*\}\s*,\s*\d/);
+    expect(source, "follows the Reduce motion switch and the system setting").toMatch(/useReducedMotion\(\)/);
+    expect(source).toMatch(/if \(reduced\)/);
+  });
+
+  it("keeps the count up's real text in the page and draws the moving number over it", () => {
+    const rule = DECLARATIONS.filter((d) => d.context.some((c) => c.startsWith('.cu[data-counting="true"]')));
+    const props = rule.map((d) => d.property);
+    expect(props).toContain("color");
+    expect(props).toContain("content");
+    expect(props).not.toContain("transition");
+  });
+});

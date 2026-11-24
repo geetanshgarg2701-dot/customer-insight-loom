@@ -1365,3 +1365,39 @@ th.rb-col {
 .readout-first .range-ticks span {
   font-size: 0.9375rem;
 }
+
+/* Step 6. A change of color eases over a quarter second, only where the system has not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .flow-stage,
+  .flow-tab,
+  .flow-stub {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  }
+  .react-flow__edge-path.band {
+    transition: stroke 0.25s ease;
+  }
+  .fb-pillar,
+  .fb-trunk,
+  .fb-name {
+    transition: fill 0.25s ease;
+  }
+}
+/* The quiet block shown in the journey picture while the bands are still being counted. It shares the loading pulse of .sk. */
+.flow-skeleton {
+  position: absolute;
+  inset: 0;
+}
+/* A count up draws the changing number over the real one, which stays in the page text. */
+.cu {
+  position: relative;
+}
+.cu[data-counting="true"] {
+  color: transparent;
+}
+.cu[data-counting="true"]::after {
+  content: attr(data-shown);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--text);
+}

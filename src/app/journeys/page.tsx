@@ -21,7 +21,8 @@ import { createCycle, runWhileCurrent } from "@/lib/app/latest";
 import { decodeJourneyView, encodeJourneyView, type JourneyView } from "@/lib/app/view-state";
 import { explainWhy, explainAnchored, explainBehind, explainComparison, explainReplay, explainPaths, explainTiming, explainWhatIf } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
-import { Chart } from "./chart";
+import { Chart, type Hit } from "./chart";
+import { CountUp } from "../count-up";
 import { LoadingSkeleton } from "../skeleton";
 import { RangeCell, RangeHeader, TableScroll } from "../range-bar";
 import { rateAxis, rateSentence } from "@/lib/app/range";
@@ -196,7 +197,9 @@ function timingOption(t: Timing, theme: ChartTheme): ChartOption {
     series: [
       {
         type: "boxplot",
-        itemStyle: { color: theme.fill, borderColor: theme.palette[0] },
+        // The neutral mark for the box and its lines, and the accent for the one pointed at, here or in another chart.
+        itemStyle: { color: theme.fill, borderColor: theme.mark, borderWidth: 1.5 },
+        emphasis: { itemStyle: { color: theme.fill, borderColor: theme.selected, borderWidth: 3 } },
         data: shown.map((s) => [s.p10Hours!, s.p25Hours!, s.medianHours!, s.p75Hours!, s.p90Hours!]),
       },
     ],
@@ -231,14 +234,17 @@ function anchoredOption(flow: AnchoredFlow, theme: ChartTheme): ChartOption {
 }
 
 /** The cumulative count of each step by day, one line per step, with ledger launches and the scrubber's day marked. */
+// One dash pattern for each step, so the lines stay apart without color, and each line is named at its end.
+const STEP_DASH: ("solid" | "dashed" | "dotted" | number[])[] = ["solid", "dashed", "dotted", [8, 3, 2, 3]];
+
 function overTimeOption(s: StepsOverTime, launches: Marker[], scrubIndex: number, theme: ChartTheme): ChartOption {
   return {
     aria: { enabled: true },
-    color: theme.palette,
+    color: [theme.mark],
     textStyle: { color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
     tooltip: { trigger: "axis" },
     legend: { top: 0, textStyle: { color: theme.text, fontFamily: theme.fontFamily } },
-    grid: { left: 64, right: 24, top: 36, bottom: 40 },
+    grid: { left: 64, right: 84, top: 36, bottom: 40 },
     xAxis: { type: "category", data: s.days, axisLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
     yAxis: { type: "value", splitLine: { lineStyle: { color: theme.line } }, axisLabel: { color: theme.text } },
     series: JOURNEY_STEPS.map((step, k) => ({
@@ -246,6 +252,11 @@ function overTimeOption(s: StepsOverTime, launches: Marker[], scrubIndex: number
       name: step,
       data: s.cumulative[k],
       showSymbol: false,
+      triggerLineEvent: true,
+      lineStyle: { color: theme.mark, width: 2, type: STEP_DASH[k % STEP_DASH.length] },
+      itemStyle: { color: theme.mark },
+      emphasis: { focus: "none", lineStyle: { color: theme.selected, width: 3.5 }, itemStyle: { color: theme.selected }, endLabel: { color: theme.selected } },
+      endLabel: { show: true, formatter: "{a}", color: theme.text, fontFamily: theme.fontFamily, fontSize: theme.fontSize },
       ...(k === 0
         ? {
             markLine: {
@@ -290,6 +301,8 @@ export default function JourneysPage() {
   const [timing, setTiming] = useState<Timing | null>(null);
   const [overTime, setOverTime] = useState<StepsOverTime | null>(null);
   const [rules, setRules] = useState<DesignedRules | null>(null);
+  // The step pointed at in the journey picture, the timing chart or the over time lines, shown in all three.
+  const [linkedStage, setLinkedStage] = useState<number | null>(null);
   const [stageWaits, setStageWaits] = useState<WaitResult[] | null>(null);
   const [waitStep, setWaitStep] = useState(2);
   const [waitDays, setWaitDays] = useState(3);
@@ -298,6 +311,13 @@ export default function JourneysPage() {
   // choice, and it must not write its older choices over the new ones.
   const ruleChoice = useRef({ stepIndex: 2, waitDays: 3, inactiveDays: 14 });
   const [scrubIndex, setScrubIndex] = useState(0);
+  // The timing boxes are the steps that have a median, so a box number is not always a step number.
+  const timingStages = useMemo(() => (timing ? timing.steps.flatMap((st, k) => (st.medianHours === null ? [] : [k])) : []), [timing]);
+  const timingHit = useMemo<Hit | null>(() => {
+    const at = linkedStage === null ? -1 : timingStages.indexOf(linkedStage);
+    return at < 0 ? null : { seriesIndex: 0, dataIndex: at };
+  }, [linkedStage, timingStages]);
+  const overTimeHit = useMemo<Hit | null>(() => (linkedStage === null ? null : { seriesIndex: linkedStage }), [linkedStage]);
   const [launches, setLaunches] = useState<{ id: string; title: string; launchedAt: string | null }[]>([]);
   const [behindIndex, setBehindIndex] = useState(2);
   const [behind, setBehind] = useState<BehindStep | null>(null);
@@ -661,7 +681,7 @@ export default function JourneysPage() {
           <dl className="tiles" aria-label="The current selection at a glance">
             <div>
               <dt>Customers shown</dt>
-              <dd key={tiles.customers} className="swap">{tiles.customers.toLocaleString("en-US")}</dd>
+              <dd key={tiles.customers} className="swap"><CountUp id="journeys-customers" value={tiles.customers} /></dd>
             </div>
             <div>
               <dt>Reached Purchase</dt>
@@ -741,6 +761,8 @@ export default function JourneysPage() {
                 onOpenDetour={(s) => void pickDetour(s)}
                 rules={rules}
                 stageWaits={stageWaits}
+                linkedStage={linkedStage}
+                onLinkStage={setLinkedStage}
                 waitStep={waitStep}
                 waitDays={waitDays}
                 inactiveDays={inactiveDays}
@@ -1056,7 +1078,13 @@ export default function JourneysPage() {
             </p>
             {timing && (
               <div>
-                <Chart label="Hours between steps, median, middle half and 10th to 90th percentile" option={timingOption(timing, chartTheme)} height={300} />
+                <Chart
+                  label="Hours between steps, median, middle half and 10th to 90th percentile"
+                  option={timingOption(timing, chartTheme)}
+                  height={300}
+                  onHover={(hit) => setLinkedStage(hit && hit.dataIndex !== undefined ? (timingStages[hit.dataIndex] ?? null) : null)}
+                  highlight={timingHit}
+                />
                 <table aria-label="Time between steps">
                   <caption>
                     {timing.windowHours / 24} day window from entry, data cutoff {timing.asOf.slice(0, 10)}
@@ -1112,6 +1140,8 @@ export default function JourneysPage() {
                   label="People who had reached each step, by day, with ledger launches marked"
                   option={overTimeOption(overTime, markers.inRange, scrubIndex, chartTheme)}
                   height={300}
+                  onHover={(hit) => setLinkedStage(hit ? hit.seriesIndex : null)}
+                  highlight={overTimeHit}
                   onSelect={(name) => {
                     const i = overTime.days.indexOf(name);
                     if (i >= 0) setScrubIndex(i);

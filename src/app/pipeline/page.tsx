@@ -12,6 +12,7 @@ import { pipelineTiles } from "@/lib/charts/pipeline-tiles";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
 import { barEmphasis, barItem, useChartTheme, type ChartTheme } from "../journeys/theme";
 import { FunnelBands } from "./funnel-bands";
+import { CountUp } from "../count-up";
 import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
@@ -355,7 +356,7 @@ export default function PipelinePage() {
           <dl className="tiles" aria-label="The current selection at a glance">
             <div>
               <dt>Deals shown</dt>
-              <dd key={tiles.deals} className="swap">{tiles.deals.toLocaleString("en-US")}</dd>
+              <dd key={tiles.deals} className="swap"><CountUp id="pipeline-deals" value={tiles.deals} /></dd>
             </div>
             <div>
               <dt>Reached Won</dt>

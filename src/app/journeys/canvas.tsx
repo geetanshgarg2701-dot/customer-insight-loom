@@ -1,7 +1,7 @@
 "use client";
 
 import type { DetourStep } from "@/lib/charts/behind";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { MarkerType, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { PathCount } from "@/lib/charts/anchored";
@@ -53,6 +53,8 @@ export function JourneyCanvas({
   onOpenDetour,
   rules,
   stageWaits: liveWaits,
+  linkedStage,
+  onLinkStage,
   waitStep,
   waitDays,
   inactiveDays,
@@ -67,6 +69,9 @@ export function JourneyCanvas({
   rules: DesignedRules | null;
   /** The wait counted after each of the first three stages, with the chosen length, for the bands. */
   stageWaits: WaitResult[] | null;
+  /** A stage pointed at in another chart on the page, shown here too, and the other way round. */
+  linkedStage?: number | null;
+  onLinkStage?: (stage: number | null) => void;
   waitStep: number;
   waitDays: number;
   inactiveDays: number;
@@ -118,7 +123,14 @@ export function JourneyCanvas({
     return [...parts, finalStage("Purchase", stats.get("Purchase")?.entered ?? 0)];
   }, [stageWaits, counts, stats]);
   const layout = useMemo(() => (stages ? layoutBands(stages, LAYOUT) : null), [stages]);
-  const [activeStage, setActiveStage] = useState<number | null>(null);
+  const [ownStage, setActiveStage] = useState<number | null>(null);
+  // The stage under the pointer or the keyboard here wins. Otherwise it is the one pointed at in another chart.
+  const activeStage = ownStage ?? linkedStage ?? null;
+  useEffect(() => {
+    onLinkStage?.(ownStage);
+    // Only a change here is reported, so pointing at another chart is never undone by this one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownStage]);
 
   const flow = useMemo(() => {
     if (!layout) return { nodes: [] as Node[], edges: [] as Edge[] };
@@ -187,12 +199,13 @@ export function JourneyCanvas({
     targetHandle: s.loop ? "bt" : "l",
     type: s.loop ? "smoothstep" : "default",
     label: s.loop ? "loop, sketch" : "sketch",
-    style: { stroke: s.loop ? CSS_CHART.palette[3] : CSS_CHART.palette[2], strokeDasharray: "6 4", strokeWidth: 2 },
+    // A sketch is the muted ink. A loop is the full ink, thicker, with a different dash, and it is also named and announced in words.
+    style: { stroke: s.loop ? CSS_CHART.text : "var(--text-2)", strokeDasharray: s.loop ? "2 4" : "6 4", strokeWidth: s.loop ? 3 : 2 },
     labelStyle: { fill: CSS_CHART.text, fontFamily: CSS_CHART.fontFamily, fontSize: 12 },
       labelBgStyle: { fill: CSS_CHART.fill, stroke: CSS_CHART.line },
       labelBgPadding: [4, 2] as [number, number],
       labelBgBorderRadius: 4,
-    markerEnd: { type: MarkerType.ArrowClosed, color: s.loop ? CSS_CHART.palette[3] : CSS_CHART.palette[2] },
+    markerEnd: { type: MarkerType.ArrowClosed, color: s.loop ? CSS_CHART.text : "var(--text-2)" },
   }));
 
   function addConnection() {
@@ -242,7 +255,7 @@ export function JourneyCanvas({
   return (
     <div>
       <div
-        style={{ height: 560, border: `1px solid ${CSS_CHART.line}`, background: CSS_CHART.fill }}
+        style={{ position: "relative", height: 560, border: `1px solid ${CSS_CHART.line}`, background: CSS_CHART.fill }}
         onMouseOver={(e) => activate(e.target)}
         onMouseLeave={() => setActiveStage(null)}
         onFocus={(e) => activate(e.target)}
@@ -257,6 +270,7 @@ export function JourneyCanvas({
           if (id && el?.classList.contains("react-flow__node")) openNode(id);
         }}
       >
+        {!layout && <i className="sk flow-skeleton" aria-hidden="true" />}
         <ReactFlow
           // The view fits the nodes when it starts, and the bands arrive a moment later, so it starts again once they have.
           key={layout ? "with-bands" : "without-bands"}
