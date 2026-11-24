@@ -1,4 +1,4 @@
-:HL["/customer-insight-loom/_next/static/chunks/3wzcyqyzw7unj.css","style"]
+:HL["/customer-insight-loom/_next/static/chunks/19c3-iw8g2hu5.css","style"]
 2:[["children",{"s":"__PAGE__","h":160}]]
 1:[["children",{"s":"privacy","h":96,"c":"$Q2"}]]
-0:{"b":"6emBmxoWOLiZa-65XBZ3a","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
+0:{"b":"BaNaXxmh9UzSOK07y_7NZ","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
