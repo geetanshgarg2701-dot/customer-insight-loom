@@ -15,6 +15,7 @@ import { THEME_IDS, THEMES, themeOf } from "@/lib/insights/evidence";
 import { AssignmentSection } from "./assignment-section";
 import { DesignSection } from "./design-section";
 import { exportDeck } from "../../deck-export";
+import { ReadoutFirst } from "./readout-first";
 import { ResultsSection } from "./results-section";
 
 function messageOf(error: unknown): string {
@@ -161,6 +162,7 @@ export function EntryView() {
     <main>
       <h1>{entry.title}</h1>
       {error && <p role="alert">{error}</p>}
+      <ReadoutFirst key={`readout-${entry.id}`} entry={entry} ledger={ledger} />
       <p>Status: {entry.status}</p>
       <p>Type: {entry.entryType ? TYPE_LABEL[entry.entryType] : "Not set"}</p>
       <p>
