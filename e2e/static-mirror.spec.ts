@@ -52,10 +52,10 @@ test("the static mirror loads DuckDB from its own prefix and runs the demo with 
   await navTo(page, "Ledger");
 
   // Moving between pages by clicking works without the prefetch files.
-  await page.getByRole("link", { name: "Methods" }).click();
+  await navTo(page, "Methods");
   await expect(page).toHaveURL(new RegExp(`/${PREFIX}/methods/$`));
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.getByRole("link", { name: "Data intake" }).click();
+  await navTo(page, "Data intake");
   await expect(page).toHaveURL(new RegExp(`/${PREFIX}/intake/$`));
   await expect(page.getByLabel("CSV file")).toBeVisible();
 

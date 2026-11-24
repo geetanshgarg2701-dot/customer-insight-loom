@@ -70,10 +70,10 @@ const GROUPS: { label: string | null; items: Item[] }[] = [
 /** The woven mark: three warp threads crossed by two weft threads. */
 function Mark() {
   return (
-    <svg viewBox="0 0 28 28" width="28" height="28" aria-hidden="true" focusable="false">
-      <rect width="28" height="28" rx="6" fill="#267a5b" />
-      <path d="M8 5v18M14 5v18M20 5v18" stroke="#96d9c4" strokeWidth="2.4" />
-      <path d="M5 11h4m2 0h6m2 0h4M5 17h1m4 0h2m4 0h2m4 0h1" stroke="#f1f5f3" strokeWidth="2.4" />
+    <svg viewBox="0 0 28 28" width="20" height="20" aria-hidden="true" focusable="false">
+      <rect width="28" height="28" rx="6" fill="#1d5e47" />
+      <path d="M8 5v18M14 5v18M20 5v18" stroke="#dce8e2" strokeWidth="2.4" />
+      <path d="M5 11h4m2 0h6m2 0h4M5 17h1m4 0h2m4 0h2m4 0h1" stroke="#f5f5f6" strokeWidth="2.4" />
     </svg>
   );
 }
@@ -162,10 +162,10 @@ export function Nav() {
           );
         })}
       </ul>
-      <MotionSwitch />
-      <Link href="/ledger" className="button-link topnav-cta">
-        Try the demo
-      </Link>
+      <div className="nav-end">
+        <MotionSwitch />
+        <Link href="/ledger">Try the demo</Link>
+      </div>
     </nav>
   );
 }

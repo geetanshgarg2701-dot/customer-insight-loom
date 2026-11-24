@@ -115,6 +115,12 @@ export default function IntakePage() {
           />
         </label>
       </p>
+      {!fileName && !busy && !error && (
+        <p>
+          After you choose a file, its columns are listed here for you to map, with a plain report on how clean it is. Nothing
+          leaves this tab.
+        </p>
+      )}
 
       {busy && <p role="status">Working</p>}
       {error && <p role="alert">{error}</p>}

@@ -24,7 +24,7 @@ import { Explain } from "../explain";
 import { Chart } from "./chart";
 import { LoadingSkeleton } from "../skeleton";
 import { JourneyCanvas, type DesignedRules } from "./canvas";
-import { CHART_THEME, GROUP_COLOR, type ChartTheme } from "./theme";
+import { useChartTheme, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
   channel: "Channel",
@@ -160,7 +160,7 @@ function comparisonOption(c: Comparison, theme: ChartTheme): ChartOption {
       },
       data: g.rates.map((r) => ({
         value: r.rate,
-        itemStyle: { color: GROUP_COLOR[g.value] ?? theme.palette[0], opacity: g.tooSmall ? 0.35 : 1 },
+        itemStyle: { color: theme.groups[g.value] ?? theme.palette[0], opacity: g.tooSmall ? 0.35 : 1 },
       })),
     })),
   };
@@ -261,6 +261,7 @@ function overTimeOption(s: StepsOverTime, launches: Marker[], scrubIndex: number
 }
 
 export default function JourneysPage() {
+  const chartTheme = useChartTheme();
   const board = useRef<JourneyBoard | null>(null);
   const openedFromLink = useRef(false);
   const [cycle] = useState(createCycle);
@@ -670,7 +671,7 @@ export default function JourneysPage() {
                 <h2 id={`h-${d}`}>{TITLES[d]}</h2>
                 <Chart
                   label={`${TITLES[d]}, customers per value`}
-                  option={barOption(list, selected, CHART_THEME)}
+                  option={barOption(list, selected, chartTheme)}
                   height={180}
                   onSelect={(name) => void toggle(d, name)}
                 />
@@ -749,7 +750,7 @@ export default function JourneysPage() {
 
           <section aria-labelledby="h-flow">
             <h2 id="h-flow">Flow between steps</h2>
-            <Chart label="Flow of customers between steps, with drop off" option={sankeyOption(edges, CHART_THEME)} height={320} onSelect={(name) => pickFromFlow(name)} />
+            <Chart label="Flow of customers between steps, with drop off" option={sankeyOption(edges, chartTheme)} height={320} onSelect={(name) => pickFromFlow(name)} />
             <p>Select a step or a drop off in the flow to see who is behind it, below.</p>
             <table className="flow" aria-label="Flow between steps">
               <thead>
@@ -968,7 +969,7 @@ export default function JourneysPage() {
                   ))}
                 <Chart
                   label={`Share of people who went on at each step, ${comparison.a.value} and ${comparison.b.value}`}
-                  option={comparisonOption(comparison, CHART_THEME)}
+                  option={comparisonOption(comparison, chartTheme)}
                   height={320}
                 />
                 <table aria-label="Compare two groups">
@@ -1031,7 +1032,7 @@ export default function JourneysPage() {
             </p>
             {timing && (
               <div>
-                <Chart label="Hours between steps, median, middle half and 10th to 90th percentile" option={timingOption(timing, CHART_THEME)} height={300} />
+                <Chart label="Hours between steps, median, middle half and 10th to 90th percentile" option={timingOption(timing, chartTheme)} height={300} />
                 <table aria-label="Time between steps">
                   <caption>
                     {timing.windowHours / 24} day window from entry, data cutoff {timing.asOf.slice(0, 10)}
@@ -1085,7 +1086,7 @@ export default function JourneysPage() {
               <>
                 <Chart
                   label="People who had reached each step, by day, with ledger launches marked"
-                  option={overTimeOption(overTime, markers.inRange, scrubIndex, CHART_THEME)}
+                  option={overTimeOption(overTime, markers.inRange, scrubIndex, chartTheme)}
                   height={300}
                   onSelect={(name) => {
                     const i = overTime.days.indexOf(name);
@@ -1319,7 +1320,7 @@ export default function JourneysPage() {
                   {around.customers.toLocaleString("en-US")} of {around.outOf.toLocaleString("en-US")} customers did{" "}
                   {anchor}.
                 </p>
-                <Chart label={`What customers did before and after ${anchor}`} option={anchoredOption(around, CHART_THEME)} height={340} />
+                <Chart label={`What customers did before and after ${anchor}`} option={anchoredOption(around, chartTheme)} height={340} />
                 <table aria-label="Around one event">
                   <thead>
                     <tr>

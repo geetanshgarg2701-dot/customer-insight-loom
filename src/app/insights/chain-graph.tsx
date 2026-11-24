@@ -5,7 +5,7 @@ import { Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type Nod
 import "@xyflow/react/dist/style.css";
 import { CHAIN_NODE, chainGraph, type ChainNode } from "@/lib/insights/chain-graph";
 import type { ChainStep } from "@/lib/insights/evidence";
-import { CHART_THEME } from "../journeys/theme";
+import { CSS_CHART } from "../journeys/theme";
 
 type Data = ChainNode & { [key: string]: unknown };
 
@@ -21,10 +21,10 @@ function LinkNode({ data }: NodeProps<Node<Data>>) {
         minHeight: CHAIN_NODE.height,
         boxSizing: "border-box",
         padding: "8px 10px",
-        background: CHART_THEME.fill,
-        color: CHART_THEME.text,
-        border: `${data.missing ? "1px dashed" : "2px solid"} ${data.missing ? CHART_THEME.line : CHART_THEME.palette[0]}`,
-        fontFamily: CHART_THEME.fontFamily,
+        background: CSS_CHART.fill,
+        color: CSS_CHART.text,
+        border: `${data.missing ? "1px dashed" : "2px solid"} ${data.missing ? CSS_CHART.line : CSS_CHART.palette[0]}`,
+        fontFamily: CSS_CHART.fontFamily,
         fontSize: 13,
         lineHeight: 1.35,
       }}
@@ -70,8 +70,8 @@ export function ChainGraph({ steps, title }: { steps: ChainStep[]; title: string
     sourceHandle: i === 2 ? "b" : "r",
     targetHandle: i === 2 ? "t" : "l",
     type: i === 2 ? "smoothstep" : "default",
-    style: { stroke: CHART_THEME.palette[0], strokeWidth: 1.5 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: CHART_THEME.palette[0] },
+    style: { stroke: CSS_CHART.palette[0], strokeWidth: 1.5 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: CSS_CHART.palette[0] },
   }));
   return (
     <div className="chain-graph" role="group" aria-label={title} style={{ height: 2 * CHAIN_NODE.height + 120 }}>

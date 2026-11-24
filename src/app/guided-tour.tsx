@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { clampStep, isLast, progressText, TOUR, TOUR_LENGTH } from "@/lib/app/tour";
 import { seedBrowserDemo } from "@/lib/duckdb/client";
 
 /**
- * Opens once per page load, the first time the home screen is shown. The app stores nothing in the browser, so it cannot
- * remember that someone has seen it, and a person who reloads sees it again. Skip closes it at once.
+ * The tour opens only when someone asks for it, so it never covers the headline on arrival. The hint says New here until it has
+ * been opened. Nothing is stored, so a reload starts over.
  */
-let autoOpened = false;
-
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
@@ -20,17 +18,12 @@ type Demo = { state: "idle" | "loading" | "done" | "error"; text?: string };
 export function GuidedTour() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [step, setStep] = useState(0);
+  const [opened, setOpened] = useState(false);
   const [demo, setDemo] = useState<Demo>({ state: "idle" });
-
-  useEffect(() => {
-    if (autoOpened) return;
-    autoOpened = true;
-    const d = dialog.current;
-    if (d && !d.open) d.showModal();
-  }, []);
 
   function open() {
     setStep(0);
+    setOpened(true);
     const d = dialog.current;
     if (d && !d.open) d.showModal();
   }
@@ -54,7 +47,8 @@ export function GuidedTour() {
 
   return (
     <>
-      <p>
+      <p className="tour-hint">
+        {!opened && "New here? "}
         <button type="button" onClick={open}>
           Take the 2 minute tour
         </button>

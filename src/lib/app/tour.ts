@@ -2,8 +2,7 @@
  * The guided first run, plan feature 1: a short tour a new visitor can take in under two minutes, and skip at any time.
  * The steps are plain data, so a test can hold them to the length, and check that every link goes to a screen that exists.
  *
- * The tour cannot remember that someone has taken it, because the app stores nothing in the browser. So it opens on the
- * first visit to the home screen in each page load, can be closed at once, and can be opened again from a button.
+ * It opens only from its button, so it never covers the page on arrival, and it can be closed at once.
  */
 
 export type TourAction =

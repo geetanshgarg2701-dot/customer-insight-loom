@@ -1,40 +1,70 @@
 @import "tailwindcss";
 
 /*
- * The app look, chosen by the owner on 2026-11-21 from a reference they showed: near black, soft green beams of light from the
- * top, glass cards, pill buttons and one bright green card. The greens were sampled from the reference image. System fonts only,
- * so no font file is downloaded. Contrast was worked out from the colours: text on the card #f1f5f3 on #0b0e0d is 17 to 1, muted
- * #a3aba7 on the card 8 to 1, link mint #7fdcbc on the card 11 to 1, text on the green buttons #e2f2ea on #0e3426 11 to 1, and
- * mint on its pressed tint #11432e 7 to 1. Every rule below uses these tokens, so the look changes in one place.
+ * The app look, from docs/2026-11-21-visual-spec.md: a soft gray white page, dark ink, one dark pill, small chrome, and space and
+ * hairlines in place of boxes. A dark look follows the system setting. System fonts only, so no font file is downloaded. Every
+ * text color is at least 4.5 to 1 on every background here, worked out in the spec. Chart marks are at least 3 to 1, and the four
+ * series stay apart under simulated color blindness, held by src/app/journeys/theme.test.ts.
  */
 :root {
-  --canvas: #030303;
-  --surface: #0b0e0d;
-  --sunken: #111715;
-  --text: #f1f5f3;
-  --muted: #a3aba7;
-  --line: #26312c;
-  --accent: #7fdcbc;
-  --accent-fill: #0e3426;
-  --accent-ring: #2f8f6c;
-  --accent-tint: #11432e;
-  --accent-text: #e2f2ea;
-  --beam: rgba(30, 150, 108, 0.55);
-  --indigo: #050807;
-  --indigo-text: #cfd8d4;
-  --indigo-muted: #98a39e;
-  --gold: #96d9c4;
-  --danger: #ff9a9a;
+  --canvas: #ecedef;
+  --surface: #f5f5f6;
+  --sunken: #e3e5e8;
+  --text: #15171b;
+  --text-2: #3e434b;
+  --muted: #585e68;
+  --headline-light: #5a6270;
+  --accent: #1d5e47;
+  --chip: #dce8e2;
+  --note: #e2eae6;
+  --pill: #15171b;
+  --pill-hover: #2a2d33;
+  --on-pill: #f5f5f6;
+  --danger: #9b1c1c;
+  --danger-bg: #f6e4e4;
+  --control: #7d838c;
+  --line: #d3d6db;
+  --shade: rgba(21, 23, 27, 0.08);
+  --series-1: #0072b2;
+  --series-2: #c4510a;
+  --series-3: #007a5a;
+  --series-4: #a64b87;
   --font: system-ui, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
   --size: 16px;
   --gap: 1.1rem;
-  --radius: 14px;
+  --radius: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0e1012;
+    --surface: #16191c;
+    --sunken: #1d2125;
+    --text: #eceef0;
+    --text-2: #c9cdd2;
+    --muted: #a3a9b1;
+    --headline-light: #a9b1bd;
+    --accent: #7fd1b4;
+    --chip: #1e3a30;
+    --note: #18261f;
+    --pill: #eceef0;
+    --pill-hover: #c9cdd2;
+    --on-pill: #0e1012;
+    --danger: #ff9c9c;
+    --danger-bg: #2b1517;
+    --control: #6e757e;
+    --line: #2a2f34;
+    --shade: rgba(0, 0, 0, 0.4);
+    --series-1: #56b4e9;
+    --series-2: #e69f00;
+    --series-3: #2eb38c;
+    --series-4: #d08ab5;
+  }
 }
 
 html {
   background: var(--canvas);
-  color-scheme: dark;
+  color-scheme: light dark;
 }
 
 body {
@@ -42,11 +72,9 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: var(--size);
-  line-height: 1.55;
+  line-height: 1.6;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
-  background-size: 64px 64px;
 }
 
 /* The shell: the top menu, then the content. */
@@ -54,42 +82,13 @@ body {
   min-height: 100vh;
 }
 .content {
-  position: relative;
-  isolation: isolate;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 4rem);
+  min-height: calc(100vh - 3.5rem);
 }
 .content:focus {
   outline: none;
-}
-/* Three soft beams of light from the top of every page. They sit behind the content and take no clicks. */
-.content::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 22rem;
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(34px);
-  background:
-    radial-gradient(ellipse 9rem 20rem at 18% -1rem, var(--beam), transparent 70%),
-    radial-gradient(ellipse 9rem 22rem at 50% -1.5rem, var(--beam), transparent 70%),
-    radial-gradient(ellipse 9rem 20rem at 82% -1rem, var(--beam), transparent 70%);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .content::before {
-    animation: beams-in 0.9s ease-out both;
-  }
-}
-@keyframes beams-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .skip {
@@ -117,48 +116,31 @@ body {
   border: 0;
 }
 
-/* The top menu: the mark on the left, the groups in the middle, one pill button on the right. It stays at the top with a
-   blurred glass back, and slides in once when the page opens. */
+/* The top menu: a plain bar with small text, the mark on the left, the groups in the middle, two quiet links on the right. */
 nav.topnav {
   position: sticky;
   top: 0;
   z-index: 30;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  min-height: 4rem;
-  padding: 0.6rem 1rem;
-  background: rgba(3, 3, 3, 0.72);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  gap: 0 1rem;
+  min-height: 3.5rem;
+  padding: 0.4rem 1rem;
+  background: var(--canvas);
   border-bottom: 1px solid var(--line);
-  color: var(--indigo-text);
-}
-@media (prefers-reduced-motion: no-preference) {
-  nav.topnav {
-    animation: drop-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-}
-@keyframes drop-in {
-  from {
-    opacity: 0;
-    transform: translateY(-100%);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 nav.topnav a {
-  color: var(--indigo-text);
+  color: var(--text-2);
   text-decoration: none;
 }
 nav.topnav .brand {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-weight: 650;
-  color: #ffffff;
+  gap: 0.55rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
   letter-spacing: -0.01em;
   line-height: 1.2;
   margin-right: auto;
@@ -172,9 +154,14 @@ nav.topnav ul {
 nav.topnav li {
   margin: 0;
 }
-.menu-toggle {
-  display: none;
+nav.topnav svg {
+  flex: none;
+}
+nav.topnav .menu-toggle {
   margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  font-size: 0.875rem;
 }
 ul.menu {
   display: none;
@@ -183,31 +170,40 @@ ul.menu {
   position: relative;
 }
 nav.topnav .menu-item > a,
-nav.topnav .group-button {
+nav.topnav .group-button,
+nav.topnav .nav-end > a,
+nav.topnav .nav-end > button {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--indigo-text);
-  font-weight: 500;
-  font-size: 0.95rem;
+  gap: 0.35rem;
   margin: 0;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 nav.topnav .menu-item > a:hover,
 nav.topnav .group-button:hover,
-nav.topnav .group-button[aria-expanded="true"] {
-  background: rgba(255, 255, 255, 0.07);
-  color: #ffffff;
+nav.topnav .group-button[aria-expanded="true"],
+nav.topnav .nav-end > a:hover,
+nav.topnav .nav-end > button:hover {
+  color: var(--text);
 }
 nav.topnav .menu-item > a[aria-current="page"],
 nav.topnav .menu-item[data-current="true"] > .group-button {
-  color: #ffffff;
-  border-color: var(--accent-ring);
-  background: var(--accent-tint);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+nav.topnav .nav-end > button[aria-pressed="true"] {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
 }
 .chev {
   transition: transform 0.2s;
@@ -218,36 +214,23 @@ nav.topnav .menu-item[data-current="true"] > .group-button {
 .group-label {
   display: none;
 }
-/* A group's menu: a glass panel under its button. */
+/* A group's menu: a plain panel under its button. */
 ul.drop {
   display: none;
   position: absolute;
   top: calc(100% + 0.5rem);
   left: 0;
-  min-width: 13.5rem;
+  min-width: 13rem;
+}
+nav.topnav ul.drop {
   padding: 0.4rem;
-  background: rgba(11, 14, 13, 0.96);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 12px 32px var(--shade);
 }
 ul.drop.open {
   display: block;
-}
-@media (prefers-reduced-motion: no-preference) {
-  ul.drop.open {
-    animation: menu-in 0.18s ease-out both;
-  }
-}
-@keyframes menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 ul.drop a {
   display: flex;
@@ -255,88 +238,93 @@ ul.drop a {
   gap: 0.65rem;
   padding: 0.5rem 0.7rem;
   border-radius: 10px;
+  font-size: 0.875rem;
   white-space: nowrap;
 }
 ul.drop a:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #ffffff;
+  background: var(--sunken);
 }
-ul.drop a[aria-current="page"] {
-  background: var(--accent-tint);
-  color: #ffffff;
+nav.topnav ul.drop a[aria-current="page"] {
+  background: var(--chip);
+  color: var(--text);
   font-weight: 600;
 }
-nav.topnav svg {
-  flex: none;
-}
-nav.topnav a:focus-visible,
-nav.topnav button:focus-visible {
-  outline: 3px solid var(--gold);
-  outline-offset: 1px;
-}
-nav.topnav .topnav-cta {
+.nav-end {
   display: none;
 }
-
-/* A laptop: the groups sit in the middle of the bar and the pill button on the right. */
+@media (prefers-reduced-motion: no-preference) {
+  ul.drop.open {
+    animation: menu-in 0.2s ease-out both;
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+/* A laptop: the groups sit in the middle of the bar. */
 @media (min-width: 900px) {
   nav.topnav {
-    padding: 0.6rem 2rem;
+    flex-wrap: nowrap;
+    padding: 0.4rem 2rem;
   }
   nav.topnav .brand {
-    margin-right: 0;
     flex: 1 1 0;
+    margin: 0;
+  }
+  nav.topnav .menu-toggle {
+    display: none;
   }
   ul.menu {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
   }
-  nav.topnav .topnav-cta {
-    display: inline-block;
-    flex: 0 0 auto;
-    color: var(--accent-text);
+  .nav-end {
+    display: flex;
+    flex: 1 1 0;
+    justify-content: flex-end;
   }
 }
-/* A phone: one Menu button opens the whole list, with the groups listed flat under their names. */
+/* Below that: one Menu button opens the whole list, with the groups listed flat and the two quiet links at the end. */
 @media (max-width: 899px) {
-  nav.topnav {
-    flex-wrap: wrap;
-  }
-  .menu-toggle {
-    display: inline-block;
-  }
   ul.menu.open {
     display: block;
     flex-basis: 100%;
-    order: 3;
-    padding: 0.4rem 0 0.8rem;
+    padding: 0.4rem 0;
   }
-  .group-button {
-    display: none !important;
+  ul.menu.open ~ .nav-end {
+    display: flex;
+    flex-basis: 100%;
+    border-top: 1px solid var(--line);
+    padding: 0.4rem 0;
+  }
+  nav.topnav:has(ul.menu.open) {
+    max-height: 100dvh;
+    overflow-y: auto;
+  }
+  nav.topnav .group-button {
+    display: none;
   }
   .group-label {
     display: block;
-    color: var(--indigo-muted);
-    font-size: 0.8rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
     font-weight: 600;
-    margin: 0.7rem 0 0.2rem 0.8rem;
+    margin: 0.7rem 0 0.2rem 0.7rem;
   }
   ul.drop {
     display: block;
     position: static;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-    padding: 0;
-    min-width: 0;
   }
-  ul.drop a {
-    padding: 0.45rem 0.8rem;
+  nav.topnav ul.drop {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
   nav.topnav .menu-item > a {
-    display: flex;
-    border-radius: 10px;
+    font-size: 0.875rem;
   }
 }
 
@@ -354,26 +342,27 @@ main {
 }
 
 h1 {
-  font-size: 2.1rem;
+  font-size: 2rem;
   line-height: 1.15;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin: 0 0 0.6rem;
 }
 h2 {
-  font-size: 1.15rem;
-  font-weight: 650;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0 0 0.6em;
 }
 h3 {
-  font-size: 1rem;
-  font-weight: 650;
+  font-size: 1.0625rem;
+  font-weight: 600;
   margin: 1.2em 0 0.4em;
 }
 p {
   margin: 0 0 var(--gap);
-  max-width: 72ch;
+  max-width: 68ch;
 }
 main > p {
   color: var(--muted);
@@ -411,67 +400,60 @@ li {
   margin-bottom: 0.4em;
 }
 
-/* Sections are the cards. A section inside a section is a part of the card, set off by a rule, not a card in a card. */
+/* A section is set apart by space and one hairline, not by a box. */
 section {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)), var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.4rem;
-  margin-bottom: 1.25rem;
+  border-top: 1px solid var(--line);
+  padding: 1.75rem 0 0;
+  margin-bottom: 3rem;
 }
 section section {
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  padding: 1rem 0 0;
-  margin-bottom: 1rem;
+  padding-top: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 figure {
   margin: 0 0 0.5rem;
 }
 
+/* A plain button is an outlined pill. The dark pill, for the main action of a form, is the one filled style. */
 button {
   font: inherit;
-  font-weight: 550;
+  font-weight: 500;
   color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: transparent;
+  border: 1px solid var(--control);
   border-radius: 999px;
-  padding: 0.42em 1.1em;
+  padding: 0.45em 1.15em;
   margin: 0 0.5em 0.5em 0;
   cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
 }
 button:hover:not(:disabled) {
-  border-color: var(--accent-ring);
-  color: var(--accent);
+  border-color: var(--text);
 }
-/* The main action of a form. */
 button[type="submit"] {
-  background: var(--accent-fill);
-  border-color: var(--accent-ring);
-  color: var(--accent-text);
-  box-shadow: 0 0 22px -8px rgba(38, 122, 91, 0.8);
+  background: var(--pill);
+  border-color: var(--pill);
+  color: var(--on-pill);
+  font-weight: 600;
 }
 button[type="submit"]:hover:not(:disabled) {
-  background: #134a36;
-  color: var(--accent-text);
+  background: var(--pill-hover);
+  border-color: var(--pill-hover);
 }
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-/* A toggle, such as a chart filter or a choice of step: a chip that fills with the accent tint when pressed. */
+/* A toggle, such as a chart filter or a choice of step. */
 button[aria-pressed] {
-  border-radius: 999px;
-  padding: 0.22em 0.8em;
+  padding: 0.22em 0.85em;
   margin-right: 0.4em;
-  font-weight: 500;
 }
 button[aria-pressed="true"] {
-  background: var(--accent-tint);
+  background: var(--chip);
   border-color: var(--accent);
   color: var(--accent);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 input,
@@ -480,9 +462,9 @@ textarea {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control);
   border-radius: 10px;
-  padding: 0.3em 0.55em;
+  padding: 0.35em 0.6em;
   max-width: 100%;
 }
 input[type="checkbox"],
@@ -495,12 +477,31 @@ textarea:disabled {
   background: var(--sunken);
   color: var(--muted);
 }
+/* A file picker is a dashed outline with an outlined pill inside, so it reads as a control. */
 input[type="file"] {
   width: 100%;
+  max-width: 30rem;
   background: transparent;
-  border: 0;
-  padding-left: 0;
+  border: 1px dashed var(--control);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
 }
+input[type="file"]::file-selector-button {
+  font: inherit;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--control);
+  border-radius: 999px;
+  padding: 0.3em 0.95em;
+  margin-right: 0.8rem;
+  cursor: pointer;
+}
+/* The filter rows sit close together, one row to a kind of filter. */
+section[aria-labelledby="h-filters"] p[role="group"] {
+  margin-bottom: 0.35rem;
+}
+
 /* A file picker is wider than a phone by default, so its label takes the full row. */
 label:has(input[type="file"]) {
   display: block;
@@ -523,8 +524,8 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 a:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 table {
@@ -571,26 +572,30 @@ table.flow th:last-child {
   text-align: right;
 }
 
+/* A group of controls is set apart by one hairline, not a box. */
 fieldset {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: var(--gap);
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 0.9rem 0 0;
   margin: 0 0 var(--gap);
 }
 legend {
-  padding: 0 0.4em;
+  padding: 0;
   color: var(--muted);
+  font-size: 0.875rem;
+}
+[role="alert"],
+main [role="status"]:not(section):not(:empty) {
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
 }
 [role="alert"] {
   color: var(--danger);
-  background: #2a1214;
-  border-left: 3px solid var(--danger);
-  border-radius: 0 8px 8px 0;
-  padding: 0.5rem 0.75rem;
+  background: var(--danger-bg);
 }
-main [role="status"]:not(section) {
-  border-left: 3px solid var(--gold);
-  padding-left: 0.75rem;
+main [role="status"]:not(section):not(:empty) {
+  background: var(--note);
 }
 
 footer[aria-label="Site"] {
@@ -631,8 +636,8 @@ summary:hover {
   text-decoration: underline;
 }
 summary:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 details[open] > summary {
   margin-bottom: 0.5rem;
@@ -653,15 +658,16 @@ dialog.tour {
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 1.4rem 1.6rem 1.2rem;
+  text-align: left;
   width: min(34rem, calc(100vw - 2rem));
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 12px 32px var(--shade);
 }
 dialog.tour::backdrop {
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(21, 23, 27, 0.35);
 }
 dialog.tour h2 {
   font-size: 1.3rem;
@@ -682,7 +688,7 @@ dialog.tour h2 {
 .tour-bar > span {
   display: block;
   height: 100%;
-  background: var(--accent-ring);
+  background: var(--text);
 }
 .tour-actions {
   display: flex;
@@ -699,23 +705,18 @@ dialog.tour h2 {
 }
 a.button-link {
   display: inline-block;
-  font-weight: 550;
-  color: var(--accent-text);
-  background: var(--accent-fill);
-  border: 1px solid var(--accent-ring);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--on-pill);
+  background: var(--pill);
   border-radius: 999px;
-  padding: 0.42em 1.1em;
+  padding: 0.82rem 1.375rem;
   text-decoration: none;
-  box-shadow: 0 0 22px -8px rgba(38, 122, 91, 0.8);
+  transition: background-color 0.12s;
 }
 a.button-link:hover {
-  background: #134a36;
-}
-a.button-link.plain {
-  background: transparent;
-  border-color: var(--line);
-  color: var(--text);
-  box-shadow: none;
+  background: var(--pill-hover);
 }
 
 /* The warning before the retention timer deletes the tab's data. It sits above everything at the bottom of the screen. */
@@ -730,7 +731,7 @@ a.button-link.plain {
   background: var(--surface);
   border: 2px solid var(--danger);
   border-radius: var(--radius);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 12px 32px var(--shade);
   padding: 0.9rem 1.1rem 0.5rem;
 }
 .retention-warning p {
@@ -745,11 +746,8 @@ dl.tiles {
   margin: 0 0 1.25rem;
 }
 dl.tiles > div {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-top: 3px solid var(--accent-ring);
-  border-radius: var(--radius);
-  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--line);
+  padding: 0.8rem 0 0;
 }
 dl.tiles dt {
   color: var(--muted);
@@ -760,327 +758,128 @@ dl.tiles dt {
 dl.tiles dd {
   margin: 0.2rem 0 0;
   font-size: 1.55rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
-/* The home screen: a hero with the headline, then the screens grouped as they are in the sidebar, one card per group. */
-@property --n {
-  syntax: "<integer>";
-  initial-value: 0;
-  inherits: false;
-}
+/* The home screen: one centered column with a three line headline, one dark pill, and a faded chart of the synthetic journeys. */
 .hero {
-  display: grid;
-  gap: 1.5rem 2.5rem;
-  align-items: center;
-  padding: 1.5rem 0 1rem;
+  text-align: center;
+  padding: 1.75rem 0 4.5rem;
 }
 @media (min-width: 900px) {
   .hero {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    padding: 2.5rem 0 1.5rem;
+    padding: 4.5rem 0 7rem;
   }
 }
-.hero-copy {
-  min-width: 0;
-}
-.hero .badge {
-  display: inline-block;
-  font-size: 0.85rem;
-  padding: 0.28rem 0.9rem;
-  border-radius: 999px;
-  border: 1px solid var(--accent-ring);
-  background: var(--accent-tint);
-  color: var(--accent-text);
-  margin: 0 0 1.1rem;
-}
-/* The headline appears one line at a time: each line slides up out of its own mask. */
 .hero h1 {
-  font-size: clamp(2.3rem, 5.4vw, 3.7rem);
-  line-height: 1.06;
+  font-size: clamp(2.1rem, 6vw, 4rem);
+  line-height: 1.07;
   font-weight: 600;
-  letter-spacing: -0.025em;
-  margin: 0 0 1rem;
+  letter-spacing: -0.03em;
+  margin: 0 auto 1.4rem;
+  max-width: 48rem;
+  text-wrap: balance;
 }
 .hero h1 .line {
   display: block;
-  overflow: hidden;
-  padding-bottom: 0.1em;
 }
-.hero h1 .line > span {
-  display: inline-block;
-  background: linear-gradient(90deg, #6cc7a8 0%, #d1f0e8 45%, #ffffff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.hero h1 .light {
+  font-weight: 300;
+  color: var(--headline-light);
 }
 .hero .home-lead {
-  margin: 0 0 1.4rem;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 46ch;
+  margin: 0 auto 1.75rem;
 }
 .hero .cta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.5rem;
 }
-/* The facts under the buttons, set apart by thin rules like the figures in the reference. */
-.hero-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.2rem 0;
-  margin: 1.8rem 0 0;
-}
-.hero-stats > div {
-  padding: 0 1.1rem;
-  border-left: 1px solid var(--line);
-}
-.hero-stats > div:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-.hero-stats dd {
-  margin: 0;
-  font-size: 1.6rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-.hero-stats dt {
-  margin: 0.15rem 0 0;
+.tour-hint {
+  margin: 1.1rem auto 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
+}
+.tour-hint button {
+  border: 0;
+  border-radius: 4px;
+  margin: 0;
+  padding: 0.25rem 0.2rem;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+/* Only the shape fades. Its numbers sit below it at full strength, because a faded mark must never be the only way to read them. */
+.hero-funnel {
+  max-width: 64rem;
+  margin: 2.75rem auto 0;
+}
+.hero-funnel svg {
+  display: block;
+  width: 100%;
+  height: 12.5rem;
+  color: var(--accent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+@media (min-width: 900px) {
+  .hero-funnel svg {
+    height: 20rem;
+  }
+}
+.hero-funnel dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0.5rem 0 0;
+}
+.hero-funnel dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
   font-weight: 400;
 }
-/* The numbers count up once. Their final value is the starting value, so nothing breaks where the animation is not supported. */
-.count {
-  --n: var(--to);
-  counter-reset: num var(--n);
+.hero-funnel dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.9375rem;
 }
-.count::before {
-  content: counter(num);
-}
-
-/* The picture on the right: four glass layers that drop into a stack and then float, with two glass cards beside them. */
-.hero-visual {
-  position: relative;
-  min-height: 21rem;
-  perspective: 1100px;
-}
-.stack {
-  position: absolute;
-  inset: 0;
-}
-.layer {
-  position: absolute;
-  left: 14%;
-  top: 14%;
-  width: 62%;
-  aspect-ratio: 1.55;
-  border-radius: 20px;
-  border: 1px solid rgba(150, 217, 196, 0.45);
-  background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.28) 1px, transparent 1.5px) 0 0 / 14px 14px,
-    linear-gradient(135deg, rgba(38, 122, 91, 0.6), rgba(150, 217, 196, 0.14));
-  box-shadow: 0 0 44px -8px var(--beam), inset 0 0 24px rgba(150, 217, 196, 0.12);
-  transform: translateY(var(--y)) rotateX(58deg) rotateZ(-32deg);
-  transform-style: preserve-3d;
-}
-.layer.l1 {
-  --y: 150px;
-  opacity: 0.55;
-}
-.layer.l2 {
-  --y: 100px;
-  opacity: 0.72;
-}
-.layer.l3 {
-  --y: 50px;
-  opacity: 0.88;
-}
-.layer.l4 {
-  --y: 0px;
-  border-color: rgba(209, 240, 232, 0.8);
-}
-.float-card {
-  position: absolute;
-  max-width: 13.5rem;
-  padding: 0.7rem 0.9rem;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: rgba(11, 14, 13, 0.72);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  font-size: 0.82rem;
+.hero-funnel figcaption {
+  margin-top: 0.9rem;
   color: var(--muted);
-  line-height: 1.35;
-}
-.float-card strong {
-  display: block;
-  color: var(--text);
-  font-size: 0.98rem;
-  margin: 0.1rem 0;
-}
-.float-card.fc1 {
-  top: 2%;
-  left: 0;
-}
-.float-card.fc2 {
-  bottom: 4%;
-  right: 0;
+  font-size: 0.8125rem;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .hero-copy > .badge,
-  .hero-copy > .home-lead,
-  .hero-copy > .cta,
-  .hero-copy > .hero-stats {
-    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  .hero h1 .line {
+    animation: line-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
-  .hero-copy > .badge {
+  .hero h1 .line:nth-child(2) {
     animation-delay: 0.1s;
   }
-  .hero h1 .line > span {
-    animation: line-up 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-  .hero h1 .line:nth-child(1) > span {
+  .hero h1 .line:nth-child(3) {
     animation-delay: 0.2s;
   }
-  .hero h1 .line:nth-child(2) > span {
-    animation-delay: 0.34s;
-  }
-  .hero-copy > .home-lead {
-    animation-delay: 0.5s;
-  }
-  .hero-copy > .cta {
-    animation-delay: 0.62s;
-  }
-  .hero-copy > .hero-stats {
-    animation-delay: 0.74s;
-  }
-  .count {
-    animation: count-up 1.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.9s both;
-  }
-  .stack {
-    animation: float 6.5s ease-in-out 1.8s infinite alternate;
-  }
-  .layer {
-    animation: layer-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-  .layer.l1 {
-    animation-delay: 0.3s;
-  }
-  .layer.l2 {
-    animation-delay: 0.45s;
-  }
-  .layer.l3 {
-    animation-delay: 0.6s;
-  }
-  .layer.l4 {
-    animation-delay: 0.75s;
-  }
-  .float-card {
-    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both, drift 7s ease-in-out 2s infinite alternate;
-  }
-  .float-card.fc1 {
-    animation-delay: 1.2s, 2s;
-  }
-  .float-card.fc2 {
-    animation-delay: 1.4s, 3s;
-  }
-}
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+  .hero-funnel svg {
+    animation: fade-in 0.6s ease-out 0.2s both;
   }
 }
 @keyframes line-up {
   from {
-    transform: translateY(110%);
-  }
-  to {
-    transform: none;
-  }
-}
-@keyframes count-up {
-  from {
-    --n: 0;
-  }
-  to {
-    --n: var(--to);
-  }
-}
-@keyframes layer-in {
-  from {
     opacity: 0;
-    transform: translateY(calc(var(--y) - 90px)) rotateX(58deg) rotateZ(-32deg);
+    transform: translateY(0.35em);
   }
 }
-@keyframes float {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-14px);
-  }
-}
-@keyframes drift {
-  from {
-    translate: 0 0;
-  }
-  to {
-    translate: 0 -8px;
-  }
-}
-@media (max-width: 899px) {
-  .hero-visual {
-    min-height: 17rem;
-  }
-}
-/* A card lifts and its edge lights up when the pointer is on it. */
-.home-groups > section {
-  transition: transform 0.25s ease, border-color 0.25s ease;
-}
-.home-groups > section:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent-ring);
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-groups > section {
-    transition: none;
-  }
-  .home-groups > section:hover {
-    transform: none;
-  }
-}
-.home-lead {
-  font-size: 1.1rem;
-  max-width: 60ch;
-}
-/* The first group is the bright card, as in the reference: black at the top fading to green. */
-.home-groups > section:first-child {
-  background: linear-gradient(180deg, #040606 0%, #15271f 55%, #1b5a43 100%);
-  box-shadow: 0 20px 60px -28px var(--beam);
-}
-.home-groups > section:first-child li p,
-.home-groups > section:first-child > p {
-  color: #dbe6e1;
-}
-.home-groups > section:first-child li {
-  border-top-color: rgba(255, 255, 255, 0.22);
-}
-.home-groups {
-  display: grid;
-  gap: 1.25rem;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  margin-bottom: 1.25rem;
-}
-.home-groups > section {
-  margin: 0;
+
+/* Where to start: one ruled list, a group to a row. */
+.home-groups h2 {
+  margin-bottom: 0.3rem;
 }
 .home-groups ul {
   list-style: none;
@@ -1088,46 +887,41 @@ dl.tiles dd {
   margin: 0;
 }
 .home-groups li {
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--line);
-  margin: 0;
-}
-.home-groups li:first-child {
-  border-top: 0;
-  padding-top: 0;
+  margin: 0 0 1rem;
 }
 .home-groups li a {
   font-weight: 600;
 }
-.home-groups li p {
-  margin: 0.15rem 0 0;
+.home-groups p {
+  margin: 0.1rem 0 0;
   color: var(--muted);
 }
+.home-groups > section > div > p {
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 700px) {
+  .home-groups > section {
+    display: grid;
+    grid-template-columns: 12rem minmax(0, 1fr);
+    gap: 0 3rem;
+  }
+}
 
-/* The evidence chain: one box per link, joined by a rule, so the order reads top to bottom on any width. */
+/* The evidence chain: one row per link, set off by a hairline, so the order reads top to bottom on any width. */
 ol.chain {
   list-style: none;
   padding: 0;
   margin: 1rem 0;
 }
 ol.chain > li {
-  border: 1px solid var(--line);
-  padding: 0.6rem 0.8rem;
-  position: relative;
-}
-ol.chain > li + li {
-  margin-top: 1.4rem;
-}
-ol.chain > li + li::before {
-  content: "";
-  position: absolute;
-  left: 1.5rem;
-  top: calc(-1.4rem - 1px);
-  height: 1.4rem;
-  border-left: 1px solid var(--line);
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 0.7rem 0;
+  margin: 0;
 }
 ol.chain > li[data-status="missing"] {
-  border-style: dashed;
+  border-top-style: dashed;
 }
 ol.chain > li[data-status="missing"] > span {
   color: var(--muted);
@@ -1141,6 +935,7 @@ ol.chain > li > p {
   display: none;
   width: 100%;
   border: 1px solid var(--line);
+  border-radius: var(--radius);
   margin: 1rem 0;
 }
 @media (min-width: 700px) {
@@ -1157,21 +952,16 @@ html[data-motion="reduce"] *::after {
   transition: none !important;
   scroll-behavior: auto !important;
 }
-nav.topnav .motion-switch {
-  margin: 0;
-  font-size: 0.85rem;
-  padding: 0.3em 0.8em;
-  white-space: nowrap;
-}
 
 /* Loading: the shape of what is coming, a plain line, and a thin bar that slides. All soft, and still under reduced motion. */
-.skeleton {
-  margin: 0 0 1.25rem;
+main .skeleton[role="status"]:not(section):not(:empty) {
+  background: transparent;
+  padding: 0;
 }
 .sk {
   display: block;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #0f1412 0%, #18211d 50%, #0f1412 100%);
+  background: linear-gradient(90deg, var(--sunken) 0%, var(--surface) 50%, var(--sunken) 100%);
   background-size: 200% 100%;
   border: 1px solid var(--line);
 }
@@ -1188,7 +978,7 @@ nav.topnav .motion-switch {
   width: 35%;
   height: 100%;
   border-radius: 999px;
-  background: var(--accent-ring);
+  background: var(--text);
 }
 .sk-tiles {
   display: grid;
@@ -1250,15 +1040,15 @@ nav.topnav .motion-switch {
 
 /* The range picture: a number line with zero dashed, the interval as a bar that grows out from the lift, and the lift as a dot. */
 .range-plot {
-  --tone: #f2c14e;
+  --tone: var(--text-2);
   margin: 1rem 0 1.25rem;
   max-width: 40rem;
 }
 .range-plot[data-tone="above"] {
-  --tone: #5fd3a8;
+  --tone: var(--series-3);
 }
 .range-plot[data-tone="below"] {
-  --tone: #ff8a9a;
+  --tone: var(--series-2);
 }
 .range-stage {
   position: relative;
@@ -1285,7 +1075,10 @@ nav.topnav .motion-switch {
   height: 16px;
   border-radius: 999px;
   background: var(--tone);
-  opacity: 0.85;
+}
+.range-plot[data-tone="spans"] .range-bar {
+  background: transparent;
+  border: 2px dashed var(--tone);
 }
 .range-lift {
   position: absolute;
@@ -1294,8 +1087,8 @@ nav.topnav .motion-switch {
   height: 20px;
   margin-left: -10px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 3px solid var(--tone);
+  background: var(--surface);
+  border: 3px solid var(--text);
 }
 .range-ticks {
   position: absolute;
@@ -1318,10 +1111,10 @@ nav.topnav .motion-switch {
 }
 @media (prefers-reduced-motion: no-preference) {
   .range-bar {
-    animation: range-grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: range-grow 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
   .range-lift {
-    animation: range-pop 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.55s both;
+    animation: range-pop 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s both;
   }
 }
 @keyframes range-grow {
@@ -1334,4 +1127,9 @@ nav.topnav .motion-switch {
     opacity: 0;
     transform: scale(0.3);
   }
+}
+
+/* The flow drawings carry their maker's credit. It takes the page's colors so it stays readable in both looks. */
+.react-flow__attribution {
+  background: var(--surface) !important;
 }

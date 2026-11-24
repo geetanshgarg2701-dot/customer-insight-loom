@@ -1,13 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-/** The tour opens by itself on the first visit. These tests are about the menu and the hero, so they close it first. */
 async function openHome(page: Page) {
   await page.goto("/");
-  const tour = page.getByRole("dialog");
-  await expect(tour).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(tour).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 }
 
 test("a group opens as a small menu, closes with Escape and puts focus back, and one group is open at a time", async ({ page }) => {
@@ -80,27 +76,73 @@ test("on a phone the whole menu folds behind one Menu button, with the groups li
   await expect(menu).toHaveAttribute("aria-expanded", "false");
 });
 
-test("the home hero animates when motion is allowed and is simply there when it is not", async ({ page }) => {
+test("the headline arrives line by line when motion is allowed and is simply there when it is not", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openHome(page);
   const animationOf = (selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationName);
-  expect(await animationOf(".hero h1 .line > span")).toBe("line-up");
-  expect(await animationOf(".layer.l4")).toBe("layer-in");
-  expect(await animationOf("nav.topnav")).toBe("drop-in");
-  // The numbers end on their real values.
-  await expect.poll(() => page.locator(".hero-stats .count").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--n").trim()), { timeout: 8000 }).toBe("100");
-  await expect.poll(() => page.locator(".hero-stats .count").nth(1).evaluate((el) => getComputedStyle(el).getPropertyValue("--n").trim()), { timeout: 8000 }).toBe("95");
+  expect(await animationOf(".hero h1 .line")).toBe("line-up");
+  expect(await animationOf(".hero-funnel svg")).toBe("fade-in");
+  // The last line is lighter in weight and in color.
+  const style = (selector: string) => page.locator(selector).evaluate((el) => ({ weight: getComputedStyle(el).fontWeight, color: getComputedStyle(el).color }));
+  expect(await style(".hero h1 .light")).toEqual({ weight: "300", color: "rgb(90, 98, 112)" });
+  expect(await style(".hero h1")).toEqual({ weight: "600", color: "rgb(21, 23, 27)" });
 
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await animationOf(".hero h1 .line > span")).toBe("none");
-  expect(await animationOf(".layer.l4")).toBe("none");
-  expect(await animationOf("nav.topnav")).toBe("none");
-  expect(await animationOf(".hero-stats .count")).toBe("none");
-  expect(await page.locator(".hero-stats .count").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--n").trim())).toBe("100");
-  // A screen reader hears the real figures, not the counting.
-  await expect(page.locator(".hero-stats")).toContainText("100,000");
-  await expect(page.locator(".hero-stats")).toContainText("95 percent");
+  expect(await animationOf(".hero h1 .line")).toBe("none");
+  expect(await animationOf(".hero-funnel svg")).toBe("none");
 });
+
+test("the faded chart says the same counts as the Journeys screen, in text that does not fade", async ({ page }) => {
+  await openHome(page);
+  const picture = page.getByRole("img", { name: /Synthetic example/ });
+  for (const n of ["100,000", "69,311", "35,519", "16,294"]) {
+    await expect(picture).toHaveAccessibleName(new RegExp(n));
+    await expect(page.locator(".hero-funnel dl")).toContainText(n);
+  }
+  expect(await page.locator(".hero-funnel dl").evaluate((el) => getComputedStyle(el).maskImage)).toBe("none");
+});
+
+test("the home screen has one dark pill, no glass, no glow and no left stripe", async ({ page }) => {
+  await openHome(page);
+  const found = await page.evaluate(() => {
+    const dark = getComputedStyle(document.querySelector(".hero .button-link")!).backgroundColor;
+    const out = { pills: 0, glass: 0, shadow: 0, stripe: 0, gradient: 0 };
+    for (const el of document.querySelectorAll("body *:not(nextjs-portal)")) {
+      for (const pseudo of [null, "::before"]) {
+        const s = getComputedStyle(el, pseudo);
+        if (s.backdropFilter !== "none") out.glass++;
+        if (s.boxShadow !== "none" && !s.boxShadow.includes("inset")) out.shadow++;
+        if (parseFloat(s.borderLeftWidth) > parseFloat(s.borderTopWidth)) out.stripe++;
+        if (s.backgroundImage.includes("gradient")) out.gradient++;
+      }
+      if ((el.tagName === "A" || el.tagName === "BUTTON") && el.getClientRects().length > 0 && getComputedStyle(el).backgroundColor === dark) out.pills++;
+    }
+    return out;
+  });
+  // The closed tour card and the closed menus carry a soft shadow, and none of them is on show.
+  const shadowsOnShow = await page.evaluate(() => [...document.querySelectorAll("main *, nav *")].filter((el) => el.getClientRects().length > 0 && !["none"].includes(getComputedStyle(el).boxShadow) && !getComputedStyle(el).boxShadow.includes("inset")).length);
+  expect({ ...found, shadow: shadowsOnShow }).toEqual({ pills: 1, glass: 0, shadow: 0, stripe: 0, gradient: 0 });
+});
+
+test("the dark look follows the system setting, and the home screen and menu pass axe in it", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await openHome(page);
+  expect(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(14, 16, 18)");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Customers", exact: true }).click();
+  await page.waitForTimeout(1200);
+  const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).exclude("nextjs-portal").analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((x) => x.target.join(" ")).join(" | ")}`)).toEqual([]);
+});
+
+for (const path of ["/ledger", "/intake", "/compliance", "/drafts", "/ingest", "/data", "/check", "/insights", "/pipeline", "/journeys", "/methods", "/privacy", "/terms", "/no-such-page"]) {
+  test(`${path} passes axe in the dark look`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).exclude("nextjs-portal").analyze();
+    expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((x) => x.target.join(" ")).join(" | ")}`)).toEqual([]);
+  });
+}
 
 test("the hero and the open menu have no axe violations", async ({ page }) => {
   await openHome(page);

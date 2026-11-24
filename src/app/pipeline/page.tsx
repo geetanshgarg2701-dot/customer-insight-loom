@@ -10,7 +10,7 @@ import { PIPELINE_AS_OF, PIPELINE_STAGES } from "@/lib/demo/pipeline";
 import { formatPercent, formatSignedPoints } from "@/lib/app/format";
 import { pipelineTiles } from "@/lib/charts/pipeline-tiles";
 import { createBrowserPipelineBoard, type PipelineBoard } from "@/lib/duckdb/client";
-import { CHART_THEME, type ChartTheme } from "../journeys/theme";
+import { useChartTheme, type ChartTheme } from "../journeys/theme";
 import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
@@ -137,6 +137,7 @@ function snapshotOption(s: PipelineAt, max: number, theme: ChartTheme): ChartOpt
 }
 
 export default function PipelinePage() {
+  const chartTheme = useChartTheme();
   const board = useRef<PipelineBoard | null>(null);
   const openedFromLink = useRef(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -446,7 +447,7 @@ export default function PipelinePage() {
             <p>How many deals reached each stage, and the share of the stage before that made it.</p>
             <Chart
               label="Deals that reached each stage"
-              option={funnelOption(funnel, selection.stage ?? [], CHART_THEME)}
+              option={funnelOption(funnel, selection.stage ?? [], chartTheme)}
               height={200}
               onSelect={(name) => void toggle("stage", name)}
             />
@@ -588,7 +589,7 @@ export default function PipelinePage() {
                 </p>
                 <Chart
                   label="Deals open in each stage on the chosen date"
-                  option={snapshotOption(snapshot, scaleMax, CHART_THEME)}
+                  option={snapshotOption(snapshot, scaleMax, chartTheme)}
                   height={240}
                 />
                 <table aria-label="Pipeline over time">
@@ -635,7 +636,7 @@ export default function PipelinePage() {
               <>
                 <Chart
                   label={`Days from ${dwell.from} to ${dwell.to}, deals per range`}
-                  option={dwellOption(dwell, CHART_THEME)}
+                  option={dwellOption(dwell, chartTheme)}
                   height={240}
                 />
                 <p>
@@ -663,7 +664,7 @@ export default function PipelinePage() {
             <p>
               {stalledTotal.toLocaleString("en-US")} open deals have not moved for {threshold} days or more.
             </p>
-            <Chart label="Stalled deals by stage" option={stalledOption(stalled, CHART_THEME)} height={200} />
+            <Chart label="Stalled deals by stage" option={stalledOption(stalled, chartTheme)} height={200} />
             <table className="short-first" aria-label="Stalled deals">
               <thead>
                 <tr>

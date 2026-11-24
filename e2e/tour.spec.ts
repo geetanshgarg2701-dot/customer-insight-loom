@@ -2,9 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { navTo } from "./nav-helper";
 
-test("the tour opens on its own, walks four steps, loads the demo ledger, and finishes", async ({ page }) => {
+test("the tour opens from its button, walks four steps, loads the demo ledger, and finishes", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/");
+  await page.getByRole("button", { name: "Take the 2 minute tour" }).click();
   const tour = page.getByRole("dialog", { name: "Quick tour of the app" });
   await expect(tour).toBeVisible();
   await expect(tour.getByText("Step 1 of 4")).toBeVisible();
@@ -38,6 +39,7 @@ test("the tour card is centered on the screen, on a laptop and on a phone, and f
   for (const size of [{ width: 1280, height: 800 }, { width: 375, height: 812 }]) {
     await page.setViewportSize(size);
     await page.goto("/");
+    await page.getByRole("button", { name: "Take the 2 minute tour" }).click();
     const tour = page.getByRole("dialog", { name: "Quick tour of the app" });
     await expect(tour).toBeVisible();
     const box = (await tour.boundingBox())!;
@@ -51,8 +53,9 @@ test("the tour card is centered on the screen, on a laptop and on a phone, and f
   }
 });
 
-test("Skip and Escape close it at once, it does not reopen on its own in the same visit, and the button brings it back", async ({ page }) => {
+test("Skip and Escape close it at once, it never opens on its own, and the button brings it back", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Take the 2 minute tour" }).click();
   const tour = page.getByRole("dialog", { name: "Quick tour of the app" });
   await expect(tour).toBeVisible();
   await tour.getByRole("button", { name: "Skip the tour" }).click();
@@ -71,14 +74,16 @@ test("Skip and Escape close it at once, it does not reopen on its own in the sam
   await page.keyboard.press("Escape");
   await expect(tour).toBeHidden();
 
-  // Nothing is remembered between visits, because the app stores nothing, so a reload shows it again.
+  // Nothing is remembered between visits, because the app stores nothing, so a reload greets a person as new, with the tour closed.
   await page.reload();
-  await expect(page.getByRole("dialog", { name: "Quick tour of the app" })).toBeVisible();
+  await expect(page.getByText("New here?")).toBeVisible();
+  await expect(tour).toBeHidden();
 });
 
 test("focus stays inside the open tour, and the tour has no axe violations and fits a phone", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
+  await page.getByRole("button", { name: "Take the 2 minute tour" }).click();
   const tour = page.getByRole("dialog", { name: "Quick tour of the app" });
   await expect(tour).toBeVisible();
   for (let i = 0; i < 6; i++) {
@@ -94,4 +99,27 @@ test("focus stays inside the open tour, and the tour has no axe violations and f
   expect(overflow).toBeLessThanOrEqual(0);
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).exclude("nextjs-portal").analyze();
   expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((x) => x.target.join(" ")).join(" | ")}`)).toEqual([]);
+});
+
+test("on arrival nothing covers the headline, the line under it or the main button, at three widths", async ({ page }) => {
+  for (const width of [390, 820, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    // Long enough for the headline to finish arriving, and for a tour that opened by itself to show.
+    await page.waitForTimeout(1500);
+    await expect(page.locator("dialog[open]"), `${width}`).toHaveCount(0);
+    for (const selector of [".hero h1", ".hero .home-lead", ".hero .button-link"]) {
+      const seen = await page.locator(selector).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const inside = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+        // Nine points over the box: whatever is on top at each must be the element, part of it, or the plain page around it.
+        const clear = [0.05, 0.5, 0.95].every((x) => [0.1, 0.5, 0.9].every((y) => {
+          const top = document.elementFromPoint(r.left + r.width * x, r.top + r.height * y);
+          return top !== null && (el.contains(top) || top.contains(el));
+        }));
+        return { inside, clear };
+      });
+      expect(seen, `${selector} at ${width}`).toEqual({ inside: true, clear: true });
+    }
+  }
 });

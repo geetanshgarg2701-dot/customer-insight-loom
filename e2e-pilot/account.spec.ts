@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { navTo } from "../e2e/nav-helper";
 
 const MOCK = "https://pilot-mock.test";
 const CORS = {
@@ -87,7 +88,7 @@ test("a pilot account signs in, saves the ledger, loads it back after a reload, 
   await page.getByLabel("Hypothesis").fill("A short hypothesis");
   await page.getByRole("button", { name: "Create draft" }).click();
   await expect(page.getByRole("table", { name: "Ledger entries" })).toBeVisible({ timeout: 60_000 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Account" }).click();
+  await navTo(page, "Account");
 
   // Short passwords and bad emails are refused before any request.
   await page.getByLabel("Email").fill("pilot@example.com");
@@ -125,9 +126,9 @@ test("a pilot account signs in, saves the ledger, loads it back after a reload, 
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Load Demo project into the ledger" }).click();
   await expect(page.getByRole("status")).toContainText('Loaded "Demo project" into the ledger.');
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ledger" }).click();
+  await navTo(page, "Ledger");
   await expect(page.getByRole("table", { name: "Ledger entries" }).getByRole("link", { name: "Pilot entry" })).toBeVisible();
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Account" }).click();
+  await navTo(page, "Account");
 
   // Delete everything, behind a typed word.
   const del = page.getByRole("button", { name: "Delete all my saved projects" });

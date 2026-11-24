@@ -3,28 +3,19 @@ import { expect, test, type Page } from "@playwright/test";
 
 const animationOf = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationName);
 
-async function closeTour(page: Page) {
-  const tour = page.getByRole("dialog");
-  await expect(tour).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(tour).toBeHidden();
-}
-
 test("the Reduce motion switch turns motion off for the tab, and on again, without storing anything", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
-  await closeTour(page);
   const nav = page.getByRole("navigation", { name: "Main" });
   const sw = nav.getByRole("button", { name: "Reduce motion" });
   await expect(sw).toHaveAttribute("aria-pressed", "false");
-  expect(await animationOf(page, ".hero h1 .line > span")).toBe("line-up");
+  expect(await animationOf(page, ".hero h1 .line")).toBe("line-up");
 
   await sw.click();
   await expect(sw).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce");
-  expect(await animationOf(page, ".hero h1 .line > span")).toBe("none");
-  expect(await animationOf(page, ".layer.l4")).toBe("none");
-  expect(await animationOf(page, "nav.topnav")).toBe("none");
+  expect(await animationOf(page, ".hero h1 .line")).toBe("none");
+  expect(await animationOf(page, ".hero-funnel svg")).toBe("none");
 
   // Nothing is stored, so a reload starts with motion allowed again.
   const stored = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookies: document.cookie }));
@@ -33,7 +24,7 @@ test("the Reduce motion switch turns motion off for the tab, and on again, witho
   await sw.click();
   await expect(sw).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("html")).not.toHaveAttribute("data-motion", /./);
-  expect(await animationOf(page, ".hero h1 .line > span")).toBe("line-up");
+  expect(await animationOf(page, ".hero h1 .line")).toBe("line-up");
 });
 
 test("while the journeys load there is a skeleton and a plain line, and the charts follow the switch", async ({ page }) => {

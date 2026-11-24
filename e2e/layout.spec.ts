@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { navTo } from "./nav-helper";
 
-// The app look applies to every screen: the near black canvas, the system font and the top menu with the current screen marked.
+// The app look applies to every screen: the soft gray white canvas, the system font and the top menu with the current screen marked.
 // Every screen fits a phone, 375 pixels wide, with no sideways scroll.
-const CANVAS = "rgb(3, 3, 3)";
+const CANVAS = "rgb(236, 237, 239)";
 
 async function expectFits(page: Page, where: string) {
   const { scroll, client } = await page.evaluate(() => ({
@@ -22,7 +22,7 @@ test.describe("phone width", () => {
       await expect(page.getByRole("main")).toBeVisible();
       expect(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(CANVAS);
       expect(await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/^system-ui/);
-      expect(await page.getByRole("navigation", { name: "Main" }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(3, 3, 3, 0.72)");
+      expect(await page.getByRole("navigation", { name: "Main" }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(CANVAS);
       await expect(page).not.toHaveTitle(/Create Next App/);
       await expectFits(page, path);
     });

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { PILOT } from "@/lib/pilot/enabled";
 import { GuidedTour } from "./guided-tour";
+import { HeroFunnel } from "./hero-funnel";
 
 type Screen = { href: string; name: string; what: string };
 
@@ -43,78 +43,31 @@ export default function Home() {
   return (
     <main>
       <div className="hero">
-        <div className="hero-copy">
-          <span className="badge">Your files stay in your browser</span>
-          <h1>
-            <span className="line">
-              <span>Customer Insight</span>
-            </span>{" "}
-            <span className="line">
-              <span>Loom</span>
-            </span>
-          </h1>
-          <p className="home-lead">
-            Customer journeys, pipelines and email experiments in one picture, with the evidence kept and the uncertainty
-            shown. When a result is too small to tell, it says so plainly.
-          </p>
-          <div className="cta">
-            <Link className="button-link" href="/ledger">
-              Start with the experiment ledger
-            </Link>
-            <Link className="button-link plain" href="/journeys">
-              Explore customer journeys
-            </Link>
-          </div>
-          <dl className="hero-stats">
-            <div>
-              <dd>
-                <span className="sr-only">100,000</span>
-                <span className="count" style={{ "--to": 100 } as CSSProperties} aria-hidden="true" />
-                <span aria-hidden="true">k</span>
-              </dd>
-              <dt>demo customers</dt>
-            </div>
-            <div>
-              <dd>
-                <span className="sr-only">95 percent</span>
-                <span className="count" style={{ "--to": 95 } as CSSProperties} aria-hidden="true" />
-                <span aria-hidden="true">%</span>
-              </dd>
-              <dt>range on results</dt>
-            </div>
-            <div>
-              <dd>0</dd>
-              <dt>files uploaded</dt>
-            </div>
-          </dl>
+        <h1>
+          <span className="line">Customer Insight Loom</span> <span className="line">shows if your campaign really worked,</span>{" "}
+          <span className="line light">or if luck did the work.</span>
+        </h1>
+        <p className="home-lead">
+          Plan the test, hold back a control group, and read one result with its range.{" "}
+          {PILOT ? "Files stay in this tab unless you save one to your account." : "Your files never leave this tab."}
+        </p>
+        <div className="cta">
+          <Link className="button-link" href="/ledger">
+            Start with the ledger
+          </Link>
+          <Link href="/journeys">Explore journeys</Link>
         </div>
-        <div className="hero-visual" aria-hidden="true">
-          <div className="stack">
-            <i className="layer l1" />
-            <i className="layer l2" />
-            <i className="layer l3" />
-            <i className="layer l4" />
-          </div>
-          <div className="float-card fc1">
-            Experiment ledger
-            <strong>Lift +1.8 points</strong>
-            Range 0.6 to 3.0. Example.
-          </div>
-          <div className="float-card fc2">
-            Journeys
-            <strong>100,000 demo customers</strong>
-            Where people drop off. Example.
-          </div>
-        </div>
+        <GuidedTour />
+        <HeroFunnel />
       </div>
-
-      <GuidedTour />
 
       <div className="home-groups">
         {GROUPS.map((g) => (
           <section key={g.id} aria-labelledby={`h-${g.id}`}>
-            <h2 id={`h-${g.id}`}>{g.title}</h2>
-            <p>{g.intro}</p>
+            <div>
+              <h2 id={`h-${g.id}`}>{g.title}</h2>
+              <p>{g.intro}</p>
+            </div>
             <ul>
               {g.screens.map((s) => (
                 <li key={s.href}>

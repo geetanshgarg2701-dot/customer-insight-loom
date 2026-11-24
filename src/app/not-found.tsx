@@ -3,11 +3,16 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main>
-      <h1>Page not found</h1>
-      <p>There is nothing at this address. It may have been moved, or the link may have a typo.</p>
-      <p>
-        <Link href="/">Go to the home page</Link>
-      </p>
+      <div className="hero">
+        <h1>
+          <span className="line">Page not found.</span> <span className="line light">It may have moved, or the link has a typo.</span>
+        </h1>
+        <div className="cta">
+          <Link className="button-link" href="/">
+            Go to the home page
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }
