@@ -15,6 +15,8 @@ import { Chart } from "../journeys/chart";
 import { explainCohorts, explainDwell, explainFunnel, explainOutlook, explainPeriods, explainRecords, explainSnapshot, explainStalled } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { LoadingSkeleton } from "../skeleton";
+import { RangeCell, RangeHeader, TableScroll } from "../range-bar";
+import { differenceAxis, rangeSentence, rateAxis, rateSentence } from "@/lib/app/range";
 
 const TITLES: Record<PipelineDimension, string> = {
   segment: "Segment",
@@ -753,6 +755,10 @@ export default function PipelinePage() {
                     not be read as a trend.
                   </p>
                 )}
+                {(() => {
+                  const axis = differenceAxis(periods.rows.map((r) => ({ difference: r.difference, low: r.interval.low, high: r.interval.high })));
+                  return (
+                <TableScroll label="Period comparison table">
                 <table aria-label="Period comparison">
                   <thead>
                     <tr>
@@ -762,6 +768,7 @@ export default function PipelinePage() {
                       <th>Difference</th>
                       <th>95 percent interval</th>
                       <th>Clear difference</th>
+                      {axis && <RangeHeader axis={axis} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -775,10 +782,14 @@ export default function PipelinePage() {
                           {formatSignedPoints(r.interval.low, 1)} to {formatSignedPoints(r.interval.high, 1)}
                         </td>
                         <td>{r.significant ? "yes" : "no, inconclusive"}</td>
+                        {axis && <RangeCell axis={axis} value={r.difference} low={r.interval.low} high={r.interval.high} sentence={`${r.stage}. ${rangeSentence(r.interval.low, r.interval.high, r.difference, 95, (v) => formatSignedPoints(v, 1), "Difference")}`} />}
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </TableScroll>
+                  );
+                })()}
                 <Explain summary="How the period comparison was worked out" items={explainPeriods(periods)} />
                 <p>
                   A clear difference says the two periods differ, not why. Something else may have changed at the same time,
@@ -798,6 +809,10 @@ export default function PipelinePage() {
             </p>
             {outlook && (
               <>
+                {(() => {
+                  const axis = rateAxis(outlook.stages.map((s) => ({ rate: s.rate, low: s.rateLow, high: s.rateHigh })));
+                  return (
+                <TableScroll label="Outlook for open deals table">
                 <table className="short-first" aria-label="Outlook for open deals">
                   <thead>
                     <tr>
@@ -807,6 +822,7 @@ export default function PipelinePage() {
                       <th>Chance of winning</th>
                       <th>Expected wins</th>
                       <th>Range</th>
+                      {axis && <RangeHeader axis={axis} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -824,6 +840,7 @@ export default function PipelinePage() {
                         <td>
                           {Math.round(s.low).toLocaleString("en-US")} to {Math.round(s.high).toLocaleString("en-US")}
                         </td>
+                        {axis && <RangeCell axis={axis} value={s.rate} low={s.rateLow} high={s.rateHigh} sentence={`${s.stage}, chance of winning. ${rateSentence(s.rate, s.rateLow, s.rateHigh, axis, (v) => formatPercent(v, 1))}`} />}
                       </tr>
                     ))}
                   </tbody>
@@ -837,9 +854,13 @@ export default function PipelinePage() {
                       <td>
                         {Math.round(outlook.totals.low).toLocaleString("en-US")} to {Math.round(outlook.totals.high).toLocaleString("en-US")}
                       </td>
+                      {axis && <td className="rb-col" />}
                     </tr>
                   </tfoot>
                 </table>
+                </TableScroll>
+                  );
+                })()}
                 <p>
                   The range comes from not knowing the win rates exactly. On top of that, the real count varies by chance, by about{" "}
                   {Math.round(outlook.totals.chanceSpread).toLocaleString("en-US")} either way. {outlook.totals.stalled.toLocaleString("en-US")}{" "}

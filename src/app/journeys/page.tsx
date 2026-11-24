@@ -23,6 +23,8 @@ import { explainWhy, explainAnchored, explainBehind, explainComparison, explainR
 import { Explain } from "../explain";
 import { Chart } from "./chart";
 import { LoadingSkeleton } from "../skeleton";
+import { RangeCell, RangeHeader, TableScroll } from "../range-bar";
+import { rateAxis, rateSentence } from "@/lib/app/range";
 import { JourneyCanvas, type DesignedRules } from "./canvas";
 import { barEmphasis, barItem, useChartTheme, type ChartTheme } from "./theme";
 
@@ -803,6 +805,10 @@ export default function JourneysPage() {
                     ? ` ${behind.elsewhere.toLocaleString("en-US")} went somewhere the design does not show.`
                     : ""}
                 </p>
+                {(() => {
+                  const axis = behind.next === null ? null : rateAxis(behind.groups.filter((g) => g.rate !== null).map((g) => ({ rate: g.rate as number, low: g.low ?? (g.rate as number), high: g.high ?? (g.rate as number) })));
+                  return (
+                <TableScroll label="Behind a step table">
                 <table aria-label="Behind a step">
                   <thead>
                     <tr>
@@ -811,6 +817,7 @@ export default function JourneysPage() {
                       {behind.next !== null && <th scope="col">Went on to {behind.next}</th>}
                       {behind.next !== null && <th scope="col">Left at {behind.step}</th>}
                       {behind.next !== null && <th scope="col">Rate of going on, with range</th>}
+                      {axis && <RangeHeader axis={axis} />}
                     </tr>
                   </thead>
                   <tbody>
@@ -827,10 +834,14 @@ export default function JourneysPage() {
                               : `${formatPercent(g.rate, 1)}, ${formatPercent(g.low ?? 0, 1)} to ${formatPercent(g.high ?? 0, 1)}`}
                           </td>
                         )}
+                        {axis && (g.rate === null ? <td className="rb-col" /> : <RangeCell axis={axis} value={g.rate} low={g.low ?? g.rate} high={g.high ?? g.rate} sentence={`${g.label}. ${rateSentence(g.rate, g.low ?? g.rate, g.high ?? g.rate, axis, (v) => formatPercent(v, 1))}`} />)}
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </TableScroll>
+                  );
+                })()}
                 <p>Groups with a lower rate go with more people leaving here. That is an association, not a cause.</p>
                 <Explain summary="How who is behind a step was worked out" items={explainBehind(behind)} />
               </div>

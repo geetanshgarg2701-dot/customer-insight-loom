@@ -1137,3 +1137,89 @@ main .skeleton[role="status"]:not(section):not(:empty) {
 .react-flow__attribution {
   background: var(--surface) !important;
 }
+
+/* A rate and its range in a table row: a dot and a whisker on one axis shared by the table. Square edges, no shadow, no gradient. */
+.table-scroll {
+  overflow-x: auto;
+  margin-bottom: var(--gap);
+}
+.table-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.table-scroll > table {
+  margin-bottom: 0;
+}
+th.rb-col,
+td.rb-col {
+  min-width: 11rem;
+  width: 11rem;
+}
+th.rb-col {
+  font-weight: 500;
+}
+.rb-ticks {
+  position: relative;
+  display: block;
+  height: 1.1rem;
+  margin: 0.15rem 0.7rem 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.rb-ticks > span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.rb-ticks > span[data-end="start"] {
+  transform: none;
+}
+.rb-ticks > span[data-end="end"] {
+  transform: translateX(-100%);
+}
+.rb {
+  position: relative;
+  height: 1.6rem;
+  margin: 0 0.7rem;
+}
+.rb > i {
+  position: absolute;
+  display: block;
+}
+.rb-axis {
+  left: 0;
+  right: 0;
+  top: calc(50% - 0.5px);
+  height: 1px;
+  background: var(--control);
+}
+.rb-zero {
+  top: 0.15rem;
+  bottom: 0.15rem;
+  width: 1px;
+  background: var(--control);
+}
+.rb-whisker {
+  top: calc(50% - 1px);
+  height: 0;
+  border-top: 2px solid var(--text-2);
+}
+.rb[data-crosses="true"] .rb-whisker {
+  border-top-style: dashed;
+}
+.rb-cap {
+  top: calc(50% - 5px);
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: var(--text-2);
+}
+.rb-dot {
+  top: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--text);
+}
