@@ -67,7 +67,9 @@ test("a draft is built in the named framework, blocked until the address and sta
 
   // The draft becomes a ledger entry that carries the framework and the complaint.
   await section.getByRole("button", { name: "Make a draft ledger entry from this" }).click();
-  await expect(section.getByText(/^Made a draft ledger entry\./)).toBeVisible();
+  // The first use of the in-browser database starts it, which takes about 1.4 seconds alone and far longer when the whole
+  // suite is running, so this one wait is longer than the 5 second default.
+  await expect(section.getByText(/^Made a draft ledger entry\./)).toBeVisible({ timeout: 45_000 });
   await navTo(page, "Ledger");
   await page.getByRole("link", { name: "Email: A simpler answer on shipping" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Email: A simpler answer on shipping" })).toBeVisible();
