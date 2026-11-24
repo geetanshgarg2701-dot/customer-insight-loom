@@ -18,18 +18,20 @@ test("the designed journey shows the generator's live numbers on every step, ope
   await load(page);
   const section = page.getByRole("region", { name: "Designed journey" });
 
-  // Live numbers are real text inside each node.
+  // Each step shows its name and its count, and every number is in its accessible name too.
   const cart = section.getByRole("group", { name: /^Cart, main step\./ });
-  await expect(cart).toContainText(`Entered ${n(entered("Cart"))}`);
-  await expect(cart).toContainText(`Ended here ${n(endedAt("Cart"))}`);
+  await expect(cart).toContainText(n(entered("Cart")));
+  await expect(cart).toHaveAttribute("aria-label", new RegExp(`Entered ${n(entered("Cart"))}`));
   const search = section.getByRole("group", { name: /^Search, detour\./ });
-  await expect(search).toContainText(`Entered ${n(entered("Search"))}`);
-  await expect(search).toContainText("Time to next not measured");
+  await expect(search).toContainText(n(entered("Search")));
+  await expect(search).toHaveAttribute("aria-label", new RegExp(`Entered ${n(entered("Search"))}, went on .*, ended here ${n(endedAt("Search"))}`));
 
   // The table version has the same numbers.
   await section.getByText("Show as table").click();
   const steps = section.getByRole("table", { name: "Designed journey steps" });
   await expect(steps.getByRole("row", { name: /^Support / })).toContainText(n(entered("Support")));
+  await expect(steps.getByRole("row", { name: /^Cart / })).toContainText(n(endedAt("Cart")));
+  await expect(steps.getByRole("row", { name: /^Search / })).toContainText("not measured");
   const edges = section.getByRole("table", { name: "Designed journey connections" });
   const cartToPurchase = rows.filter((r) => r.path.some((s, i) => s === "Cart" && r.path[i + 1] === "Purchase")).length;
   await expect(edges.getByRole("row", { name: /^Cart Purchase / })).toContainText(n(cartToPurchase));
@@ -67,7 +69,7 @@ test("the designed journey follows the filters", async ({ page }) => {
   await page.getByRole("group", { name: "Filter by segment" }).getByRole("button", { name: /^new, / }).click();
   const fresh = rows.filter((r) => r.segment === "new");
   const e = fresh.filter((r) => r.path.includes("Cart")).length;
-  await expect(section.getByRole("group", { name: /^Cart, main step\./ })).toContainText(`Entered ${n(e)}`);
+  await expect(section.getByRole("group", { name: /^Cart, main step\./ })).toHaveAttribute("aria-label", new RegExp(`Entered ${n(e)}`));
 });
 
 test("the designed journey can be reached from the keyboard, has no axe violations, and the page fits a phone", async ({ page }) => {

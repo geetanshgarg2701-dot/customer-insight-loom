@@ -2,144 +2,36 @@
 
 import type { DetourStep } from "@/lib/charts/behind";
 import { useDeferredValue, useMemo, useState } from "react";
-import { Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { MarkerType, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { PathCount } from "@/lib/charts/anchored";
-import { DESIGNED_JOURNEY, edgeCounts, stepStats, transitionsNotDesigned, wouldCreateCycle, type DesignedNode } from "@/lib/charts/designed";
+import { DESIGNED_JOURNEY, edgeCounts, stepStats, transitionsNotDesigned, wouldCreateCycle } from "@/lib/charts/designed";
+import { finalStage, layoutBands, stageFromWait, withDetour, type StageParts } from "@/lib/charts/butterfly";
 import { formatDuration, type Timing } from "@/lib/charts/timing";
 import { INACTIVE_CHOICES, WAIT_CHOICES, type ExitResult, type WaitResult } from "@/lib/charts/rules";
-import { formatPercent } from "@/lib/app/format";
 import { downloadText } from "@/lib/app/download";
 import { designToFile, markLoops, readDesignFile } from "@/lib/charts/design-file";
 import { explainDesigned, explainRules } from "@/lib/app/explain-views";
 import { Explain } from "../explain";
 import { CSS_CHART } from "./theme";
-
-type StepData = {
-  label: string;
-  kind: DesignedNode["kind"];
-  mainIndex: number | null;
-  reached: boolean;
-  entered: number;
-  completed: number;
-  endedHere: number;
-  share: number;
-  medianToNext: string | null;
-  [key: string]: unknown;
-};
+import { BAND_EDGE_TYPES, BAND_NODE_TYPES, bandFlow } from "./flow-bands";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
-/** One step of the journey, with its live numbers as real text, so nothing depends on seeing the picture. */
-function StepNode({ data }: NodeProps<Node<StepData>>) {
-  return (
-    <div
-      style={{
-        width: 160,
-        padding: "8px 10px",
-        background: CSS_CHART.fill,
-        color: CSS_CHART.text,
-        border: `${data.kind === "branch" ? "1px dashed" : "2px solid"} ${data.kind === "branch" ? CSS_CHART.palette[1] : CSS_CHART.palette[0]}`,
-        fontFamily: CSS_CHART.fontFamily,
-        fontSize: 14,
-        lineHeight: 1.35,
-      }}
-    >
-      <Handle id="l" type="target" position={Position.Left} />
-      <Handle id="r" type="source" position={Position.Right} />
-      <Handle id="bt" type="target" position={Position.Bottom} style={{ left: "30%" }} />
-      <Handle id="bs" type="source" position={Position.Bottom} style={{ left: "70%" }} />
-      <strong style={{ fontSize: 17 }}>{data.label}</strong>
-      <div>{data.kind === "branch" ? "Detour" : "Main step"}</div>
-      {data.reached ? (
-        <>
-          <div>Entered {n(data.entered)}</div>
-          <div>Went on {n(data.completed)}</div>
-          <div>Ended here {n(data.endedHere)}</div>
-          <div>{formatPercent(data.share, 1)} of everyone</div>
-          <div>{data.medianToNext === null ? "Time to next not measured" : `Median to next ${data.medianToNext}`}</div>
-        </>
-      ) : (
-        <div>Nobody reached this step.</div>
-      )}
-    </div>
-  );
-}
-
-type RuleData = { title: string; lines: string[]; [key: string]: unknown };
-
-/** A designed rule, a wait or an exit, with its live counts as real text. Drawn dashed, since it is not an event in the data. */
-function RuleNode({ data }: NodeProps<Node<RuleData>>) {
-  return (
-    <div
-      style={{
-        width: 200,
-        padding: "8px 10px",
-        background: CSS_CHART.fill,
-        color: CSS_CHART.text,
-        border: `1px dashed ${CSS_CHART.palette[2]}`,
-        fontFamily: CSS_CHART.fontFamily,
-        fontSize: 13,
-        lineHeight: 1.35,
-      }}
-    >
-      <Handle id="l" type="target" position={Position.Left} />
-      <Handle id="t" type="target" position={Position.Top} />
-      <strong style={{ fontSize: 15 }}>{data.title}</strong>
-      {data.lines.map((line) => (
-        <div key={line}>{line}</div>
-      ))}
-    </div>
-  );
-}
-
-const nodeTypes = { step: StepNode, rule: RuleNode };
-
-export type DesignedRules = { wait: WaitResult; exit: ExitResult };
 const MAIN_STEPS = DESIGNED_JOURNEY.nodes.filter((d) => d.mainIndex !== null);
+export type DesignedRules = { wait: WaitResult; exit: ExitResult };
 
-function ruleNodes(rules: DesignedRules | null): { nodes: Node<RuleData>[]; edges: Edge[] } {
-  if (!rules) return { nodes: [], edges: [] };
-  const { wait, exit } = rules;
-  const anchor = MAIN_STEPS[MAIN_STEPS.findIndex((d) => d.label === wait.step)];
-  const days = `${wait.days} ${wait.days === 1 ? "day" : "days"}`;
-  const waitLines = [
-    `${n(wait.within)} went on to ${wait.next} within it`,
-    `${n(wait.later)} went on later`,
-    `${n(wait.stillWaiting)} still waiting`,
-    `${n(wait.outlasted)} sat through it`,
-  ];
-  const exitLines = [
-    `${n(exit.goal)} reached the goal`,
-    `${n(exit.inactive)} inactive for ${exit.inactiveDays} days or more`,
-    `${n(exit.active)} still active`,
-  ];
-  const nodes: Node<RuleData>[] = [
-    {
-      id: "rule-wait",
-      type: "rule",
-      position: { x: anchor.x - 20, y: 410 },
-      data: { title: `Wait ${days} after ${wait.step}`, lines: waitLines },
-      width: 200,
-      height: 130,
-      ariaLabel: `Designed wait of ${days} after ${wait.step}. ${waitLines.join(", ")}.`,
-    },
-    {
-      id: "rule-exit",
-      type: "rule",
-      position: { x: 1020, y: 410 },
-      data: { title: "Exit conditions", lines: exitLines },
-      width: 200,
-      height: 110,
-      ariaLabel: `Designed exit conditions. ${exitLines.join(", ")}.`,
-    },
-  ];
-  const line = { stroke: CSS_CHART.palette[2], strokeDasharray: "4 4", strokeWidth: 1.5 };
-  const edges: Edge[] = [
-    { id: "rule-wait-edge", source: anchor.id, target: "rule-wait", sourceHandle: "bs", targetHandle: "t", style: line },
-    { id: "rule-exit-edge", source: "Purchase", target: "rule-exit", sourceHandle: "bs", targetHandle: "t", style: line },
-  ];
-  return { nodes, edges };
+/** The geometry of the bands: one scale for the whole flow, every pillar on one center line. */
+const LAYOUT = { maxHeight: 220, centerY: 270, columnGap: 300, pillarWidth: 28 };
+
+/** Which stage a node belongs to, so hovering or focusing any part of a stage lights up the whole stage. */
+function stageOf(id: string): number | null {
+  const main = MAIN_STEPS.findIndex((d) => d.id === id);
+  if (main >= 0) return main;
+  const detour = DESIGNED_JOURNEY.nodes.find((d) => d.id === id);
+  if (detour && detour.mainIndex === null) return id === "Search" ? 0 : id === "Support" ? 2 : null;
+  const stub = /^(?:drop|wait)-(\d)$/.exec(id);
+  return stub ? Number(stub[1]) : null;
 }
 
 const ARIA_LABELS = {
@@ -160,6 +52,7 @@ export function JourneyCanvas({
   onOpenStep,
   onOpenDetour,
   rules,
+  stageWaits: liveWaits,
   waitStep,
   waitDays,
   inactiveDays,
@@ -172,6 +65,8 @@ export function JourneyCanvas({
   onOpenStep: (index: number) => void;
   onOpenDetour: (step: DetourStep) => void;
   rules: DesignedRules | null;
+  /** The wait counted after each of the first three stages, with the chosen length, for the bands. */
+  stageWaits: WaitResult[] | null;
   waitStep: number;
   waitDays: number;
   inactiveDays: number;
@@ -183,6 +78,7 @@ export function JourneyCanvas({
   // the "Updated in" figure, finish first, and the canvas catches up right after.
   const paths = useDeferredValue(livePaths);
   const timing = useDeferredValue(liveTiming);
+  const stageWaits = useDeferredValue(liveWaits);
   const stats = useMemo(() => stepStats(paths), [paths]);
   const counts = useMemo(() => edgeCounts(paths), [paths]);
   const missing = useMemo(() => transitionsNotDesigned(paths), [paths]);
@@ -210,54 +106,77 @@ export function JourneyCanvas({
       setOpened(`Opened who is behind ${d.label}, below under Behind a step.`);
     }
   }
-  const maxCount = Math.max(1, ...DESIGNED_JOURNEY.edges.map((e) => counts.get(e.id) ?? 0));
+  // The three parts of each stage, counted once by the wait rule. A detour's share can lag the wait by a moment, since they are
+  // separate counts, so it is held between none and everyone who went on.
+  const stages: StageParts[] | null = useMemo(() => {
+    if (!stageWaits || stageWaits.length !== 3) return null;
+    const via = [counts.get("Search>Product") ?? 0, 0, counts.get("Support>Purchase") ?? 0];
+    const parts = stageWaits.map((w, k) => {
+      const base = stageFromWait(w);
+      return withDetour(base, Math.min(via[k], base.wentOn));
+    });
+    return [...parts, finalStage("Purchase", stats.get("Purchase")?.entered ?? 0)];
+  }, [stageWaits, counts, stats]);
+  const layout = useMemo(() => (stages ? layoutBands(stages, LAYOUT) : null), [stages]);
+  const [activeStage, setActiveStage] = useState<number | null>(null);
 
-  const nodes: Node<StepData>[] = useMemo(() => DESIGNED_JOURNEY.nodes.map((d) => {
-    const s = stats.get(d.id);
-    const median = d.mainIndex !== null ? timing?.steps[d.mainIndex]?.medianHours : null;
-    const data: StepData = {
-      label: d.label,
-      kind: d.kind,
-      mainIndex: d.mainIndex,
-      reached: s !== undefined,
-      entered: s?.entered ?? 0,
-      completed: s?.completed ?? 0,
-      endedHere: s?.endedHere ?? 0,
-      share: s?.share ?? 0,
-      medianToNext: median === null || median === undefined ? null : formatDuration(median),
-    };
-    return {
-      id: d.id,
-      type: "step",
-      position: { x: d.x, y: d.y },
-      data,
-      width: 160,
-      height: 130,
-      ariaLabel: s
-        ? `${d.label}, ${d.kind === "branch" ? "detour" : "main step"}. Entered ${n(s.entered)}, went on ${n(s.completed)}, ended here ${n(s.endedHere)}.`
-        : `${d.label}. Nobody reached this step.`,
-    };
-  }), [stats, timing]);
+  const flow = useMemo(() => {
+    if (!layout) return { nodes: [] as Node[], edges: [] as Edge[] };
+    const detours = [
+      { id: "Search", label: "Search", count: stats.get("Search")?.entered ?? 0, fromStage: 0 },
+      { id: "Support", label: "Support", count: stats.get("Support")?.entered ?? 0, fromStage: 2 },
+    ];
+    const built = bandFlow({ layout, detours, active: activeStage, columnGap: LAYOUT.columnGap, pillarWidth: LAYOUT.pillarWidth, labels: MAIN_STEPS.map((d) => d.label) });
+    // Every number is also in the accessible name, so nothing depends on seeing the picture.
+    const nodes = built.nodes.map((node) => {
+      const k = MAIN_STEPS.findIndex((d) => d.id === node.id);
+      if (k >= 0 && stages) {
+        const s = stages[k];
+        const label =
+          s.next === null
+            ? `${s.stage}, main step. Entered ${n(s.intake)}. Nobody goes on from here.`
+            : `${s.stage}, main step. Entered ${n(s.intake)}, went on ${n(s.wentOn)}, dropped off ${n(s.droppedOff)}, still waiting ${n(s.stillWaiting)}.`;
+        return { ...node, ariaLabel: label };
+      }
+      const detour = node.id === "Search" || node.id === "Support" ? stats.get(node.id) : undefined;
+      if (detour) return { ...node, ariaLabel: `${node.id}, detour. Entered ${n(detour.entered)}, went on ${n(detour.completed)}, ended here ${n(detour.endedHere)}.` };
+      return node;
+    });
+    return { nodes, edges: built.edges };
+  }, [layout, stages, stats, activeStage]);
 
-  const designedRules = useMemo(() => ruleNodes(rules), [rules]);
+  /** What the panel says about one stage or detour. */
+  function panelLines(k: number): string[] {
+    if (!stages) return [];
+    const s = stages[k];
+    const median = timing?.steps[k]?.medianHours;
+    if (s.next === null) {
+      const lines = [`${n(s.intake)} reached ${s.stage}, the end of the journey.`];
+      if (rules) {
+        lines.push(`${n(rules.exit.goal)} reached the goal.`, `${n(rules.exit.inactive)} inactive for ${rules.exit.inactiveDays} days or more.`, `${n(rules.exit.active)} still active.`);
+      }
+      return lines;
+    }
+    const days = stageWaits?.[k]?.days ?? waitDays;
+    const lines = [
+      `${n(s.intake)} reached ${s.stage}.`,
+      `${n(s.wentOn)} went on to ${s.next}${s.via > 0 ? `, ${n(s.via)} of them through a detour` : ""}.`,
+      `${n(s.droppedOff)} dropped off. They had not moved on, and the wait of ${days} ${days === 1 ? "day" : "days"} was over at the data cutoff.`,
+      `${n(s.stillWaiting)} still waiting. The wait of ${days} ${days === 1 ? "day" : "days"} was not over at the data cutoff.`,
+    ];
+    lines.push(median === null || median === undefined ? "Time to the next step is not measured." : `Median time to the next step is ${formatDuration(median)}.`);
+    if (k === waitStep) lines.push(`Your designed wait of ${days} ${days === 1 ? "day" : "days"} is set here.`);
+    return lines;
+  }
+  const panelTitle = activeStage === null || !stages ? null : stages[activeStage].stage;
 
-  const designedEdges: Edge[] = useMemo(() => DESIGNED_JOURNEY.edges.map((e) => {
-    const c = counts.get(e.id) ?? 0;
-    return {
-      id: e.id,
-      source: e.from,
-      target: e.to,
-      sourceHandle: "r",
-      targetHandle: "l",
-      label: `${n(c)}`,
-      style: { stroke: CSS_CHART.palette[0], strokeWidth: 1 + (6 * c) / maxCount },
-      labelStyle: { fill: CSS_CHART.text, fontFamily: CSS_CHART.fontFamily, fontSize: 12 },
-      labelBgStyle: { fill: CSS_CHART.fill, stroke: CSS_CHART.line },
-      labelBgPadding: [4, 2] as [number, number],
-      labelBgBorderRadius: 4,
-      markerEnd: { type: MarkerType.ArrowClosed, color: CSS_CHART.palette[0] },
-    };
-  }), [counts, maxCount]);
+  /** Hovering or focusing any part of a stage shows its numbers, the same for the pointer and the keyboard. */
+  function activate(target: EventTarget | null) {
+    const el = (target as HTMLElement | null)?.closest?.(".react-flow__node[data-id]");
+    const id = el?.getAttribute("data-id");
+    const k = id ? stageOf(id) : null;
+    if (k !== null) setActiveStage(k);
+  }
 
   // A sketched connection that makes a loop is a back-edge: it leaves from and arrives at the bottom of the steps.
   const sketchEdges: Edge[] = sketch.map((s, i) => ({
@@ -324,6 +243,12 @@ export function JourneyCanvas({
     <div>
       <div
         style={{ height: 560, border: `1px solid ${CSS_CHART.line}`, background: CSS_CHART.fill }}
+        onMouseOver={(e) => activate(e.target)}
+        onMouseLeave={() => setActiveStage(null)}
+        onFocus={(e) => activate(e.target)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as globalThis.Node | null)) setActiveStage(null);
+        }}
         onKeyDown={(e) => {
           // React Flow selects a focused node on Enter or Space but sends no click, so a keyboard user would never open it.
           if (e.key !== "Enter" && e.key !== " ") return;
@@ -333,21 +258,45 @@ export function JourneyCanvas({
         }}
       >
         <ReactFlow
-          // The view fits the nodes when it starts, and the rule nodes arrive a moment later, so it starts again once they have.
-          key={rules ? "with-rules" : "without-rules"}
-          nodes={[...nodes, ...designedRules.nodes] as Node[]}
-          edges={[...designedEdges, ...designedRules.edges, ...sketchEdges]}
-          nodeTypes={nodeTypes}
+          // The view fits the nodes when it starts, and the bands arrive a moment later, so it starts again once they have.
+          key={layout ? "with-bands" : "without-bands"}
+          nodes={flow.nodes}
+          edges={[...flow.edges, ...sketchEdges]}
+          nodeTypes={BAND_NODE_TYPES}
+          edgeTypes={BAND_EDGE_TYPES}
           nodesDraggable={false}
           nodesConnectable={false}
           zoomOnScroll={false}
           preventScrolling={false}
           fitView
-          fitViewOptions={{ padding: 0.04 }}
+          fitViewOptions={{ padding: 0.04, minZoom: 0.7 }}
           minZoom={0.3}
+          onInit={(rf) => {
+            // On a narrow screen the whole picture cannot be read at once, so it starts at the first step and the person drags along it.
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                const v = rf.getViewport();
+                if (v.zoom <= 0.7 + 1e-6) void rf.setViewport({ x: 16, y: v.y, zoom: v.zoom });
+              }),
+            );
+          }}
           ariaLabelConfig={ARIA_LABELS}
           onNodeClick={(_, node) => openNode(node.id)}
         />
+        <div className="flow-panel" data-open={panelTitle ? "true" : undefined} aria-hidden={panelTitle ? undefined : true}>
+          {panelTitle && activeStage !== null ? (
+            <>
+              <strong>{panelTitle}</strong>
+              <ul>
+                {panelLines(activeStage).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <span>Point at a step, or move to it with the keyboard, to see its numbers.</span>
+          )}
+        </div>
       </div>
       {opened && <p role="status">{opened}</p>}
 
@@ -433,8 +382,10 @@ export function JourneyCanvas({
         </label>
       </p>
       <p>
-        The wait and the exit conditions are designed rules. The counts on them come from the data and follow the filters,
-        and a rule does not send anything.
+        Each step is a pillar as tall as the people who reached it. Those who went on run along the trunk, those who dropped off
+        run down, and those still waiting run up. Every band is as thick as its count, on one scale. The wait and the exit
+        conditions are designed rules. The counts on them come from the data and follow the filters, and a rule does not send
+        anything.
       </p>
 
       <details>
@@ -451,18 +402,48 @@ export function JourneyCanvas({
             </tr>
           </thead>
           <tbody>
-            {nodes.map((x) => (
-              <tr key={x.id}>
-                <td>{x.data.label}</td>
-                <td>{x.data.kind === "branch" ? "Detour" : "Main step"}</td>
-                <td>{n(x.data.entered)}</td>
-                <td>{n(x.data.completed)}</td>
-                <td>{n(x.data.endedHere)}</td>
-                <td>{x.data.medianToNext ?? "not measured"}</td>
-              </tr>
-            ))}
+            {DESIGNED_JOURNEY.nodes.map((d) => {
+              const st = stats.get(d.id);
+              const median = d.mainIndex !== null ? timing?.steps[d.mainIndex]?.medianHours : null;
+              return (
+                <tr key={d.id}>
+                  <td>{d.label}</td>
+                  <td>{d.kind === "branch" ? "Detour" : "Main step"}</td>
+                  <td>{n(st?.entered ?? 0)}</td>
+                  <td>{n(st?.completed ?? 0)}</td>
+                  <td>{n(st?.endedHere ?? 0)}</td>
+                  <td>{median === null || median === undefined ? "not measured" : formatDuration(median)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        {stages && (
+          <table aria-label="Journey bands">
+            <thead>
+              <tr>
+                <th scope="col">Stage</th>
+                <th scope="col">Reached</th>
+                <th scope="col">Went on</th>
+                <th scope="col">Dropped off</th>
+                <th scope="col">Still waiting</th>
+                <th scope="col">Parts add up to those who reached it</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map((s) => (
+                <tr key={s.stage}>
+                  <td>{s.stage}</td>
+                  <td>{n(s.intake)}</td>
+                  <td>{s.next === null ? "not applicable" : n(s.wentOn)}</td>
+                  <td>{s.next === null ? "not applicable" : n(s.droppedOff)}</td>
+                  <td>{s.next === null ? "not applicable" : n(s.stillWaiting)}</td>
+                  <td>{s.next === null ? "not applicable" : s.wentOn + s.droppedOff + s.stillWaiting === s.intake ? "yes" : "no"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {rules && (
           <table aria-label="Designed rules">
             <thead>

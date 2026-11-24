@@ -41,7 +41,8 @@ test("a design is saved to a file and opened again in a fresh page, with nothing
   await expect(canvas2.getByLabel("Inactivity rule")).toHaveValue("90");
   await expect(canvas2.getByRole("alert")).toContainText("1 of the connections make a loop");
   await expect(canvas2.getByRole("alert")).toContainText("1 sketched connection, a 7 day wait, and an exit after 90 days inactive");
-  await expect(canvas2.getByTestId("rf__node-rule-wait").getByText("Wait 7 days after Product")).toBeVisible();
+  await canvas2.getByRole("group", { name: /^Product, main step\./ }).focus();
+  await expect(canvas2.locator(".flow-panel")).toContainText("Your designed wait of 7 days is set here.", { timeout: 60_000 });
 
   // The browser keeps nothing.
   const stored = await page2.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookies: document.cookie }));

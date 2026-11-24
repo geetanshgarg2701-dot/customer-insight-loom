@@ -26,6 +26,7 @@ import { LoadingSkeleton } from "../skeleton";
 import { RangeCell, RangeHeader, TableScroll } from "../range-bar";
 import { rateAxis, rateSentence } from "@/lib/app/range";
 import { JourneyCanvas, type DesignedRules } from "./canvas";
+import type { WaitResult } from "@/lib/charts/rules";
 import { barEmphasis, barItem, useChartTheme, type ChartTheme } from "./theme";
 
 const TITLES: Record<JourneyDimension, string> = {
@@ -289,6 +290,7 @@ export default function JourneysPage() {
   const [timing, setTiming] = useState<Timing | null>(null);
   const [overTime, setOverTime] = useState<StepsOverTime | null>(null);
   const [rules, setRules] = useState<DesignedRules | null>(null);
+  const [stageWaits, setStageWaits] = useState<WaitResult[] | null>(null);
   const [waitStep, setWaitStep] = useState(2);
   const [waitDays, setWaitDays] = useState(3);
   const [inactiveDays, setInactiveDays] = useState(14);
@@ -346,13 +348,23 @@ export default function JourneysPage() {
     setTiming(await board_.timing(hours, sel));
   }, []);
 
+  const stageWaitRun = useRef(0);
   const refreshRules = useCallback(async (sel: Selection) => {
     const board_ = board.current;
     if (!board_) return;
     const choice = ruleChoice.current;
     const next = await board_.rules(sel, choice);
     // A choice changed while this was counting, so a newer count is on its way and this one is out of date.
-    if (choice === ruleChoice.current) setRules(next);
+    if (choice !== ruleChoice.current) return;
+    setRules(next);
+    // The bands need the wait counted after each of the first three stages. They are not waited for, so a filter update takes
+    // as long as it did before, and the bands follow a moment later. A newer count replaces an older one that is still running.
+    const run = ++stageWaitRun.current;
+    void (async () => {
+      const waits: WaitResult[] = [];
+      for (const stepIndex of [0, 1, 2]) waits.push((await board_.rules(sel, { ...choice, stepIndex })).wait);
+      if (run === stageWaitRun.current && choice === ruleChoice.current) setStageWaits(waits);
+    })().catch((e: unknown) => setError(messageOf(e)));
   }, []);
 
   /** The days stay the same under any filter, so the scrubber keeps its day. The first load starts on the last day. */
@@ -728,6 +740,7 @@ export default function JourneysPage() {
                 onOpenStep={(i) => void pickBehind(i)}
                 onOpenDetour={(s) => void pickDetour(s)}
                 rules={rules}
+                stageWaits={stageWaits}
                 waitStep={waitStep}
                 waitDays={waitDays}
                 inactiveDays={inactiveDays}
